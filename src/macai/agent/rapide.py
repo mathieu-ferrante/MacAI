@@ -60,7 +60,12 @@ class CommandesRapides:
             (P(r"^(?:precedent|chanson precedente|musique precedente)$"), lambda m, t: self._media("precedent")),
             (P(r"^(?:prends une |fais une )?capture d'ecran$"), lambda m, t: Plan([("capture_ecran", {})])),
             (P(r"^(?:quelle heure (?:est-il|il est)|il est quelle heure)$"), self._heure),
-            (P(r"^(?:quel jour (?:sommes-nous|on est|est-on)|on est quel jour|quelle est la date)$"), self._date),
+            (P(r"^(?:quel jour (?:sommes-nous|on est|est-on|est-ce)|on est quel jour|quelle est la date(?: d'aujourd'hui)?"
+               r"|quelle date (?:sommes-nous|on est|est-on|est-ce|aujourd'hui)|on est le combien|c'est quoi la date)$"), self._date),
+            (P(r"^(?:(?:etat de la |niveau de )?batterie|(?:combien de|quel niveau de) batterie(?: il me reste| reste-t-il)?"
+               r"|(?:quel est )?l'?espace disque(?: libre)?|infos? systeme)$"), lambda m, t: Plan([("infos_systeme", {})])),
+            (P(r"^(?:etat de la )?(?:memoire|ram)(?: du mac)?|pourquoi (?:le|mon) mac (?:rame|est lent)$"),
+             lambda m, t: Plan([("etat_memoire", {})])),
         ]
 
     def reconnaitre(self, demande: str, registre=None) -> Plan | None:

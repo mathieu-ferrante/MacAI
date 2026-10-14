@@ -77,10 +77,12 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
     deja = {t.chemin for t in trouvailles}
     complements = [c for c in spotlight(requete) if c not in deja][: max(0, 5 - len(trouvailles))]
     lignes += [f"- {c}  (trouvé par Spotlight)" for c in complements]
+    etat = index.stats() if index else {"fichiers": 0}
+    conseil = " L'index est encore vide : l'indexation se fait Mac branché et inutilisé." if not etat["fichiers"] else ""
     if not lignes:
-        etat = index.stats() if index else {"fichiers": 0}
-        conseil = " L'index est encore vide : l'indexation se fait Mac branché et inutilisé." if not etat["fichiers"] else ""
         return Resultat(True, f"Aucun fichier trouvé pour « {requete} ».{conseil}", {"resultats": []})
+    if conseil:
+        lignes.append(f"(Recherche par le sens indisponible :{conseil})")
     return Resultat(True, "\n".join(lignes), {"resultats": [t.chemin for t in trouvailles] + complements})
 
 

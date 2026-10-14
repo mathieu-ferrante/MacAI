@@ -99,17 +99,23 @@ def etat_memoire(ctx):
     return "\n".join(lignes)
 
 
+ETATS_BATTERIE = {"discharging": "sur batterie", "charging": "en charge", "charged": "chargée",
+                  "AC attached": "sur secteur", "finishing charge": "fin de charge"}
+
+
 @outil("infos_systeme", "Batterie, espace disque libre, version de macOS, durée depuis le démarrage.",
        "systeme", {})
 def infos_systeme(ctx):
     batt = commun.executer(["pmset", "-g", "batt"], verifier=False)
     pct = re.search(r"(\d+)%;\s*([^;]+);", batt)
     disque = commun.executer(["df", "-h", "/System/Volumes/Data"], verifier=False).splitlines()
-    libre = disque[1].split()[3] if len(disque) > 1 else "?"
+    libre = disque[1].split()[3].replace("Gi", " Go").replace("Ti", " To") if len(disque) > 1 else "?"
     version = commun.executer(["sw_vers", "-productVersion"], verifier=False).strip()
-    depuis = commun.executer(["uptime"], verifier=False).strip()
+    brut = commun.executer(["uptime"], verifier=False).strip()
+    m = re.search(r"up\s+(.*?),\s+\d+\s+users?", brut)
+    depuis = m.group(1).replace("days", "jours").replace("day", "jour").replace("mins", "min") if m else brut
     return "\n".join([
-        f"Batterie : {pct.group(1)} % ({pct.group(2)})" if pct else "Batterie : inconnue",
+        f"Batterie : {pct.group(1)} % ({ETATS_BATTERIE.get(pct.group(2).strip(), pct.group(2).strip())})" if pct else "Batterie : inconnue",
         f"Disque : {libre} libres", f"macOS {version}", f"Allumé : {depuis}",
     ])
 

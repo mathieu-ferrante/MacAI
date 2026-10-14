@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -31,12 +32,20 @@ CATEGORIES = {
 }
 
 
+def _ecriture_permise(p: Path) -> bool:
+    """Dossier personnel, disques externes et dossier temporaire du système ; jamais le système lui-même."""
+    r = p.resolve()
+    temporaire = Path(tempfile.gettempdir()).resolve()
+    return (r.is_relative_to(Path.home().resolve()) or r.is_relative_to(temporaire)
+            or str(r).startswith("/Volumes/"))
+
+
 def verifier_chemin(p: Path, ecriture: bool = False) -> Path:
     texte = p.as_posix()
     for interdit in INTERDITS:
         if f"/{interdit}" in texte or texte.endswith(interdit):
             raise ErreurOutil(f"Accès refusé à {p} : dossier protégé (clés, mots de passe ou cookies).")
-    if ecriture and sys.platform == "darwin" and not p.is_relative_to(Path.home()) and not str(p).startswith("/Volumes/"):
+    if ecriture and sys.platform == "darwin" and not _ecriture_permise(p):
         raise ErreurOutil(f"Écriture refusée hors du dossier personnel : {p}")
     return p
 

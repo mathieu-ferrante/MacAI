@@ -25,7 +25,8 @@ def _expliquer(erreur: str) -> str:
     if "-1743" in erreur or "Not authorized to send Apple events" in erreur:
         return ("macOS bloque l'automatisation : Réglages Système > Confidentialité et sécurité > "
                 "Automatisation > autorise MacAI pour cette application.")
-    if "-25211" in erreur or "assistive access" in erreur.lower():
+    if ("-25211" in erreur or "-1719" in erreur or "assistive access" in erreur.lower()
+            or "accès d’aide" in erreur or "accès d'aide" in erreur):
         return ("macOS bloque le contrôle des fenêtres : Réglages Système > Confidentialité et sécurité > "
                 "Accessibilité > active MacAI.")
     if "-1728" in erreur:

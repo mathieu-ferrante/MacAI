@@ -156,6 +156,10 @@ def test_commandes_rapides():
     assert r.reconnaitre("pause").actions == [("controle_media", {"action": "pause"})]
     assert r.reconnaitre("quitte Spotify").actions == [("quitter_application", {"nom": "Spotify"})]
     assert r.reconnaitre("Quelle heure est-il ?").reponse.startswith("Il est")
+    assert r.reconnaitre("Quelle date sommes-nous ?").reponse.startswith("Nous sommes le")
+    assert r.reconnaitre("batterie").actions == [("infos_systeme", {})]
+    assert r.reconnaitre("Pourquoi mon Mac rame ?").actions == [("etat_memoire", {})]
+    assert r.reconnaitre("batterie faible : préviens-moi") is None
     # Demandes complexes : laissées à l'agent.
     assert r.reconnaitre("ouvre le fichier rapport.pdf") is None
     assert r.reconnaitre("ouvre onshape et fais moi un cube de 1 m") is None

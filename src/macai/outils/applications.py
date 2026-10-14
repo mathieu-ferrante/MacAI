@@ -92,10 +92,12 @@ def quitter_application(ctx, nom):
        "applications", {})
 def applications_ouvertes(ctx):
     sortie = commun.executer(["lsappinfo", "visibleProcessList"])
-    noms = re.findall(r'"([^"]+)"-ASN', sortie)
+    # macOS 27 : ASN:0x0-0x16016-"Google_Chrome": (espaces remplacés par _) ; anciens : "Nom"-ASN
+    noms = re.findall(r'ASN:[0-9a-fx-]+?-"([^"]+)"', sortie) or re.findall(r'"([^"]+)"-ASN', sortie)
+    noms = [n.replace("_", " ") for n in noms]
     asn = commun.executer(["lsappinfo", "front"], verifier=False).strip()
     avant = commun.executer(["lsappinfo", "info", "-only", "name", asn], verifier=False) if asn else ""
-    front = re.search(r'"LSDisplayName"="([^"]+)"', avant)
+    front = re.search(r'"LSDisplayName"="([^"]+)"', avant) or re.search(r'^"([^"]+)" ASN', avant.strip())
     texte = "Ouvertes : " + ", ".join(noms)
     if front:
         texte += f"\nAu premier plan : {front.group(1)}"
