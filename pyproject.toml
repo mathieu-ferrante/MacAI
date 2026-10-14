@@ -10,6 +10,7 @@ fichiers = ["pypdf>=4", "python-docx>=1.1", "openpyxl>=3.1", "python-pptx>=1.0"]
 recherche = ["numpy>=1.26"]
 securite = ["cryptography>=42"]
 mac = [
+    "pyobjc-framework-Cocoa>=10; sys_platform == 'darwin'",
     "pyobjc-framework-Quartz>=10; sys_platform == 'darwin'",
     "pyobjc-framework-ApplicationServices>=10; sys_platform == 'darwin'",
     "pyobjc-framework-Vision>=10; sys_platform == 'darwin'",
