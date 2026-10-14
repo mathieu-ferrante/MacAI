@@ -39,7 +39,9 @@ MOTS_GROUPES: dict[str, list[str]] = {
 
 GROUPES_DEFAUT = ["applications", "fichiers", "recherche", "web", "systeme"]
 TOUJOURS = ["memoire"]
-MAX_OUTILS = 22
+MAX_OUTILS = 14
+VIDES = {"le", "la", "les", "un", "une", "des", "de", "du", "et", "ou", "a", "au", "en", "mon", "ma", "mes",
+         "ce", "cette", "pour", "dans", "sur", "avec", "moi", "me", "il", "elle", "est", "dis", "fais", "peux"}
 
 
 def normaliser(texte: str) -> str:
@@ -67,6 +69,35 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
     for o in registre.disponibles():
         if o.mots_cles and any(_contient(t, normaliser(m)) for m in o.mots_cles):
             noms.append(o.nom)
-    for g in choisis + [g for g in TOUJOURS if g in groupes]:
-        noms += [o.nom for o in groupes[g] if o.nom not in noms]
+    # Dans les groupes retenus, les outils dont le nom et la description ressemblent le plus à la demande.
+    mots = {_racine(m) for m in re.findall(r"[a-z0-9']+", t) if m not in VIDES and len(m) > 2}
+    candidats = []
+    for rang, g in enumerate(choisis):
+        for o in groupes[g]:
+            if o.nom in noms:
+                continue
+            texte = normaliser(o.nom.replace("_", " ") + " " + o.description)
+            proximite = len(mots & {_racine(m) for m in re.findall(r"[a-z0-9']+", texte)})
+            candidats.append((-proximite, rang, o.nom))
+    noms += [n for _, _, n in sorted(candidats)]
+    noms = noms[:MAX_OUTILS - 3]
+    for g in TOUJOURS:  # toujours disponibles, en fin de liste
+        noms += [o.nom for o in groupes.get(g, []) if o.nom not in noms]
     return noms[:MAX_OUTILS]
+
+
+SYNONYMES = {
+    "lis": "lire", "lit": "lire", "lecture": "lire", "ouvre": "ouvrir", "lance": "ouvrir", "demarre": "ouvrir",
+    "trouve": "chercher", "retrouve": "chercher", "cherche": "chercher", "recherche": "chercher",
+    "retrouver": "chercher", "trouver": "chercher", "ou": "chercher", "cree": "creer", "fais": "creer",
+    "ecris": "ecrire", "redige": "ecrire", "ferme": "quitter", "quitte": "quitter", "supprime": "corbeille",
+    "efface": "corbeille", "jette": "corbeille", "resume": "lire", "analyse": "lire", "dis-moi": "lire",
+    "clique": "cliquer", "appuie": "cliquer", "tape": "taper", "saisis": "saisir", "remplis": "remplir",
+    "range": "ranger", "classe": "ranger", "deplace": "deplacer", "renomme": "renommer",
+}
+
+
+def _racine(mot: str) -> str:
+    """Racine grossière : synonymes ramenés au même verbe, puis 5 premières lettres sans « s » final."""
+    mot = SYNONYMES.get(mot, mot)
+    return mot.rstrip("s")[:5]

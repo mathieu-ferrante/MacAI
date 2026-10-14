@@ -69,7 +69,8 @@ class Ollama:
             "stream": True,
             "keep_alive": self.garder,
             "think": reflexion,
-            "options": {"num_ctx": self.contexte, "temperature": 0.2, **(options or {})},
+            # num_predict : plafond de longueur — un petit modèle qui s'emballe ne bloque jamais le Mac.
+            "options": {"num_ctx": self.contexte, "temperature": 0.2, "num_predict": 1500, **(options or {})},
         }
         if outils:
             corps["tools"] = outils

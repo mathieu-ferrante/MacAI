@@ -44,8 +44,31 @@ def verifier_chemin(p: Path, ecriture: bool = False) -> Path:
 def resoudre(chemin: str, ecriture: bool = False, doit_exister: bool = False) -> Path:
     p = verifier_chemin(commun.chemin(chemin), ecriture)
     if doit_exister and not p.exists():
-        raise ErreurOutil(f"{p} n'existe pas. Utilise rechercher_fichiers pour retrouver le bon chemin.")
+        proche = fichier_proche(p, strict=ecriture)
+        if proche is None:
+            raise ErreurOutil(f"{p} n'existe pas. Utilise rechercher_fichiers pour retrouver le bon chemin.")
+        p = verifier_chemin(proche, ecriture)
     return p
+
+
+def fichier_proche(p: Path, strict: bool) -> Path | None:
+    """Corrige un nom mal recopié par le modèle (« reunion.jpg » pour « reunion.txt ») s'il n'y a qu'un candidat.
+    En écriture (strict) : seulement même nom avec une autre extension."""
+    import difflib
+    dossier = p.parent
+    if not dossier.is_dir():
+        return None
+    try:
+        noms = [e.name for e in dossier.iterdir() if not e.name.startswith(".")]
+    except OSError:
+        return None
+    meme_nom = [n for n in noms if Path(n).stem.lower() == p.stem.lower()]
+    if len(meme_nom) == 1:
+        return dossier / meme_nom[0]
+    if strict:
+        return None
+    proches = difflib.get_close_matches(p.name, noms, n=2, cutoff=0.85)
+    return dossier / proches[0] if len(proches) == 1 else None
 
 
 def taille_lisible(n: float) -> str:

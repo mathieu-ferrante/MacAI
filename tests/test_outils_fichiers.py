@@ -142,3 +142,14 @@ def test_risque_commandes_terminal():
     assert r({"commande": "find . -delete"}) == Risque.SENSIBLE
     assert r({"commande": "echo $(whoami)"}) == Risque.SENSIBLE
     assert r({"commande": "brew install x"}) == Risque.SENSIBLE
+
+
+def test_nom_mal_recopie_corrige(ctx, tmp_path):
+    (tmp_path / "reunion.txt").write_text("budget 4500", encoding="utf-8")
+    assert fichiers.resoudre(str(tmp_path / "reunion.jpg"), doit_exister=True).name == "reunion.txt"
+    assert fichiers.resoudre(str(tmp_path / "reunon.txt"), doit_exister=True).name == "reunion.txt"
+    with pytest.raises(ErreurOutil):   # en écriture, pas de correction approximative
+        fichiers.resoudre(str(tmp_path / "reunon.txt"), ecriture=True, doit_exister=True)
+    (tmp_path / "reunion.pdf").write_text("x")
+    with pytest.raises(ErreurOutil):   # ambigu : on ne devine pas
+        fichiers.resoudre(str(tmp_path / "reunion.jpg"), doit_exister=True)
