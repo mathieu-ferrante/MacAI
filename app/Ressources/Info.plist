@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>fr.mathieu.macai</string>
+    <key>CFBundleName</key>
+    <string>MacAI</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacAI</string>
+    <key>CFBundleExecutable</key>
+    <string>MacAI</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>fr</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>MacAI écoute ta voix uniquement pendant que tu maintiens la touche pour parler. Tout reste sur ton Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>MacAI transcrit ta voix sur ton Mac, sans rien envoyer sur internet.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MacAI pilote tes applications (Chrome, Finder, Calendrier, Rappels, Mail…) quand tu le lui demandes.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>MacAI crée et lit tes événements quand tu le lui demandes.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>MacAI crée et lit tes rappels quand tu le lui demandes.</string>
+</dict>
+</plist>

@@ -161,3 +161,27 @@ def test_commandes_rapides():
     assert r.reconnaitre("ouvre onshape et fais moi un cube de 1 m") is None
     assert r.reconnaitre("quitte tout") is None
     assert r.reconnaitre("résume ce document") is None
+
+
+def test_arguments_corriges_pour_petits_modeles(ctx):
+    reg = Registre()
+    recu = {}
+
+    @outil("chercher", "", "recherche", {"requete": ("string", ""), "genre": ("string", "", ["pdf", "image"]),
+                                          "nombre": ("integer", ""), "liste": ("string", ""), "exact": ("boolean", "")},
+           requis=["requete"], mac_seulement=False, registre=reg)
+    def chercher(ctx, requete, genre="", nombre=8, liste="", exact=False):
+        recu.update(requete=requete, genre=genre, nombre=nombre, liste=liste, exact=exact)
+        return "ok"
+
+    r = reg.get("chercher").executer(ctx, {"requete": "facture", "genre": "facture", "nombre": "8",
+                                          "liste": ["banque"], "exact": "true"})
+    assert r.ok and recu == {"requete": "facture", "genre": "", "nombre": 8, "liste": "banque", "exact": True}
+    assert reg.get("chercher").executer(ctx, {"requete": "x", "nombre": "beaucoup"}).ok and recu["nombre"] == 8  # facultatif invalide : ignoré
+
+
+def test_heure_seule():
+    from datetime import datetime
+    from macai.outils.organisation import lire_date
+    d = lire_date("09:00")
+    assert d.hour == 9 and d > datetime.now()

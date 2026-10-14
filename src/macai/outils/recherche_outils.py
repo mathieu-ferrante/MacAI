@@ -64,8 +64,11 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
         genres = [genre] if genre else None
         if genre == "image":
             genres = ["image", "capture"]
+        d = chemin(dossier) if dossier else None
+        if d is not None and not d.is_dir():
+            d = None  # dossier inventé par le modèle : ignoré plutôt que de tout filtrer
         trouvailles = index.rechercher(requete, int(nombre or 8), genres=genres,
-                                       dossier=str(chemin(dossier)) if dossier else None, apres=_date_min(periode))
+                                       dossier=str(d) if d else None, apres=_date_min(periode))
     lignes = []
     for t in trouvailles:
         date = time.strftime("%d/%m/%Y", time.localtime(t.mtime or 0))

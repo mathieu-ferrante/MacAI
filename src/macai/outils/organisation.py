@@ -24,6 +24,9 @@ def lire_date(texte: str) -> datetime:
             heure = datetime.strptime(reste, "%H:%M").time()
             return datetime.combine((base + timedelta(days=decalage)).date(), heure)
     t = t.rstrip(":")
+    if re.fullmatch(r"\d{1,2}:\d{2}", t):  # heure seule : aujourd'hui, ou demain si l'heure est passée
+        h = datetime.combine(base.date(), datetime.strptime(t, "%H:%M").time())
+        return h if h > base else h + timedelta(days=1)
     try:
         d = datetime.fromisoformat(t)
     except ValueError:

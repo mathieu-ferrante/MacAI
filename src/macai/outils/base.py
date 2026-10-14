@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import os
 import sys
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -76,6 +77,9 @@ class Outil:
         signature = inspect.signature(self.fonction)
         accepte_tout = any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values())
         propres = {k: v for k, v in args.items() if accepte_tout or k in signature.parameters}
+        propres, invalides = self._corriger(propres)
+        if invalides:
+            return Resultat.echec("Valeur invalide : " + " ; ".join(invalides))
         manquants = [r for r in self.requis if r not in propres or propres[r] in ("", None)]
         if manquants:
             return Resultat.echec(f"Paramètre manquant : {', '.join(manquants)}.")
@@ -88,6 +92,44 @@ class Outil:
         if isinstance(r, Resultat):
             return r
         return Resultat(True, "" if r is None else str(r))
+
+
+    def _corriger(self, args: dict) -> tuple[dict, list[str]]:
+        """Rend les arguments d'un petit modèle exploitables : types convertis, valeurs hors liste écartées
+        si le paramètre est facultatif (refusées s'il est obligatoire)."""
+        sortie, invalides = {}, []
+        for k, v in args.items():
+            spec = self.parametres.get(k)
+            if not spec or v is None:
+                sortie[k] = v
+                continue
+            typ = spec.get("type")
+            try:
+                if typ == "integer" and not isinstance(v, bool):
+                    v = int(float(str(v).replace(",", ".").strip())) if not isinstance(v, int) else v
+                elif typ == "number" and not isinstance(v, (int, float)):
+                    v = float(str(v).replace(",", ".").strip())
+                elif typ == "boolean" and not isinstance(v, bool):
+                    v = str(v).strip().lower() in ("true", "1", "oui", "yes", "vrai")
+                elif typ == "string" and not isinstance(v, str):
+                    v = str(v[0]) if isinstance(v, list) and len(v) == 1 else (
+                        ", ".join(map(str, v)) if isinstance(v, list) else str(v))
+                elif typ == "array" and isinstance(v, str):
+                    import json as _json
+                    try:
+                        v = _json.loads(v)
+                    except ValueError:
+                        v = [x.strip() for x in v.split(",") if x.strip()]
+            except (ValueError, TypeError):
+                if k in self.requis:
+                    invalides.append(f"{k} doit être de type {typ}")
+                continue
+            if "enum" in spec and v not in spec["enum"]:
+                if k in self.requis:
+                    invalides.append(f"{k} doit valoir : {', '.join(map(str, spec['enum']))}")
+                continue
+            sortie[k] = v
+        return sortie, invalides
 
 
 def _param(spec) -> dict:
@@ -123,7 +165,8 @@ class Registre:
         return g
 
     def disponibles(self) -> list[Outil]:
-        sur_mac = sys.platform == "darwin"
+        # MACAI_TOUS_OUTILS=1 : montre aussi les outils macOS ailleurs (banc, tests sur le poste de dev).
+        sur_mac = sys.platform == "darwin" or os.environ.get("MACAI_TOUS_OUTILS") == "1"
         return [o for o in self.outils.values() if sur_mac or not o.mac_seulement]
 
     def schemas(self, noms) -> list[dict]:
