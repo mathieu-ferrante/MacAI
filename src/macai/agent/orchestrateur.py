@@ -24,6 +24,7 @@ class Orchestrateur:
         self.rapide = rapide
         self.historique: list[dict] = []
         self.derniere_trace: dict | None = None
+        ctx.services["orchestrateur"] = self
 
     # --- Décisions de sécurité ---------------------------------------------
 
@@ -83,7 +84,16 @@ class Orchestrateur:
         self._proposer_competence(demande, trace)
         ctx.journal.ecrire("reponse", texte=texte)
         ctx.emettre("fin", texte=texte, actions=trace)
+        self._apprendre(demande)
         return texte
+
+    def _apprendre(self, demande: str) -> None:
+        """Après la réponse : retient ce que l'utilisateur dit de lui (modèle encore chargé)."""
+        from ..memoire.memoire import apprendre
+        try:
+            apprendre(self.ctx, demande)
+        except Exception as e:  # noqa: BLE001 - l'apprentissage ne doit jamais casser une réponse
+            self.ctx.journal.ecrire("erreur_apprentissage", texte=str(e))
 
     def _commande_directe(self, demande: str, trace: list) -> str | None:
         if not self.rapide:
@@ -135,7 +145,8 @@ class Orchestrateur:
                     r = Resultat.echec("Appel identique déjà fait deux fois. Change d'approche ou conclus.")
                 else:
                     r = self.executer_outil(appel.nom, appel.arguments)
-                trace.append({"outil": appel.nom, "arguments": appel.arguments, "ok": r.ok})
+                trace.append({"outil": appel.nom, "arguments": appel.arguments, "ok": r.ok,
+                              "cles": sorted(r.donnees) if isinstance(r.donnees, dict) else []})
                 statut = "SUCCÈS" if r.ok else "ÉCHEC"
                 messages.append({"role": "tool", "tool_name": appel.nom,
                                  "content": f"{statut}\n{consignes.donnees(r.texte)}"})
@@ -154,9 +165,11 @@ class Orchestrateur:
         if (len(utiles) >= seuil and all(t["ok"] for t in utiles)
                 and not any(t["outil"].startswith("competence_") for t in utiles)):
             self.derniere_trace = {"demande": demande, "actions": utiles}
+            self.ctx.services["derniere_trace"] = self.derniere_trace
             self.ctx.emettre("proposition_competence", demande=demande, nb_actions=len(utiles))
-        else:
+        elif any(t["outil"] != "creer_competence" for t in trace):
             self.derniere_trace = None
+            self.ctx.services["derniere_trace"] = None
 
 
 def _serialisable(d):
