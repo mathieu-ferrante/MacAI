@@ -1,0 +1,33 @@
+[project]
+name = "macai"
+version = "0.1.0"
+description = "Assistant personnel 100 % local qui pilote le Mac"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+fichiers = ["pypdf>=4", "python-docx>=1.1", "openpyxl>=3.1", "python-pptx>=1.0"]
+recherche = ["numpy>=1.26"]
+securite = ["cryptography>=42"]
+mac = [
+    "pyobjc-framework-Quartz>=10; sys_platform == 'darwin'",
+    "pyobjc-framework-ApplicationServices>=10; sys_platform == 'darwin'",
+    "pyobjc-framework-Vision>=10; sys_platform == 'darwin'",
+]
+tout = ["macai[fichiers,recherche,securite,mac]"]
+dev = ["macai[fichiers,recherche,securite]", "pytest>=8"]
+
+[project.scripts]
+macai = "macai.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["ollama: nécessite un serveur Ollama local avec un modèle"]
+addopts = "-m 'not ollama'"
