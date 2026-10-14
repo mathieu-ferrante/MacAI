@@ -80,7 +80,11 @@ cat > "$AGENT_OLLAMA" <<PLIST
 </plist>
 PLIST
 launchctl bootout "gui/$(id -u)/fr.mathieu.macai.ollama" >/dev/null 2>&1 || true
-launchctl bootstrap "gui/$(id -u)" "$AGENT_OLLAMA"
+for _ in 1 2 3 4 5; do   # bootout est asynchrone : on réessaie
+    launchctl bootstrap "gui/$(id -u)" "$AGENT_OLLAMA" 2>/dev/null && break
+    sleep 1
+done
+launchctl print "gui/$(id -u)/fr.mathieu.macai.ollama" >/dev/null
 for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version >/dev/null && break; sleep 1; done
 curl -sf http://127.0.0.1:11434/api/version >/dev/null || { echo "Ollama ne démarre pas : voir $DONNEES/ollama.log"; exit 1; }
 ok "Ollama démarré (modèles déchargés après 2 min, cache réduit, un seul calcul à la fois)"
@@ -101,7 +105,8 @@ ok "Modèles prêts"
 # --- 4. Moteur Python ---------------------------------------------------------------------------
 titre "Moteur MacAI (Python 3.12)"
 uv venv --quiet --allow-existing --python 3.12 "$VENV"
-uv pip install --quiet --python "$VENV/bin/python" "$RACINE[tout]"
+# Installation éditable : après un `git pull`, relancer ce script suffit à mettre le moteur à jour.
+uv pip install --quiet --python "$VENV/bin/python" -e "${RACINE}[tout]"
 cat > "$DONNEES/lancement.json" <<JSON
 {"python": "$VENV/bin/python", "source": "$RACINE"}
 JSON
@@ -136,7 +141,8 @@ cat <<'FIN'
     « Appuyer sur la touche 🌐 pour » : Ne rien faire.
  3. Chrome : menu Présentation > Options pour les développeurs >
     « Autoriser JavaScript à partir des Apple Events ».
- 4. Facultatif : `macai secret onshape` (clés API Onshape)
+ 4. Après avoir accordé l'Accessibilité : menu 🧠 > Quitter, puis rouvre MacAI.
+ 5. Facultatif : `macai secret onshape` (clés API Onshape)
                  `macai mcp detecter`   (suite ArtCraft)
 
  Utilisation : Option + Espace pour écrire, Fn maintenue pour parler.

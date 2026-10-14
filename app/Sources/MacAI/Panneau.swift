@@ -36,7 +36,7 @@ final class Panneau: NSPanel {
             let f = ecran.visibleFrame
             setFrameOrigin(NSPoint(x: f.midX - frame.width / 2, y: f.midY - frame.height / 2 + f.height * 0.12))
         }
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         makeKeyAndOrderFront(nil)
     }
 
@@ -85,7 +85,7 @@ struct VuePanneau: View {
     private var barreSaisie: some View {
         HStack(spacing: 10) {
             Image(systemName: etat.ecoute ? "waveform" : "sparkle")
-                .font(.title2).foregroundStyle(etat.ecoute ? .red : .accentColor)
+                .font(.title2).foregroundStyle(etat.ecoute ? Color.red : Color.accentColor)
                 .symbolEffect(.pulse, isActive: etat.ecoute || etat.occupe)
             TextField(etat.ecoute ? "J'écoute…" : "Demande-moi n'importe quoi sur ton Mac…", text: $etat.saisie)
                 .textFieldStyle(.plain).font(.title3)

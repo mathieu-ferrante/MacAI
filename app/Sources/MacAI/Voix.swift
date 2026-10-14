@@ -12,11 +12,20 @@ final class Voix: NSObject {
     private var tacheResultats: Task<Void, Never>?
     private var texteFinal = ""
     private var textePartiel = ""
+    private var annule = false          // touche relâchée pendant la préparation
+    private var preparation: Task<Void, Error>?
     private let locale = Locale(identifier: "fr-FR")
 
     // MARK: - Écoute
 
     func ecouter(_ surPartiel: @escaping (String) -> Void) async throws {
+        annule = false
+        let tache = Task { try await self.preparer(surPartiel) }
+        preparation = tache
+        try await tache.value
+    }
+
+    private func preparer(_ surPartiel: @escaping (String) -> Void) async throws {
         guard await AVCaptureDevice.requestAccess(for: .audio) else {
             throw NSError(domain: "MacAI", code: 1, userInfo: [NSLocalizedDescriptionKey: "accès au micro refusé (Réglages > Confidentialité > Micro)"])
         }
@@ -75,12 +84,21 @@ final class Voix: NSObject {
                 continuation.yield(AnalyzerInput(buffer: sortie))
             }
         }
+        if annule {  // relâchée pendant l'installation du modèle : on n'ouvre pas le micro
+            entree.removeTap(onBus: 0)
+            moteurAudio = nil
+            continuation.finish()
+            return
+        }
         audio.prepare()
         try audio.start()
     }
 
     /// Arrête le micro et renvoie le texte complet reconnu.
     func terminer() async -> String {
+        annule = true
+        _ = try? await preparation?.value   // attend la fin de la préparation éventuelle
+        preparation = nil
         moteurAudio?.inputNode.removeTap(onBus: 0)
         moteurAudio?.stop()
         moteurAudio = nil

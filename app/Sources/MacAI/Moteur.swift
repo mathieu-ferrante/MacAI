@@ -38,14 +38,20 @@ final class Moteur {
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         p.environment = env
         let journal = Moteur.dossier.appendingPathComponent("moteur.log")
-        FileManager.default.createFile(atPath: journal.path, contents: nil)
+        if !FileManager.default.fileExists(atPath: journal.path) {
+            FileManager.default.createFile(atPath: journal.path, contents: nil)
+        }
         if let h = try? FileHandle(forWritingTo: journal) {
+            h.seekToEndOfFile()  // on garde la trace des démarrages précédents
             p.standardOutput = h
             p.standardError = h
         }
         p.qualityOfService = .userInitiated
-        p.terminationHandler = { [weak self] _ in
-            Task { @MainActor in self?.surArret() }
+        p.terminationHandler = { [weak self] fini in
+            Task { @MainActor in
+                guard let self, self.processus === fini else { return }  // ancien processus : ignoré
+                self.surArret()
+            }
         }
         do {
             try p.run()

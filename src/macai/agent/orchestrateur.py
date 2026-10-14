@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 
 from ..llm.ollama import ErreurOllama
@@ -84,7 +85,8 @@ class Orchestrateur:
         self._proposer_competence(demande, trace)
         ctx.journal.ecrire("reponse", texte=texte)
         ctx.emettre("fin", texte=texte, actions=trace)
-        self._apprendre(demande)
+        # Apprentissage hors du verrou de la demande : l'utilisateur peut enchaîner tout de suite.
+        threading.Thread(target=self._apprendre, args=(demande,), daemon=True, name="apprentissage").start()
         return texte
 
     def _apprendre(self, demande: str) -> None:

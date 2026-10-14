@@ -96,7 +96,7 @@ final class Etat: ObservableObject {
     func creerCompetence() {
         propositionCompetence = false
         occupe = true
-        etapes = [Etape(outil: "creer_competence", texte: "Création de la compétence…", statut: .enCours)]
+        etapes = []
         Task { await client.envoyer("/competence") }
     }
 
@@ -159,6 +159,7 @@ final class Etat: ObservableObject {
         case "erreur":
             reponse = evt["texte"] as? String ?? "Erreur."
         case "fin":
+            for i in etapes.indices where etapes[i].statut == .enCours { etapes[i].statut = .echec }
             occupe = false
             confirmation = nil
             let texte = evt["texte"] as? String ?? ""

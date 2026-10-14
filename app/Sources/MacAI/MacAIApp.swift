@@ -37,8 +37,10 @@ final class Delegue: NSObject, NSApplicationDelegate {
         raccourcis.surFinParole = { [weak self] in self?.etat.finirEcoute() }
         raccourcis.installer()
         // Démarrage automatique à l'ouverture de session.
-        if SMAppService.mainApp.status != .enabled {
+        // Une seule fois : si l'utilisateur le désactive dans Réglages > Ouverture, on respecte son choix.
+        if !UserDefaults.standard.bool(forKey: "ouvertureInscrite") {
             try? SMAppService.mainApp.register()
+            UserDefaults.standard.set(true, forKey: "ouvertureInscrite")
         }
     }
 

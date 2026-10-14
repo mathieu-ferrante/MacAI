@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Carbon.HIToolbox
 
 /// Option + Espace (raccourci global Carbon : aucune autorisation requise) et touche maintenue pour parler.
@@ -49,6 +50,19 @@ final class Raccourcis {
         // Surveillance globale : nécessite l'autorisation Accessibilité (demandée au premier lancement).
         moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
         moniteurLocal = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { e in traiter(e); return e }
+        if !AXIsProcessTrusted() { attendreAccessibilite(traiter) }
+    }
+
+    /// Le moniteur global ne reçoit rien tant que l'Accessibilité n'est pas accordée : on le réinstalle ensuite.
+    private func attendreAccessibilite(_ traiter: @escaping (NSEvent) -> Void) {
+        Task { @MainActor [weak self] in
+            while !AXIsProcessTrusted() {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+            guard let self else { return }
+            if let m = self.moniteurGlobal { NSEvent.removeMonitor(m) }
+            self.moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
+        }
     }
 
     private func toucheEnfoncee(_ e: NSEvent) -> Bool? {
