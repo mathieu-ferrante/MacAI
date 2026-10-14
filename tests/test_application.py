@@ -82,3 +82,10 @@ def test_serveur_http_et_flux(cfg):
     assert evenements[-1]["texte"] == "Bonjour !"
     assert req("/demande", {"texte": ""})[0] == 400
     serveur.shutdown()
+
+
+def test_banc_embeddings_avec_faux_modele():
+    from macai import banc
+    from .conftest import FauxOllama
+    r = banc.banc_embeddings(FauxOllama(), ["faux"])
+    assert r[0]["modele"] == "faux" and "rappel_1" in r[0]

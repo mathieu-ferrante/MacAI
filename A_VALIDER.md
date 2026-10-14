@@ -23,12 +23,12 @@ indiquée** : je corrige à partir de là.
 | V15 | Une tâche en 3 étapes ou plus (ex. « trouve ma dernière facture, lis-la et fais un tableur avec le montant ») | Carte « Je peux retenir cette tâche… » → Créer → `lister mes compétences` la montre | message + dossier `competences/` |
 | V16 | `macai secret onshape` puis « fais-moi un cube de 1 mètre dans Onshape » | Nouveau document Onshape avec un cube de 1 m, ouvert dans Chrome | message affiché (ne jamais envoyer les clés) |
 | V17 | `macai mcp detecter`, configurer un logiciel ArtCraft dans `macai.toml`, `macai mcp tester` | « photocraft : N outils » | sortie de `macai mcp tester` |
-| V18 | `macai banc qwen3:4b llama3.2:3b` (autres modèles : `ollama pull` d'abord) | Tableau justesse/vitesse/RAM et un modèle recommandé | fichier JSON indiqué à la fin |
+| V18 | `macai banc --candidats` (propose de télécharger les candidats, ~12 Go au total ; tu peux refuser) | Tableau justesse/vitesse/RAM, un modèle d'agent et un modèle d'embeddings recommandés | fichier JSON indiqué à la fin |
 
 ## Points incertains (à surveiller en priorité)
 
 - **App Swift** : écrite sans pouvoir être compilée ici (SpeechAnalyzer est récent). Erreurs de compilation possibles en V2.
 - **Touche Fn** : selon les réglages clavier, macOS peut l'intercepter (voir README, étape 2). Repli : menu 🧠 > Touche pour parler > Option droite.
-- **Modèles** : `qwen3:4b` / `qwen3-vl:2b` / `qwen3-embedding:0.6b` sont des choix par défaut ; V18 tranche.
+- **Modèles** : `qwen3.5:4b` (agent + vision) et `qwen3-embedding:0.6b` sont choisis d'après la recherche (MODELES.md) ; V18 confirme sur ton Mac.
 - **Onshape** : la création d'esquisse par l'API n'a pas pu être essayée sans compte ; si V16 échoue, renvoie le message d'erreur Onshape.
 - **Mémoire au repos (V4)** : ~80 Mo est une estimation, à confirmer.

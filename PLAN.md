@@ -22,7 +22,8 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D2 | Serveur HTTP **stdlib** (pas FastAPI) | ~30 Mo de RAM économisés au repos. |
 | D3 | Client Ollama **stdlib** (urllib) | Aucune dépendance, démarrage instantané. |
 | D4 | **Imports paresseux** : pypdf, docx, openpyxl, numpy, pyobjc chargés dans l'outil qui s'en sert | Repos léger. |
-| D5 | Modèles par défaut : agent `qwen3:4b` (sans réflexion sauf demande complexe), vision `qwen3-vl:2b`, embeddings `qwen3-embedding:0.6b` tronqués à 256 dimensions | Meilleur rapport qualité/RAM pour 8 Go ; **provisoire**, confirmé par `macai banc` sur le Mac. |
+| D5 | Modèles par défaut : **`qwen3.5:4b` pour l'agent et la vision** (un seul modèle multimodal, sans réflexion sauf demande complexe), embeddings `qwen3-embedding:0.6b` tronqués à 256 dimensions | Recherche d'octobre 2026 (voir MODELES.md) : meilleur de sa taille en appels d'outils, vision sans échange de modèle. **Provisoire**, confirmé par `macai banc --candidats` sur le Mac. |
+| D21 | Consignes système fixes, date et souvenirs en fin de message utilisateur | Le cache de préfixe d'Ollama est réutilisé d'une demande à l'autre. |
 | D6 | Ollama : `KEEP_ALIVE=2m`, `MAX_LOADED_MODELS=2`, `NUM_PARALLEL=1`, `FLASH_ATTENTION=1`, `KV_CACHE_TYPE=q8_0`, contexte 8192 | Agent + petit modèle d'embeddings peuvent cohabiter (~3,3 Go) ; le modèle agent est déchargé explicitement avant la vision : jamais deux gros modèles. Cache de contexte réduit de moitié. |
 | D7 | Recherche : SQLite **FTS5** (mots) + vecteurs float16 256 dim en fichier mappé (sens), fusion RRF | ~50 Mo de disque pour 100 000 extraits, recherche < 100 ms, pas de base vectorielle à installer. |
 | D8 | Images : **Apple Vision** (OCR + étiquettes) pendant l'indexation, légende par modèle de vision en option | Rapide, natif, gratuit. |

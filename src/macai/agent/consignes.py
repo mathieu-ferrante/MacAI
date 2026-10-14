@@ -21,22 +21,22 @@ Règles :
 - Pour piloter un logiciel : connecteur dédié s'il existe, sinon menus et fenêtres (lire_fenetre puis
   cliquer/taper), et la vision de l'écran en dernier recours.
 - Ne demande pas de confirmation toi-même : le système s'en charge pour les actions sensibles.
+- La date, l'heure et ce que tu sais de l'utilisateur sont donnés à la fin de chaque demande, entre [ ]."""
 
-Nous sommes le {date}, il est {heure}.{souvenirs}"""
+
+def construire(utilisateur: str | None = None) -> str:
+    """Consignes identiques d'une demande à l'autre : Ollama réutilise leur calcul (cache de préfixe),
+    ce qui réduit nettement le temps avant la première réponse."""
+    return CONSIGNES.format(utilisateur=utilisateur or getpass.getuser())
 
 
-def construire(utilisateur: str | None = None, souvenirs: list[str] | None = None,
-               maintenant: datetime | None = None) -> str:
+def contexte(souvenirs: list[str] | None = None, maintenant: datetime | None = None) -> str:
+    """Informations variables, ajoutées à la fin du message de l'utilisateur."""
     m = maintenant or datetime.now()
-    bloc = ""
+    texte = f"[Nous sommes le {JOURS[m.weekday()]} {m.day} {MOIS[m.month - 1]} {m.year}, il est {m:%H:%M}."
     if souvenirs:
-        bloc = "\n\nCe que tu sais de l'utilisateur :\n" + "\n".join(f"- {s}" for s in souvenirs)
-    return CONSIGNES.format(
-        utilisateur=utilisateur or getpass.getuser(),
-        date=f"{JOURS[m.weekday()]} {m.day} {MOIS[m.month - 1]} {m.year}",
-        heure=m.strftime("%H:%M"),
-        souvenirs=bloc,
-    )
+        texte += " Ce que tu sais de l'utilisateur : " + " ; ".join(souvenirs)
+    return texte + "]"
 
 
 def donnees(texte: str, limite: int = 4000) -> str:

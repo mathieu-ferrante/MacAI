@@ -90,10 +90,10 @@ curl -sf http://127.0.0.1:11434/api/version >/dev/null || { echo "Ollama ne dém
 ok "Ollama démarré (modèles déchargés après 2 min, cache réduit, un seul calcul à la fois)"
 
 # --- 3. Modèles locaux ---------------------------------------------------------------------------
-titre "Modèles d'IA locaux (~5 Go à télécharger la première fois)"
-MODELES="qwen3:4b qwen3-vl:2b qwen3-embedding:0.6b"
+titre "Modèles d'IA locaux (~4 Go à télécharger la première fois)"
+MODELES="qwen3.5:4b qwen3-embedding:0.6b"
 if [ -f "$DONNEES/macai.toml" ]; then  # modèles personnalisés (bash 3.2 de macOS : pas de mapfile)
-    PERSO=$(sed -nE 's/^(agent|vision|embeddings) *= *"([^"]+)".*/\2/p' "$DONNEES/macai.toml" | tr '\n' ' ')
+    PERSO=$(sed -nE 's/^(agent|vision|embeddings) *= *"([^"]+)".*/\2/p' "$DONNEES/macai.toml" | sort -u | tr '\n' ' ')
     if [ -n "$(echo "$PERSO" | tr -d ' ')" ]; then MODELES="$PERSO"; fi
 fi
 for m in $MODELES; do

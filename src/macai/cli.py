@@ -112,7 +112,7 @@ def cmd_verifier(args) -> int:
 
 def cmd_banc(args) -> int:
     from .banc import banc
-    return banc(args.modeles)
+    return banc(args.modeles, candidats=args.candidats)
 
 
 def main(argv=None) -> int:
@@ -148,6 +148,8 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("banc", help="mesure la vitesse des modèles et la justesse de l'agent")
     s.add_argument("modeles", nargs="*")
+    s.add_argument("--candidats", action="store_true",
+                   help="compare les meilleurs modèles pour 8 Go (propose de les télécharger)")
     s.set_defaults(func=cmd_banc)
 
     args = p.parse_args(argv)

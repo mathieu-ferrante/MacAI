@@ -122,10 +122,16 @@ def test_decrire_image_decharge_l_agent(ctx, tmp_path):
     img = tmp_path / "chat.png"
     img.write_bytes(b"\x89PNG fausse image")
     decharges = []
+    ctx.config.modeles.update(agent="gros-agent", vision="petite-vision")
     ctx.ollama = FauxOllama([Reponse(texte="Un chat sur un canapé.")])
     ctx.ollama.decharger = decharges.append
     r = documents.decrire_image(ctx, str(img))
-    assert "chat" in r and decharges == [ctx.config.modeles["agent"]]
+    assert "chat" in r and decharges == ["gros-agent"]          # modèles distincts : l'agent libère la place
+    ctx.config.modeles.update(agent="qwen3.5:4b", vision="qwen3.5:4b")
+    ctx.ollama = FauxOllama([Reponse(texte="Un chien.")])
+    ctx.ollama.decharger = decharges.append
+    documents.decrire_image(ctx, str(img))
+    assert decharges == ["gros-agent"]                           # modèle unique : rien à décharger
     msg = ctx.ollama.recus[0]["messages"][0]
     assert msg["images"] and ctx.ollama.recus[0]["outils"] is None
 

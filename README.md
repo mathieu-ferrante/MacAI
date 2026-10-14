@@ -40,7 +40,7 @@ cd ~/MacAI
 ./installer.sh
 ```
 
-Le script installe tout (Homebrew, Ollama réglé pour 8 Go, ~5 Go de modèles, Python 3.12, l'app) puis lance
+Le script installe tout (Homebrew, Ollama réglé pour 8 Go, ~4 Go de modèles, Python 3.12, l'app) puis lance
 `macai verifier`. Mise à jour : `git pull && ./installer.sh`. Désinstallation : `./desinstaller.sh`.
 
 Ensuite, une seule fois :
@@ -55,8 +55,7 @@ Ensuite, une seule fois :
 |---|---|---|
 | Au repos (app + moteur + Ollama) | ~80 Mo | ~0 % |
 | Commande directe (« ouvre Safari », « volume à 30 ») | rien de plus, aucune IA | instantané |
-| L'IA réfléchit | +2,5 à 3 Go, libérés 2 min après | GPU de la M2 |
-| Vision de l'écran | l'IA principale est déchargée d'abord | quelques secondes |
+| L'IA réfléchit ou regarde l'écran | +3,3 Go (un seul modèle pour les deux), libérés 2 min après | GPU de la M2 |
 | Indexation des fichiers | priorité basse, cœurs économes | seulement Mac branché et inutilisé |
 
 Comment : imports paresseux, serveur HTTP de la bibliothèque standard, modèles déchargés automatiquement,
@@ -95,12 +94,12 @@ MacAI.app (Swift)  ──HTTP + SSE (127.0.0.1)──►  moteur Python  ──�
  panneau, voix, raccourcis                       agent, ~60 outils, recherche, mémoire, compétences, MCP
 ```
 
-Voir [PLAN.md](PLAN.md) (décisions et lots) et [CAHIER_DES_CHARGES.md](CAHIER_DES_CHARGES.md).
+Choix des modèles et optimisations : [MODELES.md](MODELES.md). Voir aussi [PLAN.md](PLAN.md) (décisions et lots) et [CAHIER_DES_CHARGES.md](CAHIER_DES_CHARGES.md).
 
 ## Développement
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest                      # tests rapides (tout OS)
-MACAI_TOUS_OUTILS=1 macai banc qwen3:4b   # justesse et vitesse d'un modèle
+MACAI_TOUS_OUTILS=1 macai banc qwen3.5:4b   # justesse et vitesse d'un modèle
 ```

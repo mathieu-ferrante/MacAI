@@ -122,8 +122,8 @@ class Orchestrateur:
 
         memoire = ctx.service("memoire")
         souvenirs = memoire.pertinents(demande) if memoire else []
-        messages = [{"role": "system", "content": consignes.construire(souvenirs=souvenirs)},
-                    *self.historique, {"role": "user", "content": demande}]
+        messages = [{"role": "system", "content": consignes.construire()}, *self.historique,
+                    {"role": "user", "content": f"{demande}\n\n{consignes.contexte(souvenirs)}"}]
         reflexion = any(m in routeur.normaliser(demande) for m in MOTS_REFLEXION) or len(demande.split()) > 40
         modele = cfg.modeles["agent"]
         deja_vus: dict[str, int] = {}

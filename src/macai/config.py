@@ -21,9 +21,10 @@ CONFIG_PAR_DEFAUT = """\
 # Après modification : menu MacAI > Redémarrer le moteur.
 
 [modeles]
-# Modèles Ollama (locaux). Confirmés par `macai banc` sur ton Mac.
-agent = "qwen3:4b"
-vision = "qwen3-vl:2b"
+# Modèles Ollama (locaux). Voir MODELES.md ; `macai banc --candidats` compare sur ton Mac.
+# qwen3.5:4b fait outils + vision + réflexion en un seul modèle (3,3 Go) : rien à échanger en mémoire.
+agent = "qwen3.5:4b"
+vision = "qwen3.5:4b"
 embeddings = "qwen3-embedding:0.6b"
 # Durée pendant laquelle un modèle reste en mémoire après usage.
 garder_en_memoire = "2m"

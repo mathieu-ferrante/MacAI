@@ -59,9 +59,11 @@ def _image_reduite(p: Path) -> bytes:
 
 
 def demander_vision(ctx, image: bytes, question: str) -> str:
-    """Interroge le modèle de vision ; le modèle agent est déchargé d'abord (8 Go de RAM)."""
+    """Interroge le modèle de vision. S'il est distinct de l'agent, l'agent est déchargé d'abord (8 Go de RAM) ;
+    avec un modèle multimodal unique (défaut), rien à décharger ni à recharger."""
     cfg = ctx.config.modeles
-    ctx.ollama.decharger(cfg["agent"])
+    if cfg["vision"] != cfg["agent"]:
+        ctx.ollama.decharger(cfg["agent"])
     rep = ctx.ollama.discuter(cfg["vision"], [{"role": "user", "content": question,
                                                "images": [base64.b64encode(image).decode()]}])
     return rep.texte.strip()
