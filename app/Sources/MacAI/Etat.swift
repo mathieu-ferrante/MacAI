@@ -38,7 +38,7 @@ final class Etat: ObservableObject {
     let voix = Voix()
 
     func demarrer() {
-        moteur.surEtat = { [weak self] s in Task { @MainActor in self?.statutMoteur = s } }
+        moteur.surEtat = { [weak self] s in self?.statutMoteur = s }
         moteur.demarrer()
         Task { await boucleConnexion() }
     }

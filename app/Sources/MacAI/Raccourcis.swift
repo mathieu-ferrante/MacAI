@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// Option + Espace (raccourci global Carbon : aucune autorisation requise) et touche maintenue pour parler.
+@MainActor
 final class Raccourcis {
     private var raccourci: EventHotKeyRef?
     private var gestionnaire: EventHandlerRef?
@@ -11,9 +12,9 @@ final class Raccourcis {
     private var ecouteLancee = false
     private var minuterie: Timer?
 
-    var surRaccourci: (() -> Void)?
-    var surDebutParole: (() -> Void)?
-    var surFinParole: (() -> Void)?
+    var surRaccourci: (@MainActor () -> Void)?
+    var surDebutParole: (@MainActor () -> Void)?
+    var surFinParole: (@MainActor () -> Void)?
 
     /// Touche pour parler : "fn" (défaut) ou "option_droite".
     var touchePourParler: String = UserDefaults.standard.string(forKey: "touchePourParler") ?? "fn"
@@ -31,7 +32,7 @@ final class Raccourcis {
         InstallEventHandler(GetApplicationEventTarget(), { _, _, donnees in
             guard let donnees else { return noErr }
             let r = Unmanaged<Raccourcis>.fromOpaque(donnees).takeUnretainedValue()
-            DispatchQueue.main.async { r.surRaccourci?() }
+            Task { @MainActor in r.surRaccourci?() }
             return noErr
         }, 1, &type, soi, &gestionnaire)
         let id = EventHotKeyID(signature: OSType(0x4D414149), id: 1)  // 'MAAI'
@@ -41,7 +42,10 @@ final class Raccourcis {
     // MARK: - Touche maintenue pour parler
 
     private func installerPourParler() {
-        let traiter: (NSEvent) -> Void = { [weak self] e in self?.changementModificateurs(e) }
+        // AppKit appelle ces moniteurs sur le fil principal.
+        let traiter: (NSEvent) -> Void = { [weak self] e in
+            MainActor.assumeIsolated { self?.changementModificateurs(e) }
+        }
         // Surveillance globale : nécessite l'autorisation Accessibilité (demandée au premier lancement).
         moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
         moniteurLocal = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { e in traiter(e); return e }
@@ -68,9 +72,11 @@ final class Raccourcis {
             appuiDepuis = Date()
             // Appui maintenu 0,3 s : on commence à écouter (un appui bref garde son rôle habituel).
             minuterie = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-                guard let self, self.appuiDepuis != nil else { return }
-                self.ecouteLancee = true
-                self.surDebutParole?()
+                MainActor.assumeIsolated {
+                    guard let self, self.appuiDepuis != nil else { return }
+                    self.ecouteLancee = true
+                    self.surDebutParole?()
+                }
             }
         } else {
             if ecouteLancee { surFinParole?() }

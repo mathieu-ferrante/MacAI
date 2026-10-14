@@ -2,8 +2,9 @@ import Foundation
 
 /// Lance le moteur Python (`python -m macai serveur`), le relance s'il s'arrête, l'arrête à la fermeture.
 /// Lancé par l'app, il hérite de ses autorisations macOS (Accessibilité, Automatisation, Micro…).
+@MainActor
 final class Moteur {
-    static let dossier = FileManager.default.homeDirectoryForCurrentUser
+    nonisolated static let dossier = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/MacAI")
 
     private var processus: Process?
@@ -44,7 +45,7 @@ final class Moteur {
         }
         p.qualityOfService = .userInitiated
         p.terminationHandler = { [weak self] _ in
-            DispatchQueue.main.async { self?.surArret() }
+            Task { @MainActor in self?.surArret() }
         }
         do {
             try p.run()
@@ -65,7 +66,10 @@ final class Moteur {
         }
         surEtat?("Moteur arrêté, relance…")
         let delai = Double(min(relances * 2, 10))
-        DispatchQueue.main.asyncAfter(deadline: .now() + delai) { [weak self] in self?.demarrer() }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delai * 1_000_000_000))
+            self?.demarrer()
+        }
     }
 
     func reinitialiserRelances() { relances = 0 }
@@ -79,6 +83,9 @@ final class Moteur {
     func redemarrer() {
         arreter()
         relances = 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.demarrer() }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            self?.demarrer()
+        }
     }
 }

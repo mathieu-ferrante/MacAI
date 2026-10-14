@@ -55,7 +55,7 @@ final class Client {
     }
 
     /// Flux d'événements : appelle `surEvenement` pour chaque message, jusqu'à coupure.
-    func ecouter(_ surEvenement: @escaping ([String: Any]) -> Void) async {
+    func ecouter(_ surEvenement: @escaping @MainActor ([String: Any]) -> Void) async {
         guard pret else { return }
         do {
             let (octets, _) = try await session.bytes(for: requete("/evenements"))
@@ -64,7 +64,7 @@ final class Client {
                 let json = String(ligne.dropFirst(6))
                 if let data = json.data(using: .utf8),
                    let evt = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    await MainActor.run { surEvenement(evt) }
+                    await surEvenement(evt)
                 }
             }
         } catch {}
