@@ -90,8 +90,20 @@ def cmd_mcp(args) -> int:
             print("Aucune application ArtCraft trouvée dans /Applications.")
         for a in apps:
             print(f"- {a.stem} : {a}")
-        print("\nPour chacune, ajoute dans macai.toml la commande qui lance son serveur MCP "
-              "(voir sa documentation, souvent `<appli> mcp`), puis `macai mcp tester`.")
+        # Le serveur MCP d'ArtCraft est un programme à part (ex. lightcraft-cli), pas l'app elle-même.
+        import shutil
+        dossiers = ["/opt/homebrew/bin", "/usr/local/bin", str(Path.home() / ".local/bin"),
+                    str(Path.home() / ".cargo/bin")]
+        clis = sorted({str(p) for d in dossiers for p in Path(d).glob("*craft-cli") if p.is_file()}
+                      | {c for a in apps if (c := shutil.which(a.stem.lower() + "-cli"))})
+        if clis:
+            print("\nServeurs MCP trouvés — à ajouter dans", cfg.fichier, ":")
+            for c in clis:
+                print(f'\n[[mcp]]\nnom = "{Path(c).name.removesuffix("-cli")}"\ncommande = ["{c}", "mcp"]')
+            print("\nPuis `macai mcp tester` (si « mcp » n'est pas le bon argument, voir `<cli> --help`).")
+        elif apps:
+            print("\nAucun serveur MCP ArtCraft installé (programmes « photocraft-cli », « lightcraft-cli »…) : "
+                  "installe-les depuis ArtCraft, puis relance `macai mcp detecter`.")
         return 0
     if not cfg.mcp:
         print(f"Aucun serveur MCP configuré dans {cfg.fichier}.")
