@@ -43,6 +43,13 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D23 | ArtCraft via ses `*-cli mcp` officiels (signés, notarisés) dans `~/.local/bin`, dossiers autorisés = dossier personnel, LightCraft `--compact` | Les applis n'exposent pas de MCP elles-mêmes ; 326 → 17 outils pour LightCraft. |
 | D24 | Outils MCP : jusqu'à 9 par logiciel, classés par proximité (verbes français traduits en anglais), schémas compactés | Mesuré : un petit modèle ne trouvait pas `doc_open` parmi 25 outils pris dans l'ordre ; prompt 3× plus court. |
 | D25 | Indexation : code des projets logiciels ignoré, dossiers personnels d'abord | Mesuré : 176 fichiers de code sur 240 au premier essai. |
+| D26 | Outils « tout-en-un » pour les tâches d'interface fréquentes : `demander_a_claude`, `ecrire_et_envoyer`, `ouvrir_reglage` | Mesuré : le modèle 4B enchaîne mal 6 clics (mode, nouvelle conversation, saisie, envoi) ; un seul appel déterministe est fiable. Claude (IA distante) n'est utilisé que si l'utilisateur le demande. |
+| D27 | Risque selon le contexte : taper/valider dans un Terminal = SENSIBLE ; valider dans une messagerie = SENSIBLE ; clic sur Envoyer/Supprimer/Publier = SENSIBLE | Relecture de sécurité : ces chemins contournaient les confirmations. |
+| D28 | Commande Terminal en lecture seule exécutée **sans shell** (liste blanche, sous-commandes contrôlées), sinon zsh -f après confirmation | `ls\nid`, `cat <(id)`, `diskutil eraseVolume` passaient sans confirmation. |
+| D29 | Écriture interdite dans les fichiers cachés, ~/Library (sauf iCloud Drive), les réglages et le code de MacAI ; lecture interdite des secrets (comparaison sans casse, liens résolus) | Persistance (~/.zshenv, LaunchAgents) et désactivation des garde-fous possibles depuis une page piégée. |
+| D30 | Interdiction absolue (dans le code) d'acheter, payer, demander des crédits ou une utilisation supplémentaire, et de mémoriser des secrets | Exigence de Mathieu. |
+| D31 | Chaque outil tourne dans un fil surveillé avec délai maximal | Vu en essai : une fenêtre d'autorisation macOS sans réponse bloquait le moteur indéfiniment. |
+| D32 | Question explicative (« comment… », « pourquoi… ») : outils de lecture seulement | Vu en essai : « comment envoyer un mail ? » préparait des brouillons et lisait les mails. |
 
 ## Lots
 
@@ -67,7 +74,7 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 
 ## Validation
 
-Installé et testé sur le MacBook Air le 15/10/2026 : 26 contrôles OK, scénarios réels avec le modèle local
-(documents, rangement, recherche, mémoire, tâches en plusieurs étapes, vision, ArtCraft). Restent à essayer
-par Mathieu ce qui demande ses autorisations macOS (voix, fenêtres, écran, Chrome) et Onshape (clés).
-Détail : [A_VALIDER.md](A_VALIDER.md).
+Installé et testé sur le MacBook Air (15/10/2026). Vérification complète le même jour : trois relectures (sécurité,
+bugs du moteur, app Swift) puis corrections, 121 tests automatiques, et essais réels avec le modèle local
+(documents, fichiers, mémoire, recherche, injection dans un fichier, commandes dangereuses, achats). Restent à
+essayer avec Mathieu les scénarios d'interface (voir [A_VALIDER.md](A_VALIDER.md)).
