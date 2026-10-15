@@ -217,3 +217,17 @@ def test_relance_si_le_modele_s_arrete_en_chemin(ctx):
     assert Orchestrateur(ctx, CommandesRapides()).traiter("demande-lui la météo") == "Message envoyé."
     assert fait == [1]
     assert "Fais-le maintenant" in ctx.ollama.recus[1]["messages"][-1]["content"]
+
+
+def test_discussions_attente_reponse_et_risque(ctx, monkeypatch):
+    from macai.outils import discussions as d
+    etats = iter([["vieux", "question ?"], ["vieux", "question ?", "Rép"], ["vieux", "Rép", "Réponse complète"],
+                  ["vieux", "Rép", "Réponse complète"], ["vieux", "Rép", "Réponse complète"],
+                  ["vieux", "Rép", "Réponse complète"]])
+    monkeypatch.setattr(d, "_textes", lambda pid: next(etats))
+    monkeypatch.setattr(d, "STABLE_S", 0.0)
+    monkeypatch.setattr(ctx.arret, "wait", lambda s: False)
+    assert d._attendre_reponse(ctx, 1, ["vieux"], "question ?") == "Rép\nRéponse complète"
+    assert d._risque_ecrire({"application": "Claude", "texte": "x"}) == Risque.MODIFICATION
+    assert d._risque_ecrire({"application": "Messages", "texte": "x"}) == Risque.SENSIBLE
+    assert d._risque_ecrire({"application": "Messages", "texte": "x", "envoyer": False}) == Risque.MODIFICATION

@@ -213,7 +213,7 @@ def outil(nom: str, description: str, groupe: str, parametres: dict | None = Non
 
 
 MODULES = ["systeme", "applications", "fichiers", "documents", "recherche_outils", "chrome",
-           "fenetres", "organisation", "memoire_outils", "competences_outils", "onshape_outils"]
+           "fenetres", "discussions", "organisation", "memoire_outils", "competences_outils", "onshape_outils"]
 
 
 def charger_tous() -> Registre:

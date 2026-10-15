@@ -41,11 +41,11 @@ def construire(utilisateur: str | None = None) -> str:
 
 # Repères pour piloter certaines applications (ajoutés seulement quand la demande les cite).
 ASTUCES = {
-    "claude": "Claude : en haut de la fenêtre, l'option « Chat et Cowork » donne le mode chat et l'option « Code » "
-              "le mode Claude Code. Après le clic, relis la fenêtre : la zone de texte du bas sert à écrire : "
-              "saisir_element avec valider=true ÉCRIT ET ENVOIE. Pour une nouvelle conversation : cmd+n. Après "
-              "l'envoi, attendre 15 s puis relire la fenêtre pour donner la réponse de Claude.",
-    "chatgpt": "ChatGPT : écris dans la zone de texte du bas (saisir_element, valider=true), puis relis la fenêtre.",
+    "claude": "Claude : pour lui poser une question ou lui envoyer un message, utilise demander_a_claude (il passe "
+              "en mode chat, ouvre une conversation, envoie et renvoie la réponse). Pour le reste (réglages, "
+              "projets, mode Code), lire_fenetre puis cliquer : l'option « Chat et Cowork » donne le mode chat, "
+              "l'option « Code » le mode Claude Code.",
+    "chatgpt": "ChatGPT : ecrire_et_envoyer(application=« ChatGPT », texte), puis attendre et lire_fenetre.",
     "reglages": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",
     "settings": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",
 }
