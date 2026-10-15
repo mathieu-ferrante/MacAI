@@ -110,7 +110,8 @@ def url_recherche(requete: str, site: str = "google") -> str:
        requis=["requete"], risque=Risque.CREATION)
 def chrome_rechercher(ctx, requete, site="google"):
     ouvrir_onglet(ctx, url_recherche(requete, site))
-    return f"Recherche « {requete} » ouverte sur {site.capitalize()}."
+    return (f"Recherche « {requete} » ouverte sur {site.capitalize()} dans Chrome. Tu n'as PAS lu les résultats : "
+            "pour répondre à une question, utilise recherche_web puis lire_page_web, ou dis que la page est ouverte.")
 
 
 PREMIERE_VIDEO_JS = r"""
