@@ -13,15 +13,18 @@ cp "$(swift build -c release --arch arm64 --show-bin-path)/MacAI" "$APP/Contents
 cp Ressources/Info.plist "$APP/Contents/Info.plist"
 [ -f Ressources/MacAI.icns ] && cp Ressources/MacAI.icns "$APP/Contents/Resources/" || true
 
-# Signature : identité « Apple Development » si Xcode est connecté à un identifiant Apple (les autorisations
-# macOS survivent alors aux mises à jour) ; sinon signature locale (autorisations à redonner après chaque
-# recompilation).
+# Signature : identité « Apple Development » si Xcode est connecté à un identifiant Apple, sinon certificat local
+# « MacAI Local » (app/creer_certificat.sh). Une signature stable garde les autorisations macOS d'une mise à jour
+# à l'autre ; en dernier recours, signature ad hoc (autorisations à redonner après chaque recompilation).
 IDENTITE=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 "Apple Development" | sed -E 's/.*"(.*)"/\1/' || true)
+if [ -z "${IDENTITE}" ] && security find-certificate -c "MacAI Local" >/dev/null 2>&1; then
+    IDENTITE="MacAI Local"
+fi
 if [ -n "${IDENTITE}" ]; then
     echo "→ Signature avec : ${IDENTITE}"
     codesign --force --deep --sign "${IDENTITE}" "$APP"
 else
-    echo "→ Signature locale (ad hoc)"
+    echo "→ Signature locale (ad hoc) : lance app/creer_certificat.sh pour garder les autorisations"
     codesign --force --deep --sign - "$APP"
 fi
 echo "✓ $APP prête"

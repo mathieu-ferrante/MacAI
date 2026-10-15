@@ -118,6 +118,7 @@ ok "Moteur installé — commande \`macai\` disponible dans le Terminal"
 titre "Application MacAI"
 if pgrep -xq "MacAI" 2>/dev/null; then osascript -e 'tell application "MacAI" to quit' >/dev/null 2>&1 || true; sleep 1; fi
 pkill -f "macai serveur" >/dev/null 2>&1 || true
+./app/creer_certificat.sh || echo "  ! Certificat local non créé : les autorisations seront à redonner après chaque mise à jour"
 ./app/construire.sh
 rm -rf /Applications/MacAI.app
 cp -R app/build/MacAI.app /Applications/
