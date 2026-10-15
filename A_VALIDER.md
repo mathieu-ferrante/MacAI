@@ -41,12 +41,24 @@ d'exécution sous confirmation, interdiction d'achat et de crédits, aucun secre
 (plus de moteur bloqué), « occupé » jamais bloqué, deux moteurs impossibles, Entrée ne confirme plus une action
 sensible, outils Claude / Réglages / messageries en un seul appel. Détail : PLAN.md (D26 à D32).
 
+## État au 15/10 au soir
+
+| Essai d'interface | Résultat |
+|---|---|
+| YouTube (« mets la vidéo Daft Punk Get Lucky »), puis « pause » | ✅ |
+| Réglages ouverts directement sur Bluetooth (`ouvrir_reglage`) | ✅ |
+| Calculatrice, TextEdit, lecture des Réglages, question à Claude | ⏳ à refaire : l'autorisation Accessibilité n'était pas active pour la nouvelle version de l'app |
+| Sans autorisation | ✅ MacAI s'arrête et donne la marche à suivre (plus de boucle dans les Réglages) |
+
+Signature : l'app est maintenant signée avec un certificat local « MacAI Local » (trousseau de session), donc
+les autorisations accordées devraient être conservées aux mises à jour suivantes.
+
 ## Ce qu'il te reste à faire (une seule fois)
 
 | # | À faire | Résultat attendu |
 |---|---|---|
 | 1 | Accepter les autorisations quand macOS les demande : **Accessibilité**, **Enregistrement de l'écran**, **Micro**, **Bureau / Documents / Téléchargements**, **Automatisation** (au premier usage de Chrome, Rappels, Mail…). Après chaque mise à jour de l'app, macOS peut les redemander (signature locale) | — |
-| 2 | Après l'Accessibilité : menu 🧠 > Quitter MacAI, puis rouvrir MacAI (Launchpad ou Spotlight) | la touche Fn fonctionne |
+| 2 | Après l'Accessibilité : menu 🧠 > Quitter MacAI, puis rouvrir MacAI (Launchpad ou Spotlight). Si MacAI était déjà coché : le retirer (−) puis le rajouter (+) | la touche Fn et le pilotage des fenêtres fonctionnent |
 | 3 | Réglages Système > Clavier > « Appuyer sur la touche 🌐 pour » : **Ne rien faire** | Fn sert à parler |
 | 4 | Chrome : Présentation > Options pour les développeurs > **Autoriser JavaScript à partir des Apple Events** | YouTube, lecture de pages |
 | 5 | Facultatif : `macai secret onshape` (clés API Onshape) | « fais-moi un cube de 1 m dans Onshape » |
@@ -84,3 +96,9 @@ Si quelque chose ne marche pas : menu 🧠 > Ouvrir le journal, et renvoie-moi l
   après 2 min d'inactivité recharge le modèle (quelques secondes de plus).
 - **Indexation complète** : environ 3 s par fichier ; elle se fait Mac branché et inutilisé, en plusieurs nuits
   si tu as beaucoup de documents.
+
+## Mise à jour de l'app
+
+`./installer.sh` (ou `app/construire.sh`) signe l'app avec le certificat « MacAI Local ». La première fois, macOS
+peut demander « codesign veut utiliser la clé MacAI Local » : saisis ton mot de passe de session et choisis
+**Toujours autoriser**. Si l'écran a été verrouillé, déverrouille-le avant de lancer la mise à jour.
