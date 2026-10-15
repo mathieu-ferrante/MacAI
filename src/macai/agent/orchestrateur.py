@@ -255,6 +255,11 @@ class Orchestrateur:
                             version += 1  # l'état a changé : refaire un appel déjà vu redevient légitime
                 trace.append({"outil": appel.nom, "arguments": appel.arguments, "ok": r.ok,
                               "cles": sorted(r.donnees) if isinstance(r.donnees, dict) else []})
+                if not r.ok and "AUTORISATION MANQUANTE" in r.texte:
+                    # Rien à tenter de plus : c'est à l'utilisateur d'accorder l'autorisation (vu en essai : le modèle
+                    # ouvrait les Réglages en boucle, ou conseillait de désactiver l'autorisation).
+                    return ("Je ne peux pas le faire pour l'instant : " +
+                            r.texte.split(":", 1)[1].strip() + " Ensuite, redemande-moi.")
                 statut = "SUCCÈS" if r.ok else "ÉCHEC"
                 limite = LIMITE_DONNEES.get(appel.nom, 4000)
                 messages.append({"role": "tool", "tool_name": appel.nom,

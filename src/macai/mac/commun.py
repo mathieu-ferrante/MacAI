@@ -23,12 +23,15 @@ def executer(cmd: list[str], delai: float = 30, entree: str | None = None, verif
 def _expliquer(erreur: str) -> str:
     """Traduit les erreurs macOS fréquentes en consignes compréhensibles."""
     if "-1743" in erreur or "Not authorized to send Apple events" in erreur:
-        return ("macOS bloque l'automatisation : Réglages Système > Confidentialité et sécurité > "
+        return ("AUTORISATION MANQUANTE (à accorder par l'utilisateur) : macOS bloque l'automatisation. "
+                "Réglages Système > Confidentialité et sécurité > "
                 "Automatisation > autorise MacAI pour cette application.")
     if ("-25211" in erreur or "-1719" in erreur or "assistive access" in erreur.lower()
             or "accès d’aide" in erreur or "accès d'aide" in erreur):
-        return ("macOS bloque le contrôle des fenêtres : Réglages Système > Confidentialité et sécurité > "
-                "Accessibilité > active MacAI.")
+        return ("AUTORISATION MANQUANTE (à accorder par l'utilisateur) : macOS bloque le contrôle des fenêtres. "
+                "Réglages Système > Confidentialité et sécurité > "
+                "Accessibilité > active MacAI (s'il est déjà coché : retire-le avec −, rajoute-le avec +), "
+                "puis relance MacAI.")
     if "-1728" in erreur:
         return f"Élément introuvable dans l'application ({erreur[:200]})."
     if "-600" in erreur:

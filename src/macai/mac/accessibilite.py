@@ -31,8 +31,10 @@ def _ax():
     except ImportError as e:
         raise ErreurOutil("Accessibilité indisponible (macOS uniquement).") from e
     if not AS.AXIsProcessTrusted():
-        raise ErreurOutil("macOS bloque le contrôle des fenêtres : Réglages Système > Confidentialité et "
-                          "sécurité > Accessibilité > active MacAI.")
+        raise ErreurOutil("AUTORISATION MANQUANTE (à accorder par l'utilisateur) : macOS bloque le contrôle des "
+                          "fenêtres. Réglages Système > Confidentialité et "
+                          "sécurité > Accessibilité > active MacAI (s'il est déjà coché : retire-le avec −, rajoute-le avec +), puis "
+                          "relance MacAI.")
     return AS
 
 

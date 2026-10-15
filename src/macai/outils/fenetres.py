@@ -288,7 +288,20 @@ def attendre(ctx, secondes=5):
 
 # --- Vision : dernier recours -----------------------------------------------------------
 
+def _verifier_capture_autorisee() -> None:
+    """Sans « Enregistrement de l'écran », macOS renvoie une capture noire : le modèle décrirait un écran noir."""
+    try:
+        import Quartz
+        if not Quartz.CGPreflightScreenCaptureAccess():
+            raise ErreurOutil("AUTORISATION MANQUANTE (à accorder par l'utilisateur) : Enregistrement de l'écran. "
+                              "Réglages Système > Confidentialité et sécurité > Enregistrement de l'écran > active "
+                              "MacAI, puis relance MacAI.")
+    except (ImportError, AttributeError):
+        pass
+
+
 def capture_reduite() -> bytes:
+    _verifier_capture_autorisee()
     with tempfile.TemporaryDirectory() as d:
         brut, petit = Path(d) / "ecran.png", Path(d) / "ecran.jpg"
         commun.executer(["screencapture", "-x", "-m", "-t", "png", str(brut)])

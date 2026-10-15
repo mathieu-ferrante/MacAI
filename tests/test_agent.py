@@ -259,3 +259,16 @@ def test_retenir_refuse_les_secrets(ctx, tmp_path):
                  "son code PIN est 1234"]:
         with pytest.raises(ErreurOutil):
             memoire_outils.retenir(ctx, fait)
+
+
+def test_autorisation_manquante_arrete_la_demande(ctx):
+    from macai.outils.base import ErreurOutil as E
+    reg = Registre()
+
+    @outil("lire_fenetre", "", "fenetres", mac_seulement=False, registre=reg)
+    def lire_fenetre(ctx):
+        raise E("AUTORISATION MANQUANTE (à accorder par l'utilisateur) : macOS bloque le contrôle des fenêtres.")
+    ctx.registre = reg
+    ctx.ollama = FauxOllama([appel("lire_fenetre"), appel("lire_fenetre"), Reponse(texte="je vais dans Réglages")])
+    texte = Orchestrateur(ctx, CommandesRapides()).traiter("lis la fenêtre du Finder")
+    assert texte.startswith("Je ne peux pas le faire pour l'instant") and len(ctx.ollama.recus) == 1
