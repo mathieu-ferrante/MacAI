@@ -40,6 +40,25 @@ MOTS_GROUPES: dict[str, list[str]] = {
 GROUPES_DEFAUT = ["applications", "fichiers", "recherche", "web", "systeme"]
 TOUJOURS = ["memoire"]
 MAX_OUTILS = 14
+MAX_DESIGNES = 9
+# Les outils des logiciels tiers (MCP) sont décrits en anglais : verbes et noms français courants traduits.
+ANGLAIS: dict[str, list[str]] = {
+    "ouvre": ["open"], "ouvrir": ["open"], "convertis": ["export", "convert", "open"],
+    "convertir": ["export", "convert", "open"], "exporte": ["export"], "exporter": ["export"],
+    "enregistre": ["save", "export"], "enregistrer": ["save", "export"], "sauvegarde": ["save"],
+    "cree": ["new", "create"], "creer": ["new", "create"], "nouveau": ["new"], "nouvelle": ["new"],
+    "ferme": ["close"], "fermer": ["close"], "ajoute": ["add", "import"], "ajouter": ["add", "import"],
+    "importe": ["import"], "importer": ["import"], "applique": ["run", "apply", "command"],
+    "filtre": ["filter", "command"], "flou": ["blur", "command"], "recadre": ["crop", "command"],
+    "redimensionne": ["resize", "size", "command"], "dessine": ["draw", "shape"], "forme": ["shape"],
+    "texte": ["text"], "calque": ["layer"], "calques": ["layer"], "image": ["image", "document"],
+    "photo": ["photo", "image"], "photos": ["photo", "query"], "video": ["video", "media"],
+    "montage": ["timeline", "clip"], "liste": ["list"], "cherche": ["query", "search", "find"],
+    "selectionne": ["select"], "note": ["rating", "rate"], "etoiles": ["rating"], "rendu": ["render"],
+    "apercu": ["preview", "render"], "capture": ["screenshot"], "annule": ["undo"], "efface": ["delete"],
+    "supprime": ["delete", "remove"], "commandes": ["command", "list"], "effet": ["effect"],
+    "anime": ["keyframe", "animation"], "animation": ["keyframe", "animation"],
+}
 VIDES = {"le", "la", "les", "un", "une", "des", "de", "du", "et", "ou", "a", "au", "en", "mon", "ma", "mes",
          "ce", "cette", "pour", "dans", "sur", "avec", "moi", "me", "il", "elle", "est", "dis", "fais", "peux"}
 
@@ -64,21 +83,26 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
     if not choisis:
         choisis = [g for g in GROUPES_DEFAUT if g in groupes]
 
-    noms: list[str] = []
-    # Outils désignés précisément par leurs mots-clés (compétences, connecteurs MCP).
-    for o in registre.disponibles():
-        if o.mots_cles and any(_contient(t, normaliser(m)) for m in o.mots_cles):
-            noms.append(o.nom)
-    # Dans les groupes retenus, les outils dont le nom et la description ressemblent le plus à la demande.
     mots = {_racine(m) for m in re.findall(r"[a-z0-9']+", t) if m not in VIDES and len(m) > 2}
+    mots |= {_racine(a) for m in re.findall(r"[a-z0-9']+", t) for a in ANGLAIS.get(m, [])}
+
+    def proximite(o) -> int:
+        texte = normaliser(o.nom.replace("_", " ") + " " + o.description)
+        return len(mots & {_racine(m) for m in re.findall(r"[a-z0-9']+", texte)})
+
+    # Outils désignés par leurs mots-clés (compétences, connecteurs MCP) : les plus proches de la demande
+    # d'abord, et pas plus de MAX_DESIGNES (une appli peut en exposer des dizaines).
+    designes = [o for o in registre.disponibles()
+                if o.mots_cles and any(_contient(t, normaliser(m)) for m in o.mots_cles)]
+    designes.sort(key=lambda o: -proximite(o))
+    noms: list[str] = [o.nom for o in designes[:MAX_DESIGNES]]
+    # Dans les groupes retenus, les outils dont le nom et la description ressemblent le plus à la demande.
     candidats = []
     for rang, g in enumerate(choisis):
         for o in groupes[g]:
             if o.nom in noms:
                 continue
-            texte = normaliser(o.nom.replace("_", " ") + " " + o.description)
-            proximite = len(mots & {_racine(m) for m in re.findall(r"[a-z0-9']+", texte)})
-            candidats.append((-proximite, rang, o.nom))
+            candidats.append((-proximite(o), rang, o.nom))
     noms += [n for _, _, n in sorted(candidats)]
     noms = noms[:MAX_OUTILS - 3]
     for g in TOUJOURS:  # toujours disponibles, en fin de liste

@@ -7,7 +7,7 @@ import pytest
 from macai.competences.competences import Bibliotheque, Competence, substituer
 from macai.connecteurs import onshape
 from macai.llm.ollama import Reponse
-from macai.mcp.client import GestionnaireMCP, risque_mcp
+from macai.mcp.client import GestionnaireMCP, compacter, developper_chemins, risque_mcp
 from macai.memoire.memoire import Memoire, apprendre
 from macai.outils import competences_outils, memoire_outils
 from macai.outils.base import ErreurOutil, Registre, Resultat, Risque, outil
@@ -54,6 +54,30 @@ def test_risque_mcp_force():
 
 
 # --- Mémoire ----------------------------------------------------------------------------
+
+def test_mcp_schemas_compactes_et_chemins():
+    longue = "Path beneath the configured automation read root. " * 10
+    p = compacter({"path": {"type": ["string", "null"], "description": longue, "default": None},
+                   "mode": {"enum": ["a", "b", None], "type": "string"},
+                   "ids": {"type": "array", "items": {"type": ["integer", "null"]}}})
+    assert p["path"]["type"] == "string" and len(p["path"]["description"]) <= 160 and "default" not in p["path"]
+    assert p["mode"]["enum"] == ["a", "b"] and p["ids"]["items"] == {"type": "integer"}
+    d = developper_chemins({"path": "~/Desktop/a.png", "liste": ["~", "texte ~ ici"]})
+    assert d["path"] == str(Path.home() / "Desktop/a.png") and d["liste"] == [str(Path.home()), "texte ~ ici"]
+
+
+def test_routeur_classe_les_outils_d_un_logiciel():
+    from macai.agent import routeur
+    reg = Registre()
+    noms = ["ui_set", "ui_pointer", "jobs_list", "session_list", "doc_inspect", "doc_close", "doc_new",
+            "doc_select", "layers_list", "history_undo", "doc_save", "doc_export", "doc_open"]
+    for n in noms:
+        outil(f"photocraft__{n}", f"[photocraft] {n.replace('_', ' ')} the document", "mcp_photocraft",
+                          mac_seulement=False, mots_cles=["photocraft"], registre=reg)(lambda ctx: None)
+    choisis = routeur.choisir("avec PhotoCraft, convertis image.png en jpg", reg)
+    assert "photocraft__doc_open" in choisis and "photocraft__doc_export" in choisis
+    assert len([n for n in choisis if n.startswith("photocraft")]) <= routeur.MAX_DESIGNES
+
 
 def test_memoire_chiffree_et_pertinence(tmp_path):
     m = Memoire(tmp_path)

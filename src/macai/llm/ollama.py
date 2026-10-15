@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -11,6 +13,9 @@ from typing import Callable, Iterator
 HOTE = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 if not HOTE.startswith("http"):
     HOTE = "http://" + HOTE
+
+
+MEMOIRE_SATUREE = re.compile(r"Insufficient Memory|out of memory|OutOfMemory|OOM", re.I)
 
 
 class ErreurOllama(RuntimeError):
@@ -74,6 +79,18 @@ class Ollama:
         }
         if outils:
             corps["tools"] = outils
+        try:
+            return self._discuter(corps, sur_texte)
+        except ErreurOllama as e:
+            # Mémoire graphique saturée (8 Go) : Ollama libère ses modèles, on décharge le reste et on réessaie.
+            if not MEMOIRE_SATUREE.search(str(e)):
+                raise
+            for m in self.charges():
+                self.decharger(m.get("name", ""))
+            time.sleep(2)
+            return self._discuter(corps, sur_texte)
+
+    def _discuter(self, corps: dict, sur_texte: Callable[[str], None] | None) -> Reponse:
         rep = Reponse()
         for morceau in self._flux("/api/chat", corps):
             msg = morceau.get("message", {})

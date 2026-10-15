@@ -151,6 +151,55 @@ class ServeurMCP:
         return not rep.get("isError", False), "\n".join(textes) or "(aucun contenu)", fichiers
 
 
+def _resumer(texte: str, limite: int) -> str:
+    """Premières phrases d'une description, sans dépasser la limite (un petit modèle lit mal les pavés)."""
+    texte = " ".join(str(texte).split())
+    if len(texte) <= limite:
+        return texte
+    coupe = texte[:limite]
+    fin = coupe.rfind(". ")
+    return coupe[:fin + 1] if fin > limite // 3 else coupe.rstrip() + "…"
+
+
+def _type_simple(spec: dict) -> str:
+    t = spec.get("type")
+    if isinstance(t, list):  # ["string", "null"] : facultatif, on garde le vrai type
+        t = next((x for x in t if x != "null"), "string")
+    if not t:
+        variantes = spec.get("anyOf") or spec.get("oneOf") or []
+        t = next((v.get("type") for v in variantes if v.get("type") not in (None, "null")), "object")
+    return t if isinstance(t, str) else "string"
+
+
+def compacter(proprietes: dict) -> dict:
+    """Schémas MCP allégés : type, description courte, valeurs permises. Divise la taille par 3 à 5
+    (mesuré sur ArtCraft) sans changer ce que le serveur reçoit."""
+    sortie = {}
+    for nom, spec in (proprietes or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        p = {"type": _type_simple(spec)}
+        if spec.get("description"):
+            p["description"] = _resumer(spec["description"], 160)
+        if spec.get("enum"):
+            p["enum"] = [v for v in spec["enum"] if v is not None]
+        if p["type"] == "array" and isinstance(spec.get("items"), dict):
+            p["items"] = {"type": _type_simple(spec["items"])}
+        sortie[nom] = p
+    return sortie
+
+
+def developper_chemins(valeur):
+    """« ~/Desktop/x.png » → chemin absolu : les logiciels tiers ne connaissent pas le « ~ » du shell."""
+    if isinstance(valeur, str) and (valeur == "~" or valeur.startswith("~/")):
+        return os.path.expanduser(valeur)
+    if isinstance(valeur, dict):
+        return {k: developper_chemins(v) for k, v in valeur.items()}
+    if isinstance(valeur, list):
+        return [developper_chemins(v) for v in valeur]
+    return valeur
+
+
 def nom_outil(serveur: str, outil: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]", "_", f"{serveur}__{outil}")[:64]
 
@@ -217,12 +266,12 @@ class GestionnaireMCP:
         nom_reel = d["name"]
 
         def appeler(ctx, **args):
-            ok, texte, fichiers = self.serveurs[serveur].appeler(nom_reel, args)
+            ok, texte, fichiers = self.serveurs[serveur].appeler(nom_reel, developper_chemins(args))
             return Resultat(ok, texte, {"fichiers": fichiers} if fichiers else None)
 
         o = Outil(nom=nom_outil(serveur, nom_reel),
-                  description=f"[{cfg.get('titre', serveur)}] {d.get('description', nom_reel)}"[:1000],
-                  fonction=appeler, groupe=f"mcp_{serveur}", parametres=schema.get("properties", {}),
+                  description=f"[{cfg.get('titre', serveur)}] {_resumer(d.get('description') or nom_reel, 300)}",
+                  fonction=appeler, groupe=f"mcp_{serveur}", parametres=compacter(schema.get("properties", {})),
                   requis=schema.get("required", []), risque=risque_mcp(d, (cfg.get("risques") or {}).get(nom_reel)),
                   mac_seulement=False, mots_cles=[serveur.lower(), *[m.lower() for m in cfg.get("mots_cles", [])]])
         # Erreurs MCP : messages lisibles plutôt qu'« Erreur inattendue ».

@@ -39,15 +39,32 @@ def genre_de(p: Path) -> str:
     return "autre"
 
 
+# Un dossier qui contient l'un de ces éléments est un projet logiciel : on y garde les documents, pas le code
+# (des milliers de fichiers sans intérêt pour « retrouve ma facture », et une indexation bien plus longue).
+MARQUEURS_PROJET = {".git", "package.json", "build.gradle", "build.gradle.kts", "settings.gradle", "Cargo.toml",
+                    "pyproject.toml", "setup.py", "go.mod", "pom.xml", "Package.swift", "Gemfile", "composer.json"}
+# Explorés en premier : là où sont les fichiers personnels.
+PRIORITAIRES = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents/com~apple~CloudDocs"]
+
+
 def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: bool = True) -> Iterator[tuple[Path, os.stat_result]]:
     ignores = set(ignorer)
-    pile = [Path(d).expanduser() for d in dossiers]
+    pile: list[tuple[Path, bool]] = []
+    for d in reversed([Path(d).expanduser() for d in dossiers]):
+        pile.append((d, False))
+        # Dossier personnel : Bureau, Documents, Téléchargements d'abord (la pile sort le dernier ajouté).
+        pile += [(d / p, False) for p in reversed(PRIORITAIRES) if d == Path.home() and (d / p).is_dir()]
+    vus: set[Path] = set()
     while pile:
-        d = pile.pop()
+        d, projet = pile.pop()
+        if d in vus:
+            continue
+        vus.add(d)
         try:
             entrees = list(os.scandir(d))
         except (PermissionError, FileNotFoundError, NotADirectoryError, OSError):
             continue
+        projet = projet or any(e.name in MARQUEURS_PROJET or e.name.endswith(".xcodeproj") for e in entrees)
         for e in entrees:
             nom = e.name
             if nom.startswith(".") or nom in ignores:
@@ -59,7 +76,7 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
                     if ext in PAQUETS_FICHIERS:
                         yield p, e.stat()
                     elif ext not in PAQUETS:
-                        pile.append(p)
+                        pile.append((p, projet))
                     continue
                 if not e.is_file(follow_symlinks=False):
                     continue
@@ -69,6 +86,8 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
             if st.st_size > taille_max or st.st_size == 0:
                 continue
             if not images and p.suffix.lower() in extraction.IMAGES:
+                continue
+            if projet and genre_de(p) in ("code", "autre"):
                 continue
             yield p, st
 

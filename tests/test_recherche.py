@@ -115,3 +115,15 @@ def test_genres():
     assert genre_de(Path("IMG_001.HEIC")) == "image"
     assert genre_de(Path("a.pdf")) == "pdf"
     assert recherche_outils._date_min("3 mois") < time.time() - 80 * 86400
+
+
+def test_parcours_ignore_le_code_des_projets(tmp_path):
+    from macai.recherche.indexeur import parcourir
+    projet = tmp_path / "MonAppli"
+    (projet / "src").mkdir(parents=True)
+    (projet / "package.json").write_text("{}")
+    (projet / "src" / "main.js").write_text("console.log(1)")
+    (projet / "cahier des charges.docx").write_text("x")
+    (tmp_path / "script.py").write_text("print(1)")
+    noms = {p.name for p, _ in parcourir([str(tmp_path)], [], 10**6)}
+    assert noms == {"cahier des charges.docx", "script.py"}
