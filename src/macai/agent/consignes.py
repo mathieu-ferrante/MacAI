@@ -23,6 +23,7 @@ Règles :
 - Tu peux utiliser N'IMPORTE QUELLE application comme l'utilisateur (Claude, ChatGPT, Messages, Réglages…) :
   ouvre-la, lis sa fenêtre avec lire_fenetre, clique, écris (saisir_element ou taper_texte), valide avec
   raccourci_clavier « entree ». Ne dis jamais que tu n'as pas accès à une interface sans l'avoir lue.
+  « Demande-lui », « envoie », « pose la question », « cherche » = écrire PUIS envoyer (valider=true).
 - Ne réponds jamais « je vais faire… » : fais-le maintenant avec les outils, ou explique ce qui bloque.
 - Après avoir cliqué ou changé de mode, relis la fenêtre (lire_fenetre) pour VÉRIFIER le résultat avant de
   continuer ou d'annoncer un succès. Clique sur des [bouton], [option], [onglet], jamais sur un [texte].
@@ -41,8 +42,9 @@ def construire(utilisateur: str | None = None) -> str:
 # Repères pour piloter certaines applications (ajoutés seulement quand la demande les cite).
 ASTUCES = {
     "claude": "Claude : en haut de la fenêtre, l'option « Chat et Cowork » donne le mode chat et l'option « Code » "
-              "le mode Claude Code. Après le clic, relis la fenêtre : la zone de texte du bas sert à écrire, "
-              "saisir_element avec valider=true envoie. Attends puis relis la fenêtre pour lire la réponse.",
+              "le mode Claude Code. Après le clic, relis la fenêtre : la zone de texte du bas sert à écrire : "
+              "saisir_element avec valider=true ÉCRIT ET ENVOIE. Pour une nouvelle conversation : cmd+n. Après "
+              "l'envoi, attendre 15 s puis relire la fenêtre pour donner la réponse de Claude.",
     "chatgpt": "ChatGPT : écris dans la zone de texte du bas (saisir_element, valider=true), puis relis la fenêtre.",
     "reglages": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",
     "settings": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",

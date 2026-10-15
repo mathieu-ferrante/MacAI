@@ -244,14 +244,23 @@ def appuyer(el) -> None:
     cliquer(*c)
 
 
-def definir_valeur(el, texte: str) -> None:
+def definir_valeur(el, texte: str, remplacer: bool = False) -> None:
+    """Écrit au clavier dans le champ (vraies frappes) : les applis web (Claude, Chrome, Slack…) ne voient pas un
+    texte posé directement dans AXValue, et leur bouton Envoyer reste grisé. Repli sur AXValue si besoin."""
     AS = _ax()
     AS.AXUIElementSetAttributeValue(el, "AXFocused", True)
-    if AS.AXUIElementSetAttributeValue(el, "AXValue", texte) != 0:
+    time.sleep(0.15)
+    if not attribut(el, "AXFocused"):
         appuyer(el)
-        time.sleep(0.1)
+        time.sleep(0.2)
+    if remplacer:
         raccourci(["cmd"], "a")
-        taper(texte)
+        time.sleep(0.05)
+    taper(texte)
+    time.sleep(0.2)
+    valeur = str(attribut(el, "AXValue") or "")
+    if texte[:20] not in valeur:
+        AS.AXUIElementSetAttributeValue(el, "AXValue", texte if remplacer or not valeur else valeur + texte)
 
 
 # --- Souris et clavier (Quartz) ----------------------------------------------------

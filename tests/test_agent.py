@@ -201,3 +201,19 @@ def test_jamais_d_achat_ni_de_credits():
             interdire_achat(t)
     for t in ["Chat et Cowork", "Nouveau", "Envoyer le message", "Fichier > Exporter", "Commandes"]:
         interdire_achat(t)
+
+
+def test_relance_si_le_modele_s_arrete_en_chemin(ctx):
+    reg = Registre()
+    fait = []
+
+    @outil("envoyer_message", "", "fenetres", mac_seulement=False, registre=reg)
+    def envoyer_message(ctx):
+        fait.append(1)
+        return "envoyé"
+    ctx.registre = reg
+    ctx.ollama = FauxOllama([Reponse(texte="J'ai écrit le texte, il reste à valider avec Entrée."),
+                             appel("envoyer_message"), Reponse(texte="Message envoyé.")])
+    assert Orchestrateur(ctx, CommandesRapides()).traiter("demande-lui la météo") == "Message envoyé."
+    assert fait == [1]
+    assert "Fais-le maintenant" in ctx.ollama.recus[1]["messages"][-1]["content"]

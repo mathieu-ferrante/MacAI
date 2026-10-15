@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 
@@ -17,6 +18,12 @@ from .contexte import Contexte
 MOTS_REFLEXION = ("analyse", "compare", "planifie", "organise", "explique pourquoi", "reflechis",
                   "strategie", "plan de", "etape par etape")
 HISTORIQUE_MAX = 12  # messages conservés d'une demande à l'autre
+
+
+# Réponse qui annonce une suite au lieu de la faire (« il reste à valider », « je vais envoyer »).
+INACHEVE = re.compile(r"\b(il (me )?reste a|reste a (faire|saisir|valider|envoyer|cliquer)|je vais|"
+                      r"prochaine etape|il faut (encore|maintenant|ensuite)|ensuite,? (il faut|je)|"
+                      r"je dois (encore|maintenant))\b")
 
 
 class Orchestrateur:
@@ -128,6 +135,7 @@ class Orchestrateur:
         reflexion = any(m in routeur.normaliser(demande) for m in MOTS_REFLEXION) or len(demande.split()) > 40
         modele = cfg.modeles["agent"]
         deja_vus: dict[str, int] = {}
+        relance = False
 
         for _etape in range(int(cfg.agent.get("etapes_max", 10))):
             ctx.verifier_arret()
@@ -136,6 +144,13 @@ class Orchestrateur:
             rep = ctx.ollama.discuter(modele, messages, outils, reflexion=reflexion,
                                       sur_texte=lambda t: ctx.emettre("texte", morceau=t))
             if not rep.appels:
+                # Un petit modèle s'arrête souvent en décrivant ce qu'il reste à faire : on le relance une fois.
+                if not relance and INACHEVE.search(routeur.normaliser(rep.texte)):
+                    relance = True
+                    messages += [{"role": "assistant", "content": rep.texte},
+                                 {"role": "user", "content": "Fais-le maintenant avec les outils, jusqu'au bout "
+                                                             "(par exemple appuyer sur Entrée pour envoyer)."}]
+                    continue
                 return rep.texte.strip() or "C'est fait."
             messages.append({"role": "assistant", "content": rep.texte,
                              "tool_calls": [{"function": {"name": a.nom, "arguments": a.arguments}}

@@ -97,10 +97,20 @@ def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
                           f"du texte (« {deja[:60]} ») : ce n'est sans doute pas le bon champ. Relis la fenêtre.")
     if e.role == "AXSecureTextField":
         raise ErreurOutil("C'est un champ de mot de passe : je ne le remplis pas, c'est à toi de le faire.")
-    ax.definir_valeur(e.ref, str(texte))
+    application = ctx.services.get("ax_application", "")
+    if application:  # les frappes vont à l'appli au premier plan
+        from .applications import trouver_application
+        app = trouver_application(application)
+        if app is not None:
+            commun.executer(["open", "-a", str(app)])
+            time.sleep(0.3)
+    ax.definir_valeur(e.ref, str(texte), remplacer=bool(remplacer))
     if valider:
+        time.sleep(0.2)
         ax.raccourci([], "entree")
-    return f"Texte écrit dans « {e.libelle or 'le champ'} »."
+        time.sleep(0.5)
+        return f"Texte écrit dans « {e.libelle or 'le champ'} » et envoyé (Entrée)."
+    return f"Texte écrit dans « {e.libelle or 'le champ'} » (pas encore envoyé : valider=true ou « entree »)."
 
 
 @outil("choisir_menu", "Choisit une commande dans la barre des menus d'une application, ex. "
@@ -157,10 +167,11 @@ def raccourci_clavier(ctx, touches):
 @outil("taper_texte", "Tape un texte au clavier à l'endroit du curseur, dans l'application indiquée. Préfère "
        "saisir_element (champ précis) quand lire_fenetre montre le champ.",
        "fenetres", {"texte": ("string", "texte à taper"),
-                    "application": ("string", "application où taper (elle doit être au premier plan)")},
+                    "application": ("string", "application où taper (elle doit être au premier plan)"),
+                    "valider": ("boolean", "appuyer sur Entrée ensuite (envoyer un message, lancer une recherche)")},
        requis=["texte", "application"], risque=Risque.MODIFICATION,
        annonce=lambda a: f"Taper « {a['texte'][:60]} » dans {a.get('application', '?')}")
-def taper_texte(ctx, texte, application):
+def taper_texte(ctx, texte, application, valider=False):
     # Garde-fou : le texte part dans le champ qui a le focus. On vérifie que c'est bien l'appli voulue,
     # sinon il atterrirait n'importe où (vu en essai : dans la saisie de l'utilisateur).
     from .applications import trouver_application
@@ -178,7 +189,11 @@ def taper_texte(ctx, texte, application):
         raise ErreurOutil(f"Le champ actif de {nom_voulu} contient déjà du texte (« {focus.strip()[:60]} ») : "
                           "c'est peut-être ce que l'utilisateur écrit. Utilise lire_fenetre puis saisir_element.")
     ax.taper(str(texte))
-    return f"Texte tapé dans {nom_voulu} (vérifie avec lire_fenetre qu'il est au bon endroit)."
+    if valider:
+        time.sleep(0.2)
+        ax.raccourci([], "entree")
+        return f"Texte tapé dans {nom_voulu} et envoyé (Entrée)."
+    return f"Texte tapé dans {nom_voulu}, pas encore envoyé (valider=true ou raccourci « entree »)."
 
 
 @outil("attendre", "Attend quelques secondes (qu'une page charge, qu'une appli réponde), puis relis la fenêtre.",
