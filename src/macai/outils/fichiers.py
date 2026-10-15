@@ -192,11 +192,6 @@ def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     return Resultat(True, f"Fichier écrit : {p} ({len(contenu)} caractères)", {"fichier": str(p)})
 
 
-@outil("deplacer", "Déplace un fichier ou dossier. Si la destination est un dossier, l'élément y est placé. "
-       "N'écrase jamais : ajoute (2) au nom si besoin.", "fichiers",
-       {"source": ("string", "chemin à déplacer"), "destination": ("string", "dossier ou nouveau chemin")},
-       risque=Risque.MODIFICATION, mac_seulement=False,
-       annonce=lambda a: f"Déplacer {a['source']} vers {a['destination']}")
 def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
     """La destination désigne-t-elle un dossier ? Oui s'il existe, finit par « / », ou s'il n'existe pas et n'a
     pas d'extension alors que la source en a une (« déplace a.pdf vers Factures » = dans le dossier Factures)."""
@@ -205,6 +200,11 @@ def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
     return not dest.exists() and not dest.suffix and src.is_file() and bool(src.suffix)
 
 
+@outil("deplacer", "Déplace un fichier ou dossier. Si la destination est un dossier, l'élément y est placé. "
+       "N'écrase jamais : ajoute (2) au nom si besoin.", "fichiers",
+       {"source": ("string", "chemin à déplacer"), "destination": ("string", "dossier ou nouveau chemin")},
+       risque=Risque.MODIFICATION, mac_seulement=False,
+       annonce=lambda a: f"Déplacer {a['source']} vers {a['destination']}")
 def deplacer(ctx, source, destination):
     src = resoudre(source, ecriture=True, doit_exister=True)
     dest = resoudre(destination, ecriture=True)

@@ -171,3 +171,11 @@ def test_deplacer_vers_dossier_inexistant_et_ecraser(ctx, tmp_path, monkeypatch)
     (tmp_path / "notes.md").write_text("v1")
     fichiers.ecrire_fichier_texte(ctx, str(tmp_path / "notes.md"), "v2", ecraser=True)
     assert (tmp_path / "notes.md").read_text() == "v2" and jetes == ["v1"]  # ancienne version à la Corbeille
+
+
+def test_outils_enregistres_sont_les_bonnes_fonctions():
+    # Une fonction d'aide placée sous un décorateur @outil le remplace silencieusement (bug vu sur deplacer).
+    from macai.outils.base import charger_tous
+    for o in charger_tous().outils.values():
+        if not o.nom.startswith(("mcp_", "competence_")) and "__" not in o.nom:
+            assert o.fonction.__name__ == o.nom, f"{o.nom} enregistre {o.fonction.__name__}"
