@@ -53,6 +53,10 @@ taille_max_mo = 50
 [chrome]
 application = "Google Chrome"
 
+[diagnostic]
+# Accès de diagnostic pour les essais (outils en lecture seule via le serveur local). Laisser à false.
+actif = false
+
 [voix]
 # "ecrit" ou "oral" (modifiable depuis le panneau).
 reponse = "ecrit"
@@ -73,6 +77,7 @@ class Config:
     chrome: dict = field(default_factory=dict)
     voix: dict = field(default_factory=dict)
     mcp: list = field(default_factory=list)
+    diagnostic: dict = field(default_factory=dict)
 
     @property
     def fichier(self) -> Path:
@@ -95,5 +100,5 @@ def charger(dossier: Path | None = None) -> Config:
         print(f"macai.toml invalide ({e}) : valeurs par défaut utilisées.", file=sys.stderr)
         perso = {}
     sections = {k: {**defaut.get(k, {}), **perso.get(k, {})}
-                for k in ("modeles", "agent", "recherche", "chrome", "voix")}
+                for k in ("modeles", "agent", "recherche", "chrome", "voix", "diagnostic")}
     return Config(donnees=dossier, mcp=perso.get("mcp", []), **sections)

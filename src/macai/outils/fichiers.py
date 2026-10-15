@@ -1,6 +1,7 @@
 """Fichiers et dossiers : lister, créer, écrire, déplacer, renommer, copier, Corbeille, ranger."""
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
@@ -11,11 +12,43 @@ from pathlib import Path
 from ..mac import commun
 from .base import ErreurOutil, Resultat, Risque, outil
 
-# Jamais lus ni modifiés par l'agent : clés, mots de passe, cookies.
-INTERDITS = [".ssh", ".gnupg", "Library/Keychains", "Library/Cookies",
-             "Library/Application Support/Google/Chrome/Default/Login Data",
-             "Library/Application Support/Google/Chrome/Default/Cookies",
-             "Library/Application Support/MacAI/secrets", ".aws", ".netrc", ".config/gh"]
+# Jamais lus ni modifiés par l'agent : clés, mots de passe, cookies, messageries, historiques, navigateurs.
+# Comparaison sans casse (APFS ne distingue pas ~/.SSH de ~/.ssh) sur le chemin réel (liens résolus).
+INTERDITS = [".ssh", ".gnupg", ".aws", ".netrc", ".config", ".docker", ".kube", ".npmrc", ".pypirc", ".env",
+             ".zsh_history", ".bash_history", ".python_history", ".lesshst", ".git-credentials",
+             "library/keychains", "library/cookies", "library/messages", "library/mail", "library/safari",
+             "library/accounts", "library/application support/google/chrome",
+             "library/application support/bravesoftware", "library/application support/microsoft edge",
+             "library/application support/arc", "library/application support/firefox",
+             "library/application support/1password", "library/application support/bitwarden",
+             "library/group containers/2bua8c4s2c.com.1password"]
+MOTS_INTERDITS = ("login data", "cookies", "web data", "keychain", "id_rsa", "id_ed25519", ".pem", ".p12")
+
+
+def _donnees_macai() -> Path:
+    from ..config import dossier_donnees
+    return Path(dossier_donnees()).expanduser().resolve()
+
+
+def _depot_macai() -> Path:
+    return Path(__file__).resolve().parents[3]  # …/MacAI (src/macai/outils/fichiers.py)
+
+
+def chemin_interdit(chemin) -> bool:
+    """Vrai si le chemin touche des secrets ou les fichiers de MacAI lui-même (jeton, journal, index, réglages)."""
+    try:
+        r = Path(os.path.realpath(Path(str(chemin)).expanduser()))
+    except (OSError, ValueError):
+        return True
+    texte = r.as_posix().casefold()
+    maison = Path.home().resolve().as_posix().casefold()
+    relatif = texte[len(maison) + 1:] if texte.startswith(maison + "/") else ""
+    if relatif and any(relatif == i or relatif.startswith(i + "/") for i in INTERDITS):
+        return True
+    if any(m in texte for m in MOTS_INTERDITS):
+        return True
+    return r.is_relative_to(_donnees_macai())
+
 
 CATEGORIES = {
     "Images": {".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp", ".svg", ".tiff", ".bmp", ".raw", ".cr2", ".nef"},
@@ -33,20 +66,29 @@ CATEGORIES = {
 
 
 def _ecriture_permise(p: Path) -> bool:
-    """Dossier personnel, disques externes et dossier temporaire du système ; jamais le système lui-même."""
-    r = p.resolve()
+    """Dossier personnel (hors fichiers cachés et Bibliothèque), disques externes et dossier temporaire ; jamais
+    le système, ni ce qui ferait exécuter du code plus tard (~/.zshenv, LaunchAgents, réglages et code de MacAI)."""
+    r = Path(os.path.realpath(p))
     temporaire = Path(tempfile.gettempdir()).resolve()
-    return (r.is_relative_to(Path.home().resolve()) or r.is_relative_to(temporaire)
-            or str(r).startswith("/Volumes/"))
+    if r.is_relative_to(temporaire) or str(r).startswith("/Volumes/"):
+        return True
+    maison = Path.home().resolve()
+    if not r.is_relative_to(maison):
+        return False
+    parties = r.relative_to(maison).parts
+    if any(x.startswith(".") for x in parties):
+        return False
+    if parties and parties[0] == "Library" and "Mobile Documents" not in parties:
+        return False  # seul iCloud Drive (Library/Mobile Documents) reste modifiable
+    return not (r.is_relative_to(_donnees_macai()) or r.is_relative_to(_depot_macai()))
 
 
 def verifier_chemin(p: Path, ecriture: bool = False) -> Path:
-    texte = p.as_posix()
-    for interdit in INTERDITS:
-        if f"/{interdit}" in texte or texte.endswith(interdit):
-            raise ErreurOutil(f"Accès refusé à {p} : dossier protégé (clés, mots de passe ou cookies).")
+    if chemin_interdit(p):
+        raise ErreurOutil(f"Accès refusé à {p} : dossier protégé (clés, mots de passe, messageries, navigateurs "
+                          "ou fichiers de MacAI).")
     if ecriture and sys.platform == "darwin" and not _ecriture_permise(p):
-        raise ErreurOutil(f"Écriture refusée hors du dossier personnel : {p}")
+        raise ErreurOutil(f"Écriture refusée : {p} (système, fichier caché, Bibliothèque ou fichiers de MacAI).")
     return p
 
 
@@ -143,6 +185,8 @@ def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     p = resoudre(chemin, ecriture=True)
     if p.exists() and not ecraser:
         p = sans_collision(p)
+    elif p.exists():
+        mettre_corbeille(p)  # l'ancienne version reste récupérable dans la Corbeille
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(contenu, encoding="utf-8")
     return Resultat(True, f"Fichier écrit : {p} ({len(contenu)} caractères)", {"fichier": str(p)})
@@ -153,10 +197,18 @@ def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
        {"source": ("string", "chemin à déplacer"), "destination": ("string", "dossier ou nouveau chemin")},
        risque=Risque.MODIFICATION, mac_seulement=False,
        annonce=lambda a: f"Déplacer {a['source']} vers {a['destination']}")
+def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
+    """La destination désigne-t-elle un dossier ? Oui s'il existe, finit par « / », ou s'il n'existe pas et n'a
+    pas d'extension alors que la source en a une (« déplace a.pdf vers Factures » = dans le dossier Factures)."""
+    if dest.is_dir() or str(texte).endswith("/"):
+        return True
+    return not dest.exists() and not dest.suffix and src.is_file() and bool(src.suffix)
+
+
 def deplacer(ctx, source, destination):
     src = resoudre(source, ecriture=True, doit_exister=True)
     dest = resoudre(destination, ecriture=True)
-    if dest.is_dir() or str(destination).endswith("/"):
+    if _vers_dossier(src, dest, destination):
         dest.mkdir(parents=True, exist_ok=True)
         dest = dest / src.name
     dest = sans_collision(dest)
@@ -186,12 +238,20 @@ def renommer(ctx, chemin, nouveau_nom):
 def copier(ctx, source, destination):
     src = resoudre(source, doit_exister=True)
     dest = resoudre(destination, ecriture=True)
-    if dest.is_dir():
+    if _vers_dossier(src, dest, destination):
+        dest.mkdir(parents=True, exist_ok=True)
         dest = dest / src.name
     dest = sans_collision(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     (shutil.copytree if src.is_dir() else shutil.copy2)(str(src), str(dest))
     return Resultat(True, f"Copié vers {dest}", {"fichier": str(dest)})
+
+
+def _cible_corbeille(chemin: str) -> str:
+    try:
+        return str(commun.chemin(chemin))
+    except (OSError, ValueError):
+        return str(chemin)
 
 
 def mettre_corbeille(p: Path) -> None:
@@ -209,13 +269,15 @@ def mettre_corbeille(p: Path) -> None:
 
 @outil("mettre_a_la_corbeille", "Met un fichier ou dossier à la Corbeille (récupérable).", "fichiers",
        {"chemin": ("string", "élément à jeter")}, risque=Risque.SENSIBLE, toujours_confirmer=True,
-       mac_seulement=False, annonce=lambda a: f"Mettre {a['chemin']} à la Corbeille")
+       mac_seulement=False, annonce=lambda a: f"Mettre {_cible_corbeille(a.get('chemin', ''))} à la Corbeille")
 def mettre_a_la_corbeille(ctx, chemin):
-    p = resoudre(chemin, ecriture=True, doit_exister=True)
-    essentiels = {"Desktop", "Documents", "Downloads", "Pictures", "Music", "Movies", "Library",
-                  "Applications", "Public", "iCloud Drive"}
-    if p == Path.home() or len(p.parts) <= 3 or (p.parent == Path.home() and p.name in essentiels):
-        raise ErreurOutil(f"Refusé : {p} est un dossier essentiel.")
+    p = resoudre(chemin, ecriture=True)
+    if not p.exists():
+        # Pas de correction automatique du nom ici : la confirmation doit porter sur le fichier exact.
+        raise ErreurOutil(f"{p} n'existe pas. Vérifie le nom exact avec lister_dossier ou rechercher_fichiers.")
+    maison = Path.home().resolve()
+    if p.resolve() == maison or len(p.parts) <= 3 or p.resolve().parent == maison:
+        raise ErreurOutil(f"Refusé : {p} est un dossier principal de ton compte.")
     mettre_corbeille(p)
     return f"{p.name} est dans la Corbeille."
 

@@ -29,6 +29,8 @@ final class Etat: ObservableObject {
     @Published var connecte = false
     @Published var statutMoteur = "Démarrage…"
     @Published var ecoute = false
+    /// Incrémenté à chaque affichage du panneau : le champ de saisie reprend le focus.
+    @Published var apparitions = 0
     @Published var modeOral: Bool = UserDefaults.standard.bool(forKey: "modeOral") {
         didSet { UserDefaults.standard.set(modeOral, forKey: "modeOral") }
     }
@@ -36,6 +38,9 @@ final class Etat: ObservableObject {
     let client = Client()
     let moteur = Moteur()
     let voix = Voix()
+    private var finEcouteEnCours = false   // un seul finirEcoute() à la fois
+    private var sessionEcoute = 0          // les résultats partiels d'une écoute finie sont ignorés
+    private var arretDemande = false       // « Arrêté. » n'est pas lu à voix haute
 
     func demarrer() {
         moteur.surEtat = { [weak self] s in self?.statutMoteur = s }
@@ -47,18 +52,38 @@ final class Etat: ObservableObject {
     private func boucleConnexion() async {
         while true {
             if client.chargerInfos() {
-                if (await client.lire("/etat")) != nil {
+                if let infos = await client.lire("/etat") as? [String: Any] {
                     connecte = true
                     statutMoteur = "Prêt"
-                    moteur.reinitialiserRelances()
+                    // Le moteur peut déjà travailler (reconnexion pendant une demande).
+                    occupe = infos["occupe"] as? Bool ?? false
+                    if !occupe { confirmation = nil }
+                    // Compteur de relances remis à zéro seulement après 60 s de connexion continue :
+                    // un moteur qui plante juste après son démarrage finit par être signalé.
+                    let stabilite = Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: 60_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        self?.moteur.reinitialiserRelances()
+                    }
                     await client.ecouter { [weak self] evt in self?.traiter(evt) }
+                    stabilite.cancel()
+                    if occupe { demandeInterrompue() }
                 }
                 connecte = false
                 client.oublierInfos()
-                statutMoteur = "Reconnexion…"
+                // Sans écraser un message du moteur (« s'arrête sans cesse »…) arrivé juste avant.
+                if statutMoteur == "Prêt" { statutMoteur = "Reconnexion…" }
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
+    }
+
+    /// Flux coupé pendant une demande : plus de « fin » à attendre, on libère l'interface.
+    private func demandeInterrompue() {
+        occupe = false
+        confirmation = nil
+        for i in etapes.indices where etapes[i].statut == .enCours { etapes[i].statut = .echec }
+        if reponse.isEmpty { reponse = "Le moteur s'est arrêté pendant la demande." }
     }
 
     // MARK: - Actions
@@ -72,6 +97,7 @@ final class Etat: ObservableObject {
         etapes = []
         propositionCompetence = false
         souvenirsAppris = []
+        arretDemande = false
         occupe = true
         Task {
             let r = await client.envoyer("/demande", ["texte": t])
@@ -90,41 +116,61 @@ final class Etat: ObservableObject {
 
     func arreter() {
         voix.taire()
+        arretDemande = true
+        guard connecte else {  // pas de moteur : rien ne renverra « fin »
+            occupe = false
+            return
+        }
         Task { await client.envoyer("/arret") }
     }
 
     func creerCompetence() {
         propositionCompetence = false
+        arretDemande = false
         occupe = true
         etapes = []
-        Task { await client.envoyer("/competence") }
+        Task {
+            if await client.envoyer("/competence") == nil { occupe = false }
+        }
     }
 
     // MARK: - Voix
 
+    // Début et fin sont lancés de façon synchrone (pas dans une Task) : un appui puis un relâchement
+    // rapides s'exécutent toujours dans cet ordre, et le micro ne peut pas rester ouvert.
+
     func commencerEcoute() {
-        guard !ecoute, connecte else { return }
+        guard !ecoute, !finEcouteEnCours, connecte else { return }
         voix.taire()
         ecoute = true
         saisie = ""
-        Task {
+        sessionEcoute += 1
+        let session = sessionEcoute
+        let tache = voix.ecouter { [weak self] partiel in
+            guard let self, self.ecoute, self.sessionEcoute == session else { return }
+            self.saisie = partiel
+        }
+        Task { [weak self] in
             do {
-                try await voix.ecouter { [weak self] partiel in
-                    Task { @MainActor in self?.saisie = partiel }
-                }
+                try await tache.value
             } catch {
-                ecoute = false
-                reponse = "Micro indisponible : \(error.localizedDescription)"
+                guard let self, self.sessionEcoute == session else { return }
+                self.ecoute = false
+                self.reponse = "Micro indisponible : \(error.localizedDescription)"
             }
         }
     }
 
     func finirEcoute() {
-        guard ecoute else { return }
-        Task {
-            let texte = await voix.terminer()
-            ecoute = false
-            if !texte.isEmpty { envoyer(texte) }
+        guard ecoute, !finEcouteEnCours else { return }
+        finEcouteEnCours = true
+        let fin = voix.terminer()
+        Task { [weak self] in
+            let texte = await fin.value
+            guard let self else { return }
+            self.ecoute = false
+            self.finEcouteEnCours = false
+            if !texte.isEmpty { self.envoyer(texte) }
         }
     }
 
@@ -135,6 +181,10 @@ final class Etat: ObservableObject {
         switch type {
         case "debut":
             occupe = true
+            reponse = ""
+            etapes = []
+            souvenirsAppris = []
+            propositionCompetence = false
             if let d = evt["demande"] as? String { derniereDemande = d }
         case "outil_debut":
             etapes.append(Etape(outil: evt["outil"] as? String ?? "", texte: evt["phrase"] as? String ?? "", statut: .enCours))
@@ -164,7 +214,8 @@ final class Etat: ObservableObject {
             confirmation = nil
             let texte = evt["texte"] as? String ?? ""
             reponse = texte
-            if modeOral && !texte.isEmpty { voix.parler(texte) }
+            if modeOral && !texte.isEmpty && !arretDemande { voix.parler(texte) }
+            arretDemande = false
         default:
             break
         }

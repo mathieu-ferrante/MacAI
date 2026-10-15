@@ -11,7 +11,8 @@ from pathlib import Path
 
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import ErreurOutil, Resultat, Risque, interdire_achat, outil
+from .base import (APPS_EXECUTION, APPS_MESSAGERIE, ENVOI, ErreurOutil, Resultat, Risque, interdire_achat,
+                   interdire_donnees_bancaires, nom_appli, outil)
 
 
 def _pas_dans_claude_code(ctx, application: str = "") -> None:
@@ -19,7 +20,7 @@ def _pas_dans_claude_code(ctx, application: str = "") -> None:
     l'utilisateur parle de Claude Code dans sa demande."""
     from ..agent.routeur import normaliser
     demande = normaliser(ctx.services.get("demande", ""))
-    if "code" in demande:
+    if re.search(r"\bclaude code\b|\bmode code\b", demande):
         return
     try:
         pid, nom = ax.pid_application(application) if application else ax.application_au_premier_plan()
@@ -30,6 +31,68 @@ def _pas_dans_claude_code(ctx, application: str = "") -> None:
     if ax.option_cochee(pid, "Code"):
         raise ErreurOutil("Claude est en mode Code : clique d'abord sur l'option « Chat et Cowork », relis la "
                           "fenêtre pour vérifier, puis écris.")
+
+
+# Dernière fenêtre lue (pour les niveaux de risque, qui ne voient que les arguments).
+_DERNIERE = {"app": "", "pid": 0, "elements": []}
+TOUCHES_ENVOI = {"entree", "return", "enter", "cmd+entree", "cmd+return", "cmd+enter", "cmd+maj+d", "cmd+shift+d"}
+
+
+def _appli_devant() -> str:
+    try:
+        return ax.application_au_premier_plan()[1]
+    except Exception:  # noqa: BLE001 - hors Mac ou lsappinfo indisponible : pas d'appli connue
+        return ""
+
+
+def _risque_selon(app: str, envoi: bool, libelle: str = "") -> Risque:
+    """Taper ou valider dans un Terminal = exécuter du code ; valider dans une messagerie = écrire à quelqu'un ;
+    cliquer sur Envoyer / Supprimer / Publier : confirmation dans tous ces cas."""
+    a = nom_appli(app)
+    if a in APPS_EXECUTION:
+        return Risque.SENSIBLE
+    if envoi and a in APPS_MESSAGERIE:
+        return Risque.SENSIBLE
+    if libelle and ENVOI.search(libelle):
+        return Risque.SENSIBLE
+    return Risque.MODIFICATION
+
+
+def _risque_cliquer(args: dict) -> Risque:
+    try:
+        n = int(args.get("numero", 0))
+        e = _DERNIERE["elements"][n - 1] if n >= 1 else None
+        libelle = f"{e.libelle} {e.valeur}" if e else ""
+    except (IndexError, ValueError, TypeError):
+        libelle = ""
+    return _risque_selon(_DERNIERE["app"], True, libelle)
+
+
+def _risque_saisir(args: dict) -> Risque:
+    return _risque_selon(_DERNIERE["app"], bool(args.get("valider")))
+
+
+def _risque_taper(args: dict) -> Risque:
+    return _risque_selon(str(args.get("application") or _appli_devant()), bool(args.get("valider")))
+
+
+def _risque_raccourci(args: dict) -> Risque:
+    touches = str(args.get("touches", "")).lower().replace(" ", "")
+    return _risque_selon(_appli_devant(), touches in TOUCHES_ENVOI)
+
+
+def _risque_menu(args: dict) -> Risque:
+    return _risque_selon(str(args.get("application", "")), False, str(args.get("chemin", "")))
+
+
+def _mettre_devant(ctx, pid: int, nom: str) -> None:
+    """Amène l'application au premier plan et vérifie qu'elle y est : les frappes vont à l'appli de devant."""
+    commun.osascript(f'tell application "System Events" to set frontmost of (first process whose unix id is '
+                     f'{int(pid)}) to true')
+    time.sleep(0.3)
+    pid_devant, devant = ax.application_au_premier_plan()
+    if pid_devant != pid:
+        raise ErreurOutil(f"{nom} n'est pas au premier plan ({devant} l'est) : je ne tape pas à l'aveugle.")
 
 
 def _elements(ctx) -> list:
@@ -52,25 +115,39 @@ def _element(ctx, numero):
        "fenetres", {"application": ("string", "nom de l'application, facultatif (sinon celle au premier plan)")},
        requis=[])
 def lire_fenetre(ctx, application=""):
+    nom = None
     if application:
         from .applications import trouver_application
         app = trouver_application(application)
-        commun.executer(["open", "-a", str(app) if app else application])
+        if app is None:
+            raise ErreurOutil(f"Application « {application} » introuvable. Vérifie avec applications_ouvertes.")
+        commun.executer(["open", "-a", str(app)])
         time.sleep(0.6)
-    titre, elements = ax.explorer_fenetre(application or None)
+        nom = app.stem
+    if nom is None and nom_appli(_appli_devant()) in ("macai", "loginwindow"):
+        raise ErreurOutil("Précise l'application à lire (paramètre application) : au premier plan, il n'y a que "
+                          "le panneau MacAI.")
+    titre, elements = ax.explorer_fenetre(nom)
+    appli = titre.split(" — ", 1)[0]
     ctx.services["ax_elements"] = elements
-    ctx.services["ax_application"] = titre.split(" — ", 1)[0]
+    ctx.services["ax_application"] = appli
+    try:
+        ctx.services["ax_pid"] = ax.pid_application(appli)[0]
+    except ErreurOutil:
+        ctx.services["ax_pid"] = 0
+    _DERNIERE.update(app=appli, pid=ctx.services["ax_pid"], elements=elements)
     if not elements:
         return Resultat(True, f"{titre} : aucun élément lisible. Essaie voir_ecran (vision).")
     return Resultat(True, f"Fenêtre : {titre}\n{ax.decrire(elements)}", {"nb": len(elements)})
 
 
 @outil("cliquer_element", "Clique sur un élément de fenêtre par son numéro (donné par lire_fenetre).", "fenetres",
-       {"numero": ("integer", "numéro de l'élément")}, risque=Risque.MODIFICATION,
+       {"numero": ("integer", "numéro de l'élément")}, risque=_risque_cliquer,
        annonce=lambda a: f"Cliquer sur l'élément {a['numero']}")
 def cliquer_element(ctx, numero):
     e = _element(ctx, numero)
-    interdire_achat(e.libelle, e.valeur)
+    interdire_achat(e.libelle, bouton=True)
+    interdire_achat(e.valeur)
     if e.role in ("AXStaticText", "AXImage"):
         raise ErreurOutil(f"L'élément {numero} est un {ax.ROLES.get(e.role)}, pas un bouton : choisis un [bouton], "
                           "[option], [case], [lien] ou [onglet] proche.")
@@ -84,10 +161,12 @@ def cliquer_element(ctx, numero):
                     "valider": ("boolean", "appuyer sur Entrée ensuite"),
                     "remplacer": ("boolean", "effacer le texte déjà présent (seulement si l'utilisateur le demande)")},
        requis=["numero", "texte"],
-       risque=Risque.MODIFICATION, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}")
+       risque=_risque_saisir, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}"
+                                                + (" puis valider (Entrée)" if a.get("valider") else ""))
 def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
     e = _element(ctx, numero)
-    interdire_achat(e.libelle)
+    interdire_achat(e.libelle, texte)
+    interdire_donnees_bancaires(texte)
     _pas_dans_claude_code(ctx, ctx.services.get("ax_application", ""))
     deja = (ax.attribut(e.ref, "AXValue") or "").strip() if e.role in ("AXTextArea", "AXTextField", "AXComboBox",
                                                                      "AXSearchField") else ""
@@ -97,13 +176,8 @@ def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
                           f"du texte (« {deja[:60]} ») : ce n'est sans doute pas le bon champ. Relis la fenêtre.")
     if e.role == "AXSecureTextField":
         raise ErreurOutil("C'est un champ de mot de passe : je ne le remplis pas, c'est à toi de le faire.")
-    application = ctx.services.get("ax_application", "")
-    if application:  # les frappes vont à l'appli au premier plan
-        from .applications import trouver_application
-        app = trouver_application(application)
-        if app is not None:
-            commun.executer(["open", "-a", str(app)])
-            time.sleep(0.3)
+    if ctx.services.get("ax_pid"):  # les frappes vont à l'appli au premier plan : on la vérifie
+        _mettre_devant(ctx, ctx.services["ax_pid"], ctx.services.get("ax_application", "l'application"))
     ax.definir_valeur(e.ref, str(texte), remplacer=bool(remplacer))
     if valider:
         time.sleep(0.2)
@@ -117,7 +191,7 @@ def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
        "« Fichier > Exporter > PDF… » (noms tels qu'affichés, en français).", "fenetres",
        {"application": ("string", "nom de l'application"),
         "chemin": ("string", "menus séparés par >, ex. « Fichier > Enregistrer sous… »")},
-       risque=Risque.MODIFICATION, annonce=lambda a: f"Menu {a['chemin']} dans {a['application']}")
+       risque=_risque_menu, annonce=lambda a: f"Menu {a['chemin']} dans {a['application']}")
 def choisir_menu(ctx, application, chemin):
     from .applications import trouver_application
     app = trouver_application(application)
@@ -152,14 +226,17 @@ def lister_menus(ctx, application, menu=""):
 
 @outil("raccourci_clavier", "Appuie sur un raccourci clavier dans l'application au premier plan, ex. "
        "« cmd+s », « cmd+maj+n », « entree », « echap », « tab ».", "fenetres",
-       {"touches": ("string", "raccourci, ex. cmd+c")}, risque=Risque.MODIFICATION,
-       annonce=lambda a: f"Raccourci {a['touches']}")
+       {"touches": ("string", "raccourci, ex. cmd+c")}, risque=_risque_raccourci,
+       annonce=lambda a: f"Raccourci {a['touches']} dans {_appli_devant() or 'l’application au premier plan'}")
 def raccourci_clavier(ctx, touches):
     parties = [p.strip() for p in touches.lower().replace(" ", "").split("+") if p.strip()]
     if not parties:
         raise ErreurOutil("Raccourci vide.")
     if parties[-1] == "q" and any(m in parties[:-1] for m in ("cmd", "command", "commande")):
         raise ErreurOutil("Pour quitter une application, utilise quitter_application.")
+    if nom_appli(_appli_devant()) in ("macai", "loginwindow", ""):
+        raise ErreurOutil("Aucune application cible au premier plan (le panneau MacAI l'est) : ouvre d'abord "
+                          "l'application avec ouvrir_application, puis refais le raccourci.")
     ax.raccourci(parties[:-1], parties[-1])
     return f"Raccourci {touches} envoyé."
 
@@ -169,20 +246,24 @@ def raccourci_clavier(ctx, touches):
        "fenetres", {"texte": ("string", "texte à taper"),
                     "application": ("string", "application où taper (elle doit être au premier plan)"),
                     "valider": ("boolean", "appuyer sur Entrée ensuite (envoyer un message, lancer une recherche)")},
-       requis=["texte", "application"], risque=Risque.MODIFICATION,
-       annonce=lambda a: f"Taper « {a['texte'][:60]} » dans {a.get('application', '?')}")
+       requis=["texte", "application"], risque=_risque_taper,
+       annonce=lambda a: f"Taper « {a['texte'][:300]} » dans {a.get('application', '?')}"
+                         + (" puis valider (Entrée)" if a.get("valider") else ""))
 def taper_texte(ctx, texte, application, valider=False):
     # Garde-fou : le texte part dans le champ qui a le focus. On vérifie que c'est bien l'appli voulue,
     # sinon il atterrirait n'importe où (vu en essai : dans la saisie de l'utilisateur).
     from .applications import trouver_application
+    interdire_achat(texte)
+    interdire_donnees_bancaires(texte)
     app = trouver_application(application)
-    if app is not None:
-        commun.executer(["open", "-a", str(app)])
-        time.sleep(0.4)
-    pid_voulu, nom_voulu = ax.pid_application(app.stem if app else application)
-    pid_devant, devant = ax.application_au_premier_plan()
-    if pid_devant != pid_voulu:
-        raise ErreurOutil(f"{nom_voulu} n'est pas au premier plan ({devant} l'est) : je ne tape pas à l'aveugle.")
+    if app is None:
+        raise ErreurOutil(f"Application « {application} » introuvable.")
+    commun.executer(["open", "-a", str(app)])
+    time.sleep(0.4)
+    pid_voulu, nom_voulu = ax.pid_application(app.stem)
+    _mettre_devant(ctx, pid_voulu, nom_voulu)
+    if ax.role_actif(pid_voulu) == "AXSecureTextField":
+        raise ErreurOutil("Le curseur est dans un champ de mot de passe : je n'y tape rien.")
     _pas_dans_claude_code(ctx, nom_voulu)
     focus = ax.champ_actif(pid_voulu)
     if focus and focus.strip():

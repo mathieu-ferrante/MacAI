@@ -159,3 +159,15 @@ def test_nom_mal_recopie_corrige(ctx, tmp_path):
     (tmp_path / "reunion.pdf").write_text("x")
     with pytest.raises(ErreurOutil):   # ambigu : on ne devine pas
         fichiers.resoudre(str(tmp_path / "reunion.jpg"), doit_exister=True)
+
+
+def test_deplacer_vers_dossier_inexistant_et_ecraser(ctx, tmp_path, monkeypatch):
+    jetes = []
+    monkeypatch.setattr(fichiers, "mettre_corbeille", lambda p: (jetes.append(p.read_text()), p.unlink()))
+    for n in ("a.pdf", "b.pdf"):
+        (tmp_path / n).write_text(n)
+        fichiers.deplacer(ctx, str(tmp_path / n), str(tmp_path / "Factures"))
+    assert sorted(p.name for p in (tmp_path / "Factures").iterdir()) == ["a.pdf", "b.pdf"]
+    (tmp_path / "notes.md").write_text("v1")
+    fichiers.ecrire_fichier_texte(ctx, str(tmp_path / "notes.md"), "v2", ecraser=True)
+    assert (tmp_path / "notes.md").read_text() == "v2" and jetes == ["v1"]  # ancienne version à la Corbeille

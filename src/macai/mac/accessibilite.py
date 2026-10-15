@@ -124,8 +124,10 @@ def activer_contenu_web(app_el, pid: int) -> bool:
         return False
     AS = _ax()
     _actives.add(pid)
-    for attr in ("AXManualAccessibility", "AXEnhancedUserInterface"):
-        AS.AXUIElementSetAttributeValue(app_el, attr, True)
+    # AXManualAccessibility suffit pour Electron (Claude, Slack…). AXEnhancedUserInterface (Chrome) peut
+    # perturber les animations de fenêtres : seulement si le premier ne s'applique pas.
+    if AS.AXUIElementSetAttributeValue(app_el, "AXManualAccessibility", True) != 0:
+        AS.AXUIElementSetAttributeValue(app_el, "AXEnhancedUserInterface", True)
     return True
 
 
@@ -156,6 +158,10 @@ def explorer_fenetre(nom_app: str | None = None, textes: bool = True) -> tuple[s
     pid, nom = pid_application(nom_app)
     app = AS.AXUIElementCreateApplication(pid)
     nouvelle = activer_contenu_web(app, pid)
+    # Une appli qui vient d'être lancée met parfois 1 à 3 s à afficher sa fenêtre (Réglages Système).
+    attente_fenetre = time.monotonic() + 4
+    while fenetre_principale(app) is None and time.monotonic() < attente_fenetre:
+        time.sleep(0.4)
     for essai in range(6):
         titre, elements = _lire(app, nom, textes)
         # Juste après l'activation, une appli web n'expose encore que ses boutons de fenêtre : on attend.
@@ -244,9 +250,16 @@ def appuyer(el) -> None:
     cliquer(*c)
 
 
+def _comparable(t: str) -> str:
+    """Texte comparable malgré les corrections automatiques (guillemets, apostrophes, tirets, espaces)."""
+    t = str(t or "").replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+    return re.sub(r"\s+", " ", t.replace("—", "-").replace("–", "-")).strip().casefold()
+
+
 def definir_valeur(el, texte: str, remplacer: bool = False) -> None:
     """Écrit au clavier dans le champ (vraies frappes) : les applis web (Claude, Chrome, Slack…) ne voient pas un
-    texte posé directement dans AXValue, et leur bouton Envoyer reste grisé. Repli sur AXValue si besoin."""
+    texte posé directement dans AXValue, et leur bouton Envoyer reste grisé. Repli sur AXValue seulement si la
+    frappe n'a rien changé du tout (jamais d'ajout : un message ne doit pas partir en double)."""
     AS = _ax()
     AS.AXUIElementSetAttributeValue(el, "AXFocused", True)
     time.sleep(0.15)
@@ -256,11 +269,12 @@ def definir_valeur(el, texte: str, remplacer: bool = False) -> None:
     if remplacer:
         raccourci(["cmd"], "a")
         time.sleep(0.05)
+    avant = str(attribut(el, "AXValue") or "")
     taper(texte)
-    time.sleep(0.2)
-    valeur = str(attribut(el, "AXValue") or "")
-    if texte[:20] not in valeur:
-        AS.AXUIElementSetAttributeValue(el, "AXValue", texte if remplacer or not valeur else valeur + texte)
+    time.sleep(0.25)
+    apres = str(attribut(el, "AXValue") or "")
+    if apres == avant and _comparable(texte[:20]) not in _comparable(apres):
+        AS.AXUIElementSetAttributeValue(el, "AXValue", texte)
 
 
 # --- Souris et clavier (Quartz) ----------------------------------------------------
@@ -403,3 +417,10 @@ def option_cochee(pid: int, libelle: str) -> bool:
         if p < PROFONDEUR_MAX:
             pile += [(e, p + 1) for e in attribut(el, "AXChildren") or []]
     return False
+
+
+def role_actif(pid: int) -> str:
+    """Rôle de l'élément qui a le focus dans l'application (ex. AXSecureTextField pour un mot de passe)."""
+    AS = _ax()
+    el = attribut(AS.AXUIElementCreateApplication(pid), "AXFocusedUIElement")
+    return str(attribut(el, "AXRole") or "") if el is not None else ""

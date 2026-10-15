@@ -91,7 +91,11 @@ def test_lire_page_et_cliquer(ctx, scripts, monkeypatch):
 
 def test_remplir_refuse_donnees_bancaires(ctx, scripts):
     with pytest.raises(ErreurOutil, match="bancaires"):
-        chrome.remplir_page(ctx, 2, "4970 1012 3456 7890")
+        chrome.remplir_page(ctx, 2, "4111 1111 1111 1111")
+    with pytest.raises(ErreurOutil, match="bancaires"):
+        chrome.remplir_page(ctx, 2, "4111.1111.1111.1111")
+    with pytest.raises(ErreurOutil, match="bancaires"):
+        chrome.remplir_page(ctx, 2, "DE89 3704 0044 0532 0130 00")
     scripts["reponses"] = ["motdepasse"]
     with pytest.raises(ErreurOutil, match="mot de passe"):
         chrome.remplir_page(ctx, 2, "texte normal")

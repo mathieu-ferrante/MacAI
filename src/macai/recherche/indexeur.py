@@ -43,6 +43,8 @@ def genre_de(p: Path) -> str:
 # (des milliers de fichiers sans intérêt pour « retrouve ma facture », et une indexation bien plus longue).
 MARQUEURS_PROJET = {".git", "package.json", "build.gradle", "build.gradle.kts", "settings.gradle", "Cargo.toml",
                     "pyproject.toml", "setup.py", "go.mod", "pom.xml", "Package.swift", "Gemfile", "composer.json"}
+# Fichier iCloud non téléchargé (« dataless ») : le lire déclencherait son téléchargement.
+SF_DATALESS = 0x40000000
 # Explorés en premier : là où sont les fichiers personnels.
 PRIORITAIRES = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents/com~apple~CloudDocs"]
 
@@ -74,7 +76,9 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
                 if e.is_dir(follow_symlinks=False):
                     ext = p.suffix.lower()
                     if ext in PAQUETS_FICHIERS:
-                        yield p, e.stat()
+                        st = e.stat()
+                        if not getattr(st, "st_flags", 0) & SF_DATALESS:
+                            yield p, st
                     elif ext not in PAQUETS:
                         pile.append((p, projet))
                     continue
@@ -83,7 +87,7 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
                 st = e.stat()
             except OSError:
                 continue
-            if st.st_size > taille_max or st.st_size == 0:
+            if st.st_size > taille_max or st.st_size == 0 or getattr(st, "st_flags", 0) & SF_DATALESS:
                 continue
             if not images and p.suffix.lower() in extraction.IMAGES:
                 continue
@@ -137,7 +141,8 @@ class Indexeur:
         return True, ""
 
     def a_faire(self) -> tuple[list[tuple[Path, os.stat_result]], list[str]]:
-        """Fichiers nouveaux ou modifiés (les plus récents d'abord) et fichiers disparus."""
+        """Fichiers nouveaux ou modifiés (les plus récents d'abord) et fichiers disparus. Un fichier non vu
+        (dossier illisible, disque débranché, fichier iCloud non téléchargé) n'est oublié que s'il n'existe plus."""
         connus = self.index.chemins()
         vus, nouveaux = set(), []
         for p, st in parcourir(self.dossiers, self.ignorer, self.taille_max, self.images):
@@ -147,7 +152,7 @@ class Indexeur:
             if ancien is None or abs((ancien[0] or 0) - st.st_mtime) > 1 or ancien[1] != st.st_size:
                 nouveaux.append((p, st))
         nouveaux.sort(key=lambda x: -x[1].st_mtime)
-        disparus = [c for c in connus if c not in vus]
+        disparus = [c for c in connus if c not in vus and not os.path.lexists(c)]
         return nouveaux, disparus
 
     def traiter(self, p: Path, st: os.stat_result) -> None:

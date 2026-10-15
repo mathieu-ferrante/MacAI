@@ -29,6 +29,7 @@ class Application:
         self._verrou_abonnes = threading.Lock()
         self._confirmations: dict[str, dict] = {}
         self._occupe = threading.Lock()
+        self._arret_avant_debut = False   # arrêt demandé entre l'envoi de la demande et son démarrage
         self.ctx = Contexte(config=self.cfg, ollama=self.ollama, registre=self.registre, journal=self.journal,
                             emettre=self.emettre, demander_confirmation=self._demander_confirmation)
         self._services()
@@ -54,6 +55,8 @@ class Application:
         if cfg.mcp:
             from .mcp.client import GestionnaireMCP
             g = GestionnaireMCP(cfg.mcp, self.registre, cfg.chemin("mcp_cache.json"))
+            # Les outils découverts en fond remplacent le dictionnaire du registre d'un bloc (voir
+            # GestionnaireMCP.enregistrer) : l'agent qui le parcourt au même moment n'est pas perturbé.
             g.enregistrer(decouvrir=False)
             s["mcp"] = g
             s["mots_routeur"] = g.mots_routeur
@@ -114,12 +117,29 @@ class Application:
             return self.orchestrateur.traiter(texte)
 
     def traiter_en_fond(self, texte: str) -> bool:
-        if self.occupe():
+        # Verrou pris ici (et non dans le fil) : deux demandes simultanées ne peuvent pas partir toutes les deux.
+        if not self._occupe.acquire(blocking=False):
             return False
-        threading.Thread(target=self.traiter, args=(texte,), daemon=True, name="demande").start()
+        self._arret_avant_debut = False
+        try:
+            threading.Thread(target=self._traiter_verrouille, args=(texte,), daemon=True, name="demande").start()
+        except RuntimeError:
+            self._occupe.release()
+            raise
         return True
 
+    def _traiter_verrouille(self, texte: str) -> str:
+        try:
+            if self._arret_avant_debut:  # « Stop » cliqué avant le démarrage : l'orchestrateur l'aurait effacé
+                self.emettre("fin", texte="Arrêté.", actions=[])
+                return "Arrêté."
+            return self.orchestrateur.traiter(texte)
+        finally:
+            self._arret_avant_debut = False
+            self._occupe.release()
+
     def arreter(self) -> None:
+        self._arret_avant_debut = True
         self.ctx.arret.set()
         for attente in list(self._confirmations.values()):
             attente["evenement"].set()

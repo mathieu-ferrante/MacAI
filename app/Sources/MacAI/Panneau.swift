@@ -3,7 +3,10 @@ import SwiftUI
 
 /// Panneau flottant façon Spotlight : apparaît au centre de l'écran, au-dessus des autres fenêtres.
 final class Panneau: NSPanel {
+    private let etat: Etat
+
     init(etat: Etat) {
+        self.etat = etat
         super.init(contentRect: NSRect(x: 0, y: 0, width: 640, height: 420),
                    styleMask: [.titled, .fullSizeContentView, .resizable],
                    backing: .buffered, defer: false)
@@ -38,6 +41,7 @@ final class Panneau: NSPanel {
         }
         NSApp.activate()
         makeKeyAndOrderFront(nil)
+        etat.apparitions += 1  // le champ de saisie reprend le focus
     }
 
     override func cancelOperation(_ sender: Any?) {
@@ -64,7 +68,12 @@ struct VuePanneau: View {
                     ForEach(etat.etapes) { e in ligneEtape(e) }
                     if let c = etat.confirmation { carteConfirmation(c) }
                     if !etat.reponse.isEmpty {
+                        // Réponse du modèle (peut reprendre du contenu lu) : seuls les liens https s'ouvrent,
+                        // jamais file:, x-apple…, ni d'autres schémas d'applications.
                         Text(LocalizedStringKey(etat.reponse)).textSelection(.enabled).font(.body)
+                            .environment(\.openURL, OpenURLAction { url in
+                                url.scheme?.lowercased() == "https" ? .systemAction : .discarded
+                            })
                     }
                     if !etat.souvenirsAppris.isEmpty {
                         Label("Retenu : " + etat.souvenirsAppris.joined(separator: " · "), systemImage: "brain")
@@ -80,6 +89,11 @@ struct VuePanneau: View {
         .frame(minWidth: 520, minHeight: 200)
         .background(.regularMaterial)
         .onAppear { focus = true }
+        // Champ désactivé tant que le moteur n'est pas prêt : on redonne le focus une fois connecté.
+        .onChange(of: etat.connecte) { _, connecte in
+            if connecte { DispatchQueue.main.async { focus = true } }
+        }
+        .onChange(of: etat.apparitions) { DispatchQueue.main.async { focus = true } }
     }
 
     private var barreSaisie: some View {
@@ -127,7 +141,8 @@ struct VuePanneau: View {
             Label(c.phrase, systemImage: "exclamationmark.shield.fill").foregroundStyle(.orange).font(.callout.bold())
             HStack {
                 Button("Refuser") { etat.repondre(false) }.keyboardShortcut(.cancelAction)
-                Button("Confirmer") { etat.repondre(true) }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                // Pas de raccourci Entrée : une action sensible ne se confirme que d'un clic.
+                Button("Confirmer") { etat.repondre(true) }.buttonStyle(.borderedProminent)
             }
         }
         .padding(12)

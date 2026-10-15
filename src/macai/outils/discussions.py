@@ -105,7 +105,8 @@ def _attendre_reponse(ctx, pid: int, avant: list[str], question: str) -> str:
         if ctx.arret.wait(2.0):
             raise ErreurOutil("Arrêt demandé.")
         nouveaux = [t for t in _textes(pid) if t not in deja]
-        if nouveaux and nouveaux == precedent:
+        # Une vraie réponse a du corps : un « Réflexion… » ou des suggestions de 2 mots ne suffisent pas.
+        if nouveaux and nouveaux == precedent and sum(len(t) for t in nouveaux) >= 40:
             stable_depuis = stable_depuis or time.monotonic()
             if time.monotonic() - stable_depuis >= STABLE_S:
                 return "\n".join(nouveaux)

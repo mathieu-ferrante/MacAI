@@ -38,9 +38,13 @@ final class Delegue: NSObject, NSApplicationDelegate {
         raccourcis.installer()
         // Démarrage automatique à l'ouverture de session.
         // Une seule fois : si l'utilisateur le désactive dans Réglages > Ouverture, on respecte son choix.
+        // Le drapeau n'est posé que si l'inscription a vraiment réussi (sinon on réessaiera au prochain lancement).
         if !UserDefaults.standard.bool(forKey: "ouvertureInscrite") {
             try? SMAppService.mainApp.register()
-            UserDefaults.standard.set(true, forKey: "ouvertureInscrite")
+            let statut = SMAppService.mainApp.status
+            if statut == .enabled || statut == .requiresApproval {
+                UserDefaults.standard.set(true, forKey: "ouvertureInscrite")
+            }
         }
     }
 
@@ -48,8 +52,14 @@ final class Delegue: NSObject, NSApplicationDelegate {
         etat.moteur.arreter()
     }
 
-    /// Accessibilité (piloter les fenêtres, touche Fn) et Enregistrement de l'écran (vision) : demandés une fois.
+    /// Accessibilité (piloter les fenêtres, touche Fn) et Enregistrement de l'écran (vision) : demandés une
+    /// fois par version de l'app (une nouvelle version signée peut devoir être autorisée à nouveau), pas à
+    /// chaque lancement.
     private func demanderAutorisations() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        let defauts = UserDefaults.standard
+        guard defauts.string(forKey: "autorisationsDemandeesVersion") != version else { return }
+        defauts.set(version, forKey: "autorisationsDemandeesVersion")
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
         if !CGPreflightScreenCaptureAccess() {

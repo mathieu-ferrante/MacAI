@@ -35,20 +35,33 @@ def applications_installees() -> dict[str, Path]:
     for d in DOSSIERS_APPS:
         dossier = Path(d).expanduser()
         if dossier.is_dir():
-            for p in dossier.glob("*.app"):
+            for p in [*dossier.glob("*.app"), *dossier.glob("*/*.app")]:  # ex. /Applications/ArtCraft/PhotoCraft.app
                 apps.setdefault(normaliser(p.stem), p)
-            for p in dossier.glob("*/*.app"):  # ex. /Applications/ArtCraft/PhotoCraft.app
-                apps.setdefault(normaliser(p.stem), p)
+    # Noms affichés en français (« Réglages Système », « Calculatrice ») en plus des noms des paquets.
+    try:
+        from Foundation import NSFileManager
+        fm = NSFileManager.defaultManager()
+        for p in list(apps.values()):
+            affiche = fm.displayNameAtPath_(str(p))
+            if affiche:
+                apps.setdefault(normaliser(str(affiche).removesuffix(".app")), p)
+    except ImportError:
+        pass
     _cache = (time.monotonic(), apps)
     return apps
 
 
 def trouver_application(nom: str) -> Path | None:
     apps = applications_installees()
-    cle = normaliser(nom).strip()
+    cle = re.sub(r"^(l'|l’|le |la |les |l'application |l'appli |application |appli |app )", "",
+                 normaliser(str(nom or "")).strip()).removesuffix(".app").strip()
+    if len(cle) < 2:
+        return None
     cle = normaliser(ALIAS.get(cle, cle))
     if cle in apps:
         return apps[cle]
+    if len(cle) < 3:
+        return None  # « m », « c » : trop court pour deviner
     # « photocraft » -> « PhotoCraft », « chrome » -> « Google Chrome », fautes de frappe.
     contient = [k for k in apps if cle in k.split() or k.startswith(cle) or cle.replace(" ", "") == k.replace(" ", "")]
     if len(contient) >= 1:
@@ -87,20 +100,23 @@ PROTEGEES = {"ollama", "llamaserver", "llama", "macai", "python", "finder", "log
        "applications", {"nom": ("string", "nom de l'application")}, risque=Risque.MODIFICATION,
        annonce=lambda a: f"Quitter {a['nom']}")
 def quitter_application(ctx, nom):
-    if normaliser(nom).replace(" ", "").replace("-", "") in PROTEGEES:
-        raise ErreurOutil(f"{nom} fait partie de MacAI ou de macOS : je ne le ferme pas. Le modèle d'IA se "
-                          "décharge tout seul 2 minutes après la dernière demande.")
     app = trouver_application(nom)
     if app is None:
         raise ErreurOutil(f"Aucune application « {nom} » installée. Vérifie le nom avec applications_ouvertes.")
-    nom_reel = app.stem
-    commun.osascript(f'if application {commun.chaine_as(nom_reel)} is running then '
-                     f'tell application {commun.chaine_as(nom_reel)} to quit', delai=30)
+    if normaliser(app.stem).replace(" ", "").replace("-", "") in PROTEGEES or \
+            normaliser(nom).replace(" ", "").replace("-", "") in PROTEGEES:
+        raise ErreurOutil(f"{app.stem} fait partie de MacAI ou de macOS : je ne le ferme pas. Le modèle d'IA se "
+                          "décharge tout seul 2 minutes après la dernière demande.")
+    from ..mac import accessibilite as ax
+    ouvertes = [a for a in ax.applis_ouvertes() if a["paquet"] == app.stem]
+    if not ouvertes:
+        return f"{app.stem} n'était pas ouvert."
+    commun.osascript(f"tell application {commun.chaine_as(app.stem)} to quit", delai=30)
     time.sleep(1)
-    if nom_reel in commun.executer(["lsappinfo", "visibleProcessList"], verifier=False).replace("_", " "):
-        return Resultat(False, f"{nom_reel} est toujours ouvert (il attend peut-être une réponse : "
+    if any(a["paquet"] == app.stem for a in ax.applis_ouvertes()):
+        return Resultat(False, f"{ouvertes[0]['nom']} est toujours ouvert (il attend peut-être une réponse : "
                                "document à enregistrer ?).")
-    return f"{nom_reel} est fermé."
+    return f"{ouvertes[0]['nom']} est fermé."
 
 
 @outil("applications_ouvertes", "Liste les applications actuellement ouvertes et celle au premier plan.",
@@ -119,19 +135,38 @@ def applications_ouvertes(ctx):
     return Resultat(True, texte, {"applications": noms})
 
 
+# Ouvrir ces fichiers revient à exécuter du code (Terminal, Automator, AppleScript, installeurs, raccourcis web).
+EXECUTABLES = {".command", ".terminal", ".sh", ".zsh", ".bash", ".tool", ".app", ".pkg", ".mpkg", ".dmg",
+               ".workflow", ".scpt", ".scptd", ".applescript", ".webloc", ".fileloc", ".inetloc", ".jar", ".py",
+               ".pl", ".rb", ".shortcut", ".prefpane", ".mobileconfig", ".kext", ".plist"}
+
+
+def _risque_ouvrir(args: dict) -> Risque:
+    from .base import APPS_EXECUTION, nom_appli
+    if Path(str(args.get("chemin", ""))).suffix.lower() in EXECUTABLES:
+        return Risque.SENSIBLE
+    if nom_appli(str(args.get("application", ""))) in APPS_EXECUTION:
+        return Risque.SENSIBLE
+    return Risque.CREATION
+
+
 @outil("ouvrir_fichier", "Ouvre un fichier ou un dossier avec son application par défaut, ou avec une "
        "application précise.", "applications",
        {"chemin": ("string", "chemin du fichier ou dossier"),
         "application": ("string", "application à utiliser, facultatif")}, requis=["chemin"],
-       risque=Risque.CREATION, annonce=lambda a: f"Ouvrir {a['chemin']}")
+       risque=_risque_ouvrir, annonce=lambda a: f"Ouvrir {a['chemin']}"
+                                                + (f" avec {a['application']}" if a.get("application") else ""))
 def ouvrir_fichier(ctx, chemin, application=""):
-    p = commun.chemin(chemin)
+    from .fichiers import verifier_chemin
+    p = verifier_chemin(commun.chemin(chemin))
     if not p.exists():
         raise ErreurOutil(f"{p} n'existe pas. Utilise rechercher_fichiers pour le retrouver.")
     cmd = ["open"]
     if application:
         app = trouver_application(application)
-        cmd += ["-a", str(app) if app else application]
+        if app is None:
+            raise ErreurOutil(f"Application « {application} » introuvable.")
+        cmd += ["-a", str(app)]
     commun.executer(cmd + [str(p)])
     return f"{p.name} est ouvert."
 

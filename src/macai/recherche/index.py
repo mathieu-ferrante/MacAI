@@ -87,6 +87,7 @@ class Index:
         self.modele = modele
         self._verrou = threading.RLock()
         self._matrice = None          # (ids, numpy float16 [n, D]) chargés à la demande
+        self._version = None          # PRAGMA data_version au chargement de la matrice
         self._derniere_utilisation = 0.0
         self.conn = self._connecter()
 
@@ -153,9 +154,16 @@ class Index:
 
     # --- Recherche ----------------------------------------------------------
 
+    def _version_base(self) -> int:
+        """Change quand une AUTRE connexion (l'indexeur, processus séparé) a modifié la base."""
+        return self.conn.execute("PRAGMA data_version").fetchone()[0]
+
     def _vecteurs(self):
         import numpy as np
         with self._verrou:
+            version = self._version_base()
+            if self._matrice is not None and version != self._version:
+                self._matrice = None  # l'indexeur a écrit depuis : matrice périmée, rechargée
             if self._matrice is None:
                 lignes = self.conn.execute("SELECT id, vecteur FROM extraits WHERE vecteur IS NOT NULL").fetchall()
                 if not lignes:
@@ -163,6 +171,7 @@ class Index:
                 ids = np.fromiter((l["id"] for l in lignes), dtype=np.int64, count=len(lignes))
                 mat = np.frombuffer(b"".join(l["vecteur"] for l in lignes), dtype=np.float16).reshape(len(lignes), -1)
                 self._matrice = (ids, mat)
+                self._version = version
             self._derniere_utilisation = time.monotonic()
             return self._matrice
 

@@ -12,6 +12,8 @@ final class Raccourcis {
     private var gestionnaire: EventHandlerRef?
     private var moniteurGlobal: Any?
     private var moniteurLocal: Any?
+    private var moniteurTouchesGlobal: Any?
+    private var moniteurTouchesLocal: Any?
     private var appuiDepuis: Date?
     private var ecouteLancee = false
     private var minuterie: Timer?
@@ -80,29 +82,51 @@ final class Raccourcis {
         let traiter: (NSEvent) -> Void = { [weak self] e in
             MainActor.assumeIsolated { self?.changementModificateurs(e) }
         }
+        // Une vraie touche frappée pendant l'appui (Fn + flèche, Fn + Effacer, Option droite pour { } [ ]
+        // sur clavier français) : ce n'est pas une prise de parole. Seul le fait qu'une touche soit frappée
+        // compte, rien n'est lu ni gardé.
+        let touche: (NSEvent) -> Void = { [weak self] _ in
+            MainActor.assumeIsolated { self?.toucheFrappee() }
+        }
         // Surveillance globale : nécessite l'autorisation Accessibilité (demandée au premier lancement).
-        moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
+        installerMoniteursGlobaux(traiter, touche)
         moniteurLocal = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { e in traiter(e); return e }
-        if !AXIsProcessTrusted() { attendreAccessibilite(traiter) }
+        moniteurTouchesLocal = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in touche(e); return e }
+        if !AXIsProcessTrusted() { attendreAccessibilite(traiter, touche) }
     }
 
-    /// Le moniteur global ne reçoit rien tant que l'Accessibilité n'est pas accordée : on le réinstalle ensuite.
-    private func attendreAccessibilite(_ traiter: @escaping (NSEvent) -> Void) {
+    private func installerMoniteursGlobaux(_ traiter: @escaping (NSEvent) -> Void, _ touche: @escaping (NSEvent) -> Void) {
+        if let m = moniteurGlobal { NSEvent.removeMonitor(m) }
+        if let m = moniteurTouchesGlobal { NSEvent.removeMonitor(m) }
+        moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
+        moniteurTouchesGlobal = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: touche)
+    }
+
+    /// Les moniteurs globaux ne reçoivent rien tant que l'Accessibilité n'est pas accordée : on les réinstalle
+    /// ensuite. Vérification toutes les 2 s pendant 10 minutes au plus (sinon : au prochain lancement).
+    private func attendreAccessibilite(_ traiter: @escaping (NSEvent) -> Void, _ touche: @escaping (NSEvent) -> Void) {
         Task { @MainActor [weak self] in
+            var essais = 0
             while !AXIsProcessTrusted() {
+                essais += 1
+                if essais > 300 { return }
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
-            guard let self else { return }
-            if let m = self.moniteurGlobal { NSEvent.removeMonitor(m) }
-            self.moniteurGlobal = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: traiter)
+            self?.installerMoniteursGlobaux(traiter, touche)
         }
+    }
+
+    private func toucheFrappee() {
+        if appuiDepuis != nil && !ecouteLancee { annulerAppui() }
     }
 
     private func toucheEnfoncee(_ e: NSEvent) -> Bool? {
         switch touchePourParler {
         case "option_droite":
             guard e.keyCode == UInt16(kVK_RightOption) else { return nil }
-            return e.modifierFlags.contains(.option)
+            // Drapeau propre à l'Option droite (NX_DEVICERALTKEYMASK) : l'Option gauche maintenue
+            // n'empêche pas de voir le relâchement.
+            return e.modifierFlags.rawValue & 0x40 != 0
         default:
             guard e.keyCode == UInt16(kVK_Function) else { return nil }
             return e.modifierFlags.contains(.function)
@@ -116,6 +140,7 @@ final class Raccourcis {
             return
         }
         if enfoncee {
+            minuterie?.invalidate()
             appuiDepuis = Date()
             // Appui maintenu 0,3 s : on commence à écouter (un appui bref garde son rôle habituel).
             minuterie = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in

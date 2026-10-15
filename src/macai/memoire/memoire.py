@@ -38,7 +38,11 @@ def _cle(dossier: Path) -> bytes:
             return base64.b64decode(r.stdout.strip())
         cle = os.urandom(32)
         # Passée par l'entrée standard (`security -i`) pour ne jamais apparaître dans la liste des processus.
-        commande = f"add-generic-password -a macai -s {SERVICE_TROUSSEAU} -w {base64.b64encode(cle).decode()} -U\n"
+        # Base64 et nom fixe : ni espace ni retour à la ligne, donc rien d'injectable dans la commande.
+        valeur = base64.b64encode(cle).decode()
+        if not re.fullmatch(r"[A-Za-z0-9+/=]+", valeur) or not re.fullmatch(r"[\w-]+", SERVICE_TROUSSEAU):
+            raise ValueError("valeur inattendue pour le Trousseau")
+        commande = f"add-generic-password -a macai -s {SERVICE_TROUSSEAU} -w {valeur} -U\n"
         subprocess.run(["security", "-i"], input=commande, text=True, check=True, capture_output=True)
         return cle
     f = dossier / "cle_memoire"

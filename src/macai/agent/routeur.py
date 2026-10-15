@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from ..outils.base import Registre
+from ..outils.base import APPS_MESSAGERIE, Registre
 
 MOTS_GROUPES: dict[str, list[str]] = {
     "systeme": ["volume", "son", "muet", "musique", "pause", "lecture", "suivant", "precedent",
@@ -41,12 +41,20 @@ GROUPES_DEFAUT = ["applications", "fichiers", "recherche", "web", "systeme"]
 TOUJOURS = ["memoire"]
 MAX_OUTILS = 14
 MAX_DESIGNES = 9
-PILOTAGE = ["ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
+# Outils de haut niveau d'abord (s'ils existent) : ils doivent survivre à la limite du nombre d'outils.
+PILOTAGE = ["demander_a_claude", "ecrire_et_envoyer", "ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
             "raccourci_clavier", "attendre"]
 # Une deuxième action après l'ouverture d'une appli : il faudra lire sa fenêtre, cliquer, écrire.
 ACTION_DANS_APPLI = re.compile(r"\b(et|puis|ensuite|va|passe|demande|ecris|tape|envoie|mets|active|desactive|"
                                r"choisis|selectionne|clique|appuie|remplis|pose|dis-lui|demande-lui|"
                                r"ecris-lui)\b|,")
+# « Écris à Claude », « demande à ChatGPT », « envoie-le sur WhatsApp » : agir dans une appli connue,
+# même sans « ouvre ».
+APPS_CONNUES = sorted({"claude", "chatgpt", "gemini", "le chat", "mistral", "perplexity", "copilot", "notes",
+                       "reglages", "reglages systeme", *APPS_MESSAGERIE}, key=len, reverse=True)
+VERS_APPLI = re.compile(r"\b(ecris|ecrire|ecris-lui|demande|demander|demande-lui|pose|poser|dis(?!-moi)|dire|envoie|"
+                        r"envoyer|envoie-lui|reponds|repondre)\b.*?\b(a|au|sur|dans|via|avec)\s+"
+                        r"(?:l'(?:appli(?:cation)?\s+)?)?(" + "|".join(map(re.escape, APPS_CONNUES)) + r")\b")
 # Les outils des logiciels tiers (MCP) sont décrits en anglais : verbes et noms français courants traduits.
 ANGLAIS: dict[str, list[str]] = {
     "ouvre": ["open"], "ouvrir": ["open"], "convertis": ["export", "convert", "open"],
@@ -75,7 +83,9 @@ def normaliser(texte: str) -> str:
 
 
 def _contient(texte: str, mot: str) -> bool:
-    return re.search(rf"(?<![a-z0-9]){re.escape(mot)}", texte) is not None
+    # Mots courts (« son », « ram », « lis ») : mot entier, pluriel admis (« sont » ne doit pas valoir « son »).
+    fin = r"(?:s|x)?(?![a-z0-9])" if len(mot) <= 4 else ""
+    return re.search(rf"(?<![a-z0-9]){re.escape(mot)}{fin}", texte) is not None
 
 
 def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] | None = None) -> list[str]:
@@ -87,7 +97,8 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
     scores = {g: sum(_contient(t, normaliser(m)) for m in ms) for g, ms in mots.items() if g in groupes}
     choisis = [g for g, s in sorted(scores.items(), key=lambda x: -x[1]) if s > 0]
     # « Ouvre Claude et demande-lui… », « ouvre Réglages, va dans Wi-Fi » : agir DANS l'appli ouverte.
-    dans_appli = "applications" in choisis and "fenetres" in groupes and bool(ACTION_DANS_APPLI.search(t))
+    dans_appli = "fenetres" in groupes and (("applications" in choisis and bool(ACTION_DANS_APPLI.search(t)))
+                                            or bool(VERS_APPLI.search(t)))
     if not choisis:
         choisis = [g for g in GROUPES_DEFAUT if g in groupes]
 

@@ -19,6 +19,11 @@ SITES = {
     "leboncoin": "https://www.leboncoin.fr", "deezer": "https://www.deezer.com",
 }
 NE_PAS_INTERCEPTER = re.compile(r"\b(fichier|dossier|document|pdf|photo|image|et (fais|cree|ecris|clique|resume|dis))")
+# Le « nom » cache une suite d'actions (« Safari puis cherche… », « Notes, crée… ») ou désigne autre chose
+# qu'une appli (« un nouvel onglet », « mes mails », « le dernier fichier ») : c'est pour l'agent.
+NOM_COMPLEXE = re.compile(r"\b(puis|ensuite|et)\b|[,;]|:(?!//)")
+NOM_NON_APPLI = re.compile(r"^(tout|toutes|mes|ma|mon|un|une|le dernier|la derniere|nouvel|nouveau|nouvelle|"
+                           r"l['’]onglet|onglet)\b")
 
 
 @dataclass
@@ -30,6 +35,11 @@ class Plan:
 def _norm(texte: str) -> str:
     """Minuscules sans accents, MÊME longueur que l'original (pour extraire les noms avec leur casse)."""
     return "".join(unicodedata.normalize("NFD", c)[0].lower() if c.strip() else " " for c in texte)
+
+
+def _nom_simple(nom: str) -> bool:
+    nom = nom.strip()
+    return bool(nom) and not NOM_COMPLEXE.search(nom) and not NOM_NON_APPLI.match(nom)
 
 
 def _nettoyer(nom: str) -> str:
@@ -105,7 +115,7 @@ class CommandesRapides:
         return Plan([("chrome_rechercher", {"requete": q, "site": m.group("site")})])
 
     def _ouvrir(self, m, original):
-        if NE_PAS_INTERCEPTER.search(m.group(0)) or " et " in m.group("nom"):
+        if NE_PAS_INTERCEPTER.search(m.group(0)) or not _nom_simple(m.group("nom")):
             return None
         nom = _nettoyer(self._extrait(m, original, "nom"))
         if not nom or len(nom.split()) > 4:
@@ -118,7 +128,7 @@ class CommandesRapides:
         return Plan([("ouvrir_application", {"nom": nom})])
 
     def _quitter(self, m, original):
-        if NE_PAS_INTERCEPTER.search(m.group(0)) or " et " in m.group("nom"):
+        if NE_PAS_INTERCEPTER.search(m.group(0)) or not _nom_simple(m.group("nom")):
             return None
         nom = _nettoyer(self._extrait(m, original, "nom"))
         if not nom or len(nom.split()) > 4 or _norm(nom) in ("tout", "toutes les applis", "tout le monde"):

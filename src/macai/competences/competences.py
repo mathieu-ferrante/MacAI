@@ -140,7 +140,28 @@ class Bibliotheque:
         self.registre.ajouter(Outil(
             nom=c.nom_outil, description=f"Compétence apprise : {c.description}", fonction=jouer,
             groupe="competences", parametres={k: {"type": "string", "description": v} for k, v in c.parametres.items()},
-            requis=list(c.parametres), risque=Risque.LECTURE, mac_seulement=False, mots_cles=sorted(mots)[:12]))
+            requis=list(c.parametres), risque=lambda valeurs: self.risque(c, valeurs), mac_seulement=False,
+            mots_cles=sorted(mots)[:12]))
+
+    def risque(self, c: Competence, valeurs: dict) -> Risque:
+        """Le plus haut risque de ses étapes : rejouer une recette qui clique, tape ou envoie demande les mêmes
+        confirmations que ces outils pris un par un. Étape inconnue ou risque incalculable : SENSIBLE."""
+        pire = Risque.LECTURE
+        for etape in c.etapes:
+            o = self.registre.get(etape.get("outil", ""))
+            if o is None:
+                return Risque.SENSIBLE
+            if o.toujours_confirmer:
+                return Risque.SENSIBLE
+            try:
+                args = substituer(etape.get("arguments", {}), valeurs or {}, [])
+            except KeyError:  # dépend du résultat d'une étape précédente : arguments bruts
+                args = etape.get("arguments", {})
+            try:
+                pire = max(pire, Risque(o.risque_pour(args)))
+            except Exception:  # noqa: BLE001 - fonction de risque déroutée par un marqueur : prudence
+                return Risque.SENSIBLE
+        return pire
 
     # --- Exécution -------------------------------------------------------------------
 

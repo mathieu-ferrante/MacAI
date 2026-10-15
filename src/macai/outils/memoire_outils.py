@@ -1,9 +1,17 @@
 """Outils de mémoire : retenir, oublier, consulter."""
 from __future__ import annotations
 
+import re
 import time
 
 from .base import ErreurOutil, Resultat, Risque, outil
+
+# La demande de l'utilisateur parle de mémoire ou de lui-même : « retenir » va de soi. Sinon (le fait vient
+# d'une page web, d'un document, d'un mail…), rien n'est mémorisé sans son accord.
+DEMANDE_DE_RETENIR = re.compile(
+    r"\b(retiens|retenir|souviens|souvenir|rappelle[- ]toi|memorise|memoriser|note (?:que|bien)|n'oublie pas|"
+    r"garde en (?:tete|memoire)|je suis|je m'appelle|appelle[- ]moi|j'aime|je n'aime pas|je deteste|je prefere|"
+    r"j'habite|je vis|je travaille|mon|ma|mes)\b")
 
 
 def _memoire(ctx):
@@ -17,12 +25,23 @@ def _memoire(ctx):
        "memoire", {"fait": ("string", "le fait, à la 3e personne, ex. « Mathieu préfère les réponses courtes »")},
        risque=Risque.CREATION, mac_seulement=False)
 def retenir(ctx, fait):
-    f = _memoire(ctx).retenir(fait, source="dit")
+    memoire = _memoire(ctx)
+    demande = ctx.services.get("demande")  # posée par l'orchestrateur à chaque demande
+    if demande is not None:
+        from ..agent.routeur import normaliser
+        if not DEMANDE_DE_RETENIR.search(normaliser(str(demande)).replace("\u2019", "'")):
+            phrase = f"Retenir durablement : « {fait} »"
+            ctx.emettre("confirmation", outil="retenir", arguments={"fait": fait}, phrase=phrase)
+            if not ctx.demander_confirmation(phrase, "retenir", {"fait": fait}):
+                raise ErreurOutil("Non retenu : la demande ne parlait pas de mémoriser, et l'utilisateur n'a pas "
+                                  "confirmé. Ne réessaie pas.")
+    f = memoire.retenir(fait, source="dit")
     return f"Retenu : {f.texte}"
 
 
 @outil("oublier", "Oublie les souvenirs qui correspondent à une description (ou « tout »).", "memoire",
-       {"quoi": ("string", "ce qu'il faut oublier, ou « tout »")}, risque=Risque.MODIFICATION, mac_seulement=False,
+       {"quoi": ("string", "ce qu'il faut oublier, ou « tout »")}, risque=Risque.SENSIBLE, toujours_confirmer=True,
+       mac_seulement=False,
        annonce=lambda a: f"Oublier : {a['quoi']}")
 def oublier(ctx, quoi):
     effaces = _memoire(ctx).oublier(quoi)

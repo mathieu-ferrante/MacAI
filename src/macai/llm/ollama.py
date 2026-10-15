@@ -1,6 +1,7 @@
 """Client Ollama minimal (stdlib) : discussion avec outils, embeddings, gestion mémoire des modèles."""
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -16,8 +17,10 @@ if not HOTE.startswith("http"):
 
 
 # « Compute error » : message de llama.cpp quand la mémoire graphique est saturée (vu dans ollama.log).
-MEMOIRE_SATUREE = re.compile(r"Insufficient Memory|out of memory|OutOfMemory|OOM|Compute error", re.I)
+MEMOIRE_SATUREE = re.compile(r"Insufficient Memory|out of memory|OutOfMemory|\bOOM\b|Compute error", re.I)
 CONTEXTE_EMBEDDINGS = 512
+# Coupure en cours de lecture (délai, connexion fermée, JSON tronqué) : traitée comme une erreur d'Ollama.
+ERREURS_FLUX = (OSError, ValueError, http.client.HTTPException)
 
 
 class ErreurOllama(RuntimeError):
@@ -62,7 +65,10 @@ class Ollama:
 
     def _json(self, chemin: str, corps: dict | None = None, delai: float = 300) -> dict:
         with self._requete(chemin, corps, delai) as r:
-            return json.loads(r.read())
+            try:
+                return json.loads(r.read())
+            except ERREURS_FLUX as e:
+                raise ErreurOllama(f"réponse d'Ollama interrompue ({type(e).__name__} : {e})") from e
 
     # --- Discussion ---------------------------------------------------------
 
@@ -81,24 +87,34 @@ class Ollama:
         }
         if outils:
             corps["tools"] = outils
-        return self._sans_saturation(lambda: self._discuter(corps, sur_texte))
+        diffuse = []  # texte déjà montré : réessayer le doublerait à l'écran
 
-    def _sans_saturation(self, appel: Callable):
-        """Mémoire graphique saturée (8 Go) : on décharge tous les modèles et on réessaie une fois."""
+        def relais(t: str) -> None:
+            diffuse.append(True)
+            sur_texte(t)
+        return self._sans_saturation(lambda: self._discuter(corps, relais if sur_texte else None),
+                                     deja_diffuse=lambda: bool(diffuse))
+
+    def _sans_saturation(self, appel: Callable, deja_diffuse: Callable[[], bool] = lambda: False):
+        """Mémoire graphique saturée (8 Go) : on décharge tous les modèles et on réessaie une fois
+        (sauf si une partie de la réponse a déjà été diffusée)."""
         try:
             return appel()
         except ErreurOllama as e:
-            if not MEMOIRE_SATUREE.search(str(e)):
+            if not MEMOIRE_SATUREE.search(str(e)) or deja_diffuse():
                 raise
-            for m in self.charges():
-                self.decharger(m.get("name", ""))
+            try:
+                for m in self.charges():
+                    self.decharger(m.get("name", ""))
+            except Exception:  # noqa: BLE001 - un déchargement raté ne doit pas masquer l'erreur d'origine
+                raise e from None
             time.sleep(2)
             return appel()
 
     def _discuter(self, corps: dict, sur_texte: Callable[[str], None] | None) -> Reponse:
         rep = Reponse()
         for morceau in self._flux("/api/chat", corps):
-            msg = morceau.get("message", {})
+            msg = morceau.get("message") or {}
             if t := msg.get("content"):
                 rep.texte += t
                 if sur_texte:
@@ -112,6 +128,8 @@ class Ollama:
                         args = json.loads(args)
                     except ValueError:
                         args = {}
+                if not isinstance(args, dict):  # « [1, 2] » ou « "texte" » : inutilisable comme arguments
+                    args = {}
                 rep.appels.append(AppelOutil(f.get("name", ""), args))
             if morceau.get("done"):
                 rep.jetons_entree = morceau.get("prompt_eval_count", 0)
@@ -121,13 +139,22 @@ class Ollama:
 
     def _flux(self, chemin: str, corps: dict) -> Iterator[dict]:
         with self._requete(chemin, corps) as r:
-            for ligne in r:
-                ligne = ligne.strip()
-                if not ligne:
+            lignes = iter(r)
+            while True:
+                try:
+                    ligne = next(lignes, None)
+                    if ligne is None:
+                        return
+                    ligne = ligne.strip()
+                    if not ligne:
+                        continue
+                    morceau = json.loads(ligne)
+                except ERREURS_FLUX as e:
+                    raise ErreurOllama(f"réponse d'Ollama interrompue ({type(e).__name__} : {e})") from e
+                if not isinstance(morceau, dict):
                     continue
-                morceau = json.loads(ligne)
                 if "error" in morceau:
-                    raise ErreurOllama(morceau["error"])
+                    raise ErreurOllama(str(morceau["error"]))
                 yield morceau
 
     # --- Embeddings ---------------------------------------------------------

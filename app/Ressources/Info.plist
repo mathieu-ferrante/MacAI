@@ -8,6 +8,8 @@
     <string>MacAI</string>
     <key>CFBundleDisplayName</key>
     <string>MacAI</string>
+    <key>CFBundleIconFile</key>
+    <string>MacAI</string>
     <key>CFBundleExecutable</key>
     <string>MacAI</string>
     <key>CFBundlePackageType</key>
@@ -30,6 +32,14 @@
     <string>MacAI transcrit ta voix sur ton Mac, sans rien envoyer sur internet.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>MacAI pilote tes applications (Chrome, Finder, Calendrier, Rappels, Mail…) quand tu le lui demandes.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>MacAI lit et crée des fichiers sur ton Bureau quand tu le lui demandes.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>MacAI lit, range et retrouve tes documents quand tu le lui demandes (tout reste sur ton Mac).</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>MacAI range et retrouve tes téléchargements quand tu le lui demandes.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>MacAI lit les fichiers des disques externes quand tu le lui demandes.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>MacAI crée et lit tes événements quand tu le lui demandes.</string>
     <key>NSRemindersFullAccessUsageDescription</key>

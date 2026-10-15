@@ -15,7 +15,7 @@ import urllib.request
 from html.parser import HTMLParser
 
 from ..mac import commun
-from .base import ErreurOutil, Resultat, Risque, interdire_achat, outil
+from .base import ErreurOutil, Resultat, Risque, interdire_achat, interdire_donnees_bancaires, outil
 
 AIDE_JS = ("Chrome bloque le pilotage des pages. Active une fois : menu Chrome > Présentation > "
            "Options pour les développeurs > « Autoriser JavaScript à partir des Apple Events ».")
@@ -183,8 +183,8 @@ def cliquer_page(ctx, numero):
         "valider": ("boolean", "appuyer sur Entrée ensuite")}, requis=["numero", "texte"],
        risque=Risque.MODIFICATION, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}")
 def remplir_page(ctx, numero, texte, valider=False):
-    if re.search(r"(?:\d[ -]?){13,19}", str(texte)) or re.search(r"\bFR\d{2}[ ]?\d{4}", str(texte)):
-        raise ErreurOutil("Ça ressemble à un numéro de carte ou un IBAN : je ne saisis pas de données bancaires.")
+    interdire_donnees_bancaires(texte)
+    interdire_achat(texte)
     js = f"""(() => {{
   const e = {_element(numero)}; if (!e) return 'absent';
   if (e.type === 'password') return 'motdepasse';

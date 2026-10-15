@@ -6,18 +6,24 @@ La liste de leurs outils est mise en cache pour ne rien lancer au démarrage de 
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import threading
 import time
 from pathlib import Path
 
-from ..outils.base import Outil, Registre, Resultat, Risque
+from ..outils.base import Outil, Registre, Resultat, Risque, interdire_achat
 
 VERSION_PROTOCOLE = "2025-06-18"
 INACTIVITE_S = 300
+# Variables transmises aux serveurs (plus celles de leur configuration) : jamais tout l'environnement de MacAI.
+ENV_TRANSMIS = ("PATH", "HOME", "LANG", "USER", "TMPDIR")
+# Noms d'outils qui exécutent, effacent ou envoient : confirmation, quoi que le serveur annonce.
+NOM_SENSIBLE = re.compile(r"run|exec|command|script|shell|delete|remove|erase|send|publish|upload", re.I)
 
 
 class ErreurMCP(RuntimeError):
@@ -44,7 +50,7 @@ class ServeurMCP:
         try:
             self.proc = subprocess.Popen(
                 self.commande, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env={**os.environ, **self.env}, text=True, encoding="utf-8", errors="replace", bufsize=1)
+                env=environnement(self.env), text=True, encoding="utf-8", errors="replace", bufsize=1)
         except OSError as e:
             raise ErreurMCP(f"Impossible de lancer le serveur MCP « {self.nom} » ({self.commande[0]}) : {e}") from e
         rep = self._requete("initialize", {"protocolVersion": VERSION_PROTOCOLE, "capabilities": {},
@@ -75,8 +81,24 @@ class ServeurMCP:
     def _notifier(self, methode: str, params: dict | None = None) -> None:
         self._envoyer({"jsonrpc": "2.0", "method": methode, **({"params": params} if params else {})})
 
+    def occupe(self) -> bool:
+        return self._verrou.locked()
+
+    def arreter_si_inactif(self, delai: float = INACTIVITE_S) -> bool:
+        """Arrête le serveur inactif ; jamais pendant un appel (verrou pris le temps de la vérification)."""
+        if not self._verrou.acquire(blocking=False):
+            return False
+        try:
+            if self.actif() and time.monotonic() - self.derniere_utilisation > delai:
+                self.arreter()
+                return True
+            return False
+        finally:
+            self._verrou.release()
+
     def _requete(self, methode: str, params: dict | None = None) -> dict:
         with self._verrou:
+            self.derniere_utilisation = time.monotonic()  # dès le début : jamais arrêté en plein appel
             self._id += 1
             ident = self._id
             self._envoyer({"jsonrpc": "2.0", "id": ident, "method": methode, "params": params or {}})
@@ -151,6 +173,33 @@ class ServeurMCP:
         return not rep.get("isError", False), "\n".join(textes) or "(aucun contenu)", fichiers
 
 
+def environnement(propre: dict | None) -> dict:
+    env = {k: os.environ[k] for k in ENV_TRANSMIS if k in os.environ}
+    return {**env, **{str(k): str(v) for k, v in (propre or {}).items()}}
+
+
+def commande_de(config: dict) -> list[str]:
+    """`commande` en liste, ou en chaîne découpée comme le ferait le shell (guillemets, espaces échappés)."""
+    c = config["commande"]
+    return [str(x) for x in c] if isinstance(c, list) else shlex.split(str(c))
+
+
+def empreinte(config: dict) -> str:
+    """Change quand la commande ou l'environnement du serveur change : outils redécouverts."""
+    brut = json.dumps([commande_de(config), config.get("env") or {}], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(brut.encode()).hexdigest()[:16]
+
+
+def textes_de(valeur) -> list[str]:
+    if isinstance(valeur, str):
+        return [valeur]
+    if isinstance(valeur, dict):
+        return [t for v in valeur.values() for t in textes_de(v)]
+    if isinstance(valeur, list):
+        return [t for v in valeur for t in textes_de(v)]
+    return []
+
+
 def _resumer(texte: str, limite: int) -> str:
     """Premières phrases d'une description, sans dépasser la limite (un petit modèle lit mal les pavés)."""
     texte = " ".join(str(texte).split())
@@ -209,11 +258,11 @@ def risque_mcp(definition: dict, force: str | None = None) -> Risque:
         return {"lecture": Risque.LECTURE, "creation": Risque.CREATION, "modification": Risque.MODIFICATION,
                 "sensible": Risque.SENSIBLE}.get(force, Risque.MODIFICATION)
     ann = definition.get("annotations") or {}
-    if ann.get("destructiveHint") is True:
+    if ann.get("destructiveHint") is True or NOM_SENSIBLE.search(str(definition.get("name", ""))):
         return Risque.SENSIBLE
     if ann.get("readOnlyHint") is True:
         return Risque.LECTURE
-    return Risque.MODIFICATION
+    return Risque.SENSIBLE  # rien d'annoncé : on ne sait pas ce que fait l'outil, confirmation
 
 
 class GestionnaireMCP:
@@ -226,8 +275,7 @@ class GestionnaireMCP:
         self.configs = {c["nom"]: c for c in configs if c.get("nom") and c.get("commande")}
         self.mots_routeur: dict[str, list[str]] = {}
         for nom, c in self.configs.items():
-            cmd = c["commande"] if isinstance(c["commande"], list) else c["commande"].split()
-            self.serveurs[nom] = ServeurMCP(nom, cmd, c.get("env"), float(c.get("delai", 60)))
+            self.serveurs[nom] = ServeurMCP(nom, commande_de(c), c.get("env"), float(c.get("delai", 60)))
             self.mots_routeur[f"mcp_{nom}"] = [nom.lower(), *[m.lower() for m in c.get("mots_cles", [])]]
         self._arret = threading.Event()
 
@@ -239,33 +287,46 @@ class GestionnaireMCP:
 
     def enregistrer(self, decouvrir: bool = True) -> dict[str, str]:
         """Inscrit les outils (depuis le cache, ou en interrogeant les serveurs). Renvoie l'état par serveur."""
-        cache, etats = self._cache(), {}
+        cache, etats, nouveaux, remplaces = self._cache(), {}, {}, set()
         for nom, serveur in self.serveurs.items():
-            definitions = cache.get(nom)
+            cle = empreinte(self.configs[nom])
+            entree = cache.get(nom)
+            anciennes = entree.get("outils") if isinstance(entree, dict) else entree  # ancien format : liste
+            # Configuration modifiée (commande, env) : outils redécouverts ; d'ici là, l'ancienne liste sert.
+            definitions = anciennes if isinstance(entree, dict) and entree.get("empreinte") == cle else None
             if definitions is None and decouvrir:
                 try:
                     definitions = serveur.lister_outils()
-                    cache[nom] = definitions
-                    serveur.arreter()
+                    cache[nom] = {"empreinte": cle, "outils": definitions}
+                    remplaces.add(f"mcp_{nom}")
+                    serveur.arreter_si_inactif(0)
                 except ErreurMCP as e:
                     etats[nom] = f"erreur : {e}"
                     continue
             if definitions is None:
+                definitions = anciennes if isinstance(anciennes, list) and not decouvrir else None
+            if definitions is None:
                 etats[nom] = "non découvert"
                 continue
             for d in definitions:
-                self._inscrire(nom, d)
+                o = self._outil(nom, d)
+                nouveaux[o.nom] = o
             etats[nom] = f"{len(definitions)} outils"
+        # Remplacement d'un bloc : la découverte tourne en fond pendant que l'agent parcourt le registre ;
+        # le dictionnaire en cours de lecture n'est jamais modifié.
+        gardes = {n: o for n, o in self.registre.outils.items() if o.groupe not in remplaces}
+        self.registre.outils = {**gardes, **nouveaux}
         self.cache_fichier.parent.mkdir(parents=True, exist_ok=True)
         self.cache_fichier.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
         return etats
 
-    def _inscrire(self, serveur: str, d: dict) -> None:
+    def _outil(self, serveur: str, d: dict) -> Outil:
         cfg = self.configs[serveur]
         schema = d.get("inputSchema") or {"type": "object", "properties": {}}
         nom_reel = d["name"]
 
         def appeler(ctx, **args):
+            interdire_achat(*textes_de(args))  # même règle que pour les applis : jamais d'achat ni de crédits
             ok, texte, fichiers = self.serveurs[serveur].appeler(nom_reel, developper_chemins(args))
             return Resultat(ok, texte, {"fichiers": fichiers} if fichiers else None)
 
@@ -283,15 +344,14 @@ class GestionnaireMCP:
             except ErreurMCP as e:
                 return Resultat.echec(str(e))
         o.fonction = protegee
-        self.registre.ajouter(o)
+        return o
 
     def surveiller(self) -> None:
         """Arrête les serveurs inactifs (fil d'exécution de fond)."""
         def boucle():
             while not self._arret.wait(30):
                 for s in self.serveurs.values():
-                    if s.actif() and time.monotonic() - s.derniere_utilisation > INACTIVITE_S:
-                        s.arreter()
+                    s.arreter_si_inactif()
         threading.Thread(target=boucle, daemon=True, name="mcp-veille").start()
 
     def fermer(self) -> None:

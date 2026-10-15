@@ -1,9 +1,11 @@
 """Outils système : son, médias, presse-papiers, capture, mémoire, infos, Terminal."""
 from __future__ import annotations
 
+import getpass
 import re
 import shlex
 import time
+from pathlib import Path
 
 from ..mac import commun
 from .base import ErreurOutil, Resultat, Risque, outil
@@ -132,36 +134,118 @@ def notifier(ctx, titre, message):
 
 # --- Terminal -----------------------------------------------------------------
 
+# Commandes sans effet, exécutées SANS shell (pas de ; | $() ni retour à la ligne possibles) : pas de confirmation.
 LECTURE_SEULE = {"ls", "cat", "head", "tail", "wc", "df", "du", "find", "grep", "ps", "pwd", "whoami",
                  "sw_vers", "date", "uptime", "which", "mdfind", "file", "stat", "echo", "uname",
-                 "system_profiler", "diskutil", "pmset", "top", "vm_stat", "sysctl", "defaults"}
-DANGEREUX = re.compile(r"[;&|`>]|\$\(|\bsudo\b|\brm\b|\bwrite\b|\bdelete\b|-delete|-exec")
+                 "system_profiler", "diskutil", "pmset", "vm_stat", "sysctl", "defaults", "top"}
+# Caractères qui feraient du shell (enchaîner, rediriger, substituer, développer) : la commande passe alors
+# par zsh, donc confirmation. Constat de la relecture : « ls\nid » ou « cat <(id) » passaient en lecture.
+SHELL = re.compile(r"[\n\r;&|`$<>(){}*?!\\]")
+# Sous-commandes autorisées en lecture seule, ou options interdites.
+SOUS_COMMANDES = {"diskutil": {"list", "info"}, "defaults": {"read"}, "pmset": {"-g"}}
+OPTIONS_INTERDITES = {"find": ("-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"),
+                      "sysctl": ("-w",), "top": ()}
 
 
-def risque_commande(args: dict) -> Risque:
-    cmd = args.get("commande", "")
+def analyser_commande(cmd: str) -> list[str] | None:
+    """Mots de la commande si elle est sûre à exécuter sans shell ni confirmation, sinon None."""
+    if not cmd or SHELL.search(cmd) or len(cmd) > 500:
+        return None
     try:
         mots = shlex.split(cmd)
     except ValueError:
-        return Risque.SENSIBLE
-    if mots and mots[0] in LECTURE_SEULE and not DANGEREUX.search(cmd):
-        if mots[0] == "defaults" and (len(mots) < 2 or mots[1] != "read"):
-            return Risque.SENSIBLE
-        return Risque.LECTURE
-    return Risque.SENSIBLE
+        return None
+    if not mots or mots[0] not in LECTURE_SEULE:
+        return None
+    nom, reste = mots[0], mots[1:]
+    if nom in SOUS_COMMANDES and (not reste or reste[0] not in SOUS_COMMANDES[nom]):
+        return None
+    if any(m in OPTIONS_INTERDITES.get(nom, ()) or "=" in m and nom == "sysctl" for m in reste):
+        return None
+    mots = [str(Path(m).expanduser()) if m.startswith("~") else m for m in mots]  # pas de shell : on développe ~
+    reste = mots[1:]
+    if nom == "top":  # sans -l, top tourne indéfiniment
+        mots = ["top", "-l", "1", "-n", "15"]
+    # Les fichiers lus passent par les mêmes interdits que lire_document (clés, mots de passe, cookies…).
+    from .fichiers import chemin_interdit
+    if any(chemin_interdit(m) for m in reste if "/" in m or m.startswith(".")):
+        return None
+    return mots
+
+
+def risque_commande(args: dict) -> Risque:
+    return Risque.LECTURE if analyser_commande(str(args.get("commande", ""))) else Risque.SENSIBLE
 
 
 @outil("executer_commande", "Exécute une commande dans le Terminal (zsh) et renvoie sa sortie. "
        "Les commandes qui modifient quelque chose demandent confirmation.", "systeme",
        {"commande": ("string", "commande shell complète"),
         "dossier": ("string", "dossier de travail, facultatif")}, requis=["commande"],
-       risque=risque_commande, annonce=lambda a: f"Exécuter dans le Terminal : {a['commande']}")
+       risque=risque_commande, toujours_confirmer=False,
+       annonce=lambda a: f"Exécuter dans le Terminal : {a['commande']}")
 def executer_commande(ctx, commande, dossier="~"):
     import subprocess
+    mots = analyser_commande(commande)
+    # Lecture seule : exécutée directement, sans shell. Sinon (confirmée par l'utilisateur) : zsh sans fichiers
+    # de démarrage (-f), pour qu'un ~/.zshenv modifié ne s'exécute pas à chaque commande.
+    cmd = mots if mots else ["/bin/zsh", "-fc", commande]
+    env = {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", "HOME": str(Path.home()),
+           "LANG": "fr_FR.UTF-8", "USER": getpass.getuser()}
     try:
-        r = subprocess.run(["/bin/zsh", "-lc", commande], capture_output=True, text=True, timeout=120,
-                           cwd=str(commun.chemin(dossier)))
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env,
+                           cwd=str(commun.chemin(dossier or "~")))
     except subprocess.TimeoutExpired:
         raise ErreurOutil("Commande arrêtée après 120 s.") from None
+    except FileNotFoundError:
+        raise ErreurOutil(f"Commande introuvable : {cmd[0]}") from None
     sortie = (r.stdout + ("\n" + r.stderr if r.stderr else "")).strip()
     return Resultat(r.returncode == 0, f"Code de sortie {r.returncode}\n{sortie or '(aucune sortie)'}")
+
+
+# --- Réglages Système : ouverture directe d'une rubrique ---------------------------------------
+# Plus fiable que de naviguer à la souris dans la fenêtre (un petit modèle s'y perd) : adresse interne de macOS.
+RUBRIQUES = {
+    "bluetooth": "com.apple.BluetoothSettings", "wifi": "com.apple.wifi-settings-extension",
+    "reseau": "com.apple.Network-Settings.extension", "son": "com.apple.Sound-Settings.extension",
+    "ecrans": "com.apple.Displays-Settings.extension", "batterie": "com.apple.Battery-Settings.extension",
+    "clavier": "com.apple.Keyboard-Settings.extension", "trackpad": "com.apple.Trackpad-Settings.extension",
+    "souris": "com.apple.Mouse-Settings.extension", "notifications": "com.apple.Notifications-Settings.extension",
+    "confidentialite": "com.apple.settings.PrivacySecurity.extension",
+    "accessibilite": "com.apple.Accessibility-Settings.extension",
+    "apparence": "com.apple.Appearance-Settings.extension", "bureau et dock": "com.apple.Desktop-Settings.extension",
+    "fond d'ecran": "com.apple.Wallpaper-Settings.extension", "concentration": "com.apple.Focus-Settings.extension",
+    "temps d'ecran": "com.apple.Screen-Time-Settings.extension",
+    "ecran verrouille": "com.apple.Lock-Screen-Settings.extension",
+    "utilisateurs": "com.apple.Users-Groups-Settings.extension",
+    "mise a jour": "com.apple.Software-Update-Settings.extension", "general": "com.apple.systempreferences.GeneralSettings",
+    "date et heure": "com.apple.Date-Time-Settings.extension", "imprimantes": "com.apple.Print-Scan-Settings.extension",
+    "siri": "com.apple.Siri-Settings.extension", "spotlight": "com.apple.Spotlight-Settings.extension",
+    "stockage": "com.apple.settings.Storage", "partage": "com.apple.Sharing-Settings.extension",
+    "comptes internet": "com.apple.Internet-Accounts-Settings.extension",
+    "touch id": "com.apple.Touch-ID-Settings.extension",
+}
+SYNONYMES_RUBRIQUES = {"wi-fi": "wifi", "audio": "son", "volume": "son", "ecran": "ecrans", "moniteur": "ecrans",
+                       "energie": "batterie", "securite": "confidentialite", "vie privee": "confidentialite",
+                       "dock": "bureau et dock", "mode sombre": "apparence", "theme": "apparence",
+                       "ne pas deranger": "concentration", "mises a jour": "mise a jour", "langue": "general",
+                       "heure": "date et heure", "imprimante": "imprimantes", "disque": "stockage",
+                       "compte": "utilisateurs", "mot de passe": "touch id", "internet": "reseau"}
+
+
+@outil("ouvrir_reglage", "Ouvre directement une rubrique des Réglages Système (Bluetooth, Wi-Fi, Son, Écrans, "
+       "Batterie, Clavier, Notifications, Confidentialité, Apparence, Bureau et Dock, Concentration, Mise à jour…).",
+       "systeme", {"rubrique": ("string", "rubrique, ex. « Bluetooth », « Wi-Fi », « Son »")},
+       risque=Risque.CREATION, annonce=lambda a: f"Ouvrir les Réglages : {a['rubrique']}",
+       mots_cles=["reglage", "reglages", "parametres", "preferences", "bluetooth", "wifi", "wi-fi",
+                  "mode sombre", "fond d'ecran", "ne pas deranger"])
+def ouvrir_reglage(ctx, rubrique):
+    from ..agent.routeur import normaliser
+    cle = normaliser(str(rubrique)).strip()
+    cle = SYNONYMES_RUBRIQUES.get(cle, cle)
+    if cle not in RUBRIQUES:
+        proches = [k for k in RUBRIQUES if cle in k or k in cle]
+        if not proches:
+            raise ErreurOutil(f"Rubrique « {rubrique} » inconnue. Disponibles : {', '.join(sorted(RUBRIQUES))}.")
+        cle = proches[0]
+    commun.executer(["open", f"x-apple.systempreferences:{RUBRIQUES[cle]}"])
+    return f"Réglages Système ouverts sur « {cle} ». Pour y changer quelque chose : lire_fenetre puis cliquer."

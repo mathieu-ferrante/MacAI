@@ -221,13 +221,13 @@ def test_relance_si_le_modele_s_arrete_en_chemin(ctx):
 
 def test_discussions_attente_reponse_et_risque(ctx, monkeypatch):
     from macai.outils import discussions as d
-    etats = iter([["vieux", "question ?"], ["vieux", "question ?", "Rép"], ["vieux", "Rép", "Réponse complète"],
-                  ["vieux", "Rép", "Réponse complète"], ["vieux", "Rép", "Réponse complète"],
-                  ["vieux", "Rép", "Réponse complète"]])
+    etats = iter([["vieux", "question ?"], ["vieux", "question ?", "Rép"], ["vieux", "Rép", "Réponse complète avec assez de détails pour compter"],
+                  ["vieux", "Rép", "Réponse complète avec assez de détails pour compter"], ["vieux", "Rép", "Réponse complète avec assez de détails pour compter"],
+                  ["vieux", "Rép", "Réponse complète avec assez de détails pour compter"]])
     monkeypatch.setattr(d, "_textes", lambda pid: next(etats))
     monkeypatch.setattr(d, "STABLE_S", 0.0)
     monkeypatch.setattr(ctx.arret, "wait", lambda s: False)
-    assert d._attendre_reponse(ctx, 1, ["vieux"], "question ?") == "Rép\nRéponse complète"
+    assert d._attendre_reponse(ctx, 1, ["vieux"], "question ?") == "Rép\nRéponse complète avec assez de détails pour compter"
     assert d._risque_ecrire({"application": "Claude", "texte": "x"}) == Risque.MODIFICATION
     assert d._risque_ecrire({"application": "Messages", "texte": "x"}) == Risque.SENSIBLE
     assert d._risque_ecrire({"application": "Messages", "texte": "x", "envoyer": False}) == Risque.MODIFICATION

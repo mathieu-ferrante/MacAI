@@ -16,9 +16,18 @@ def _fichier():
     return dossier_donnees() / "secrets" / "secrets.json"   # poste de développement uniquement
 
 
+def verifier_ligne(*valeurs: str) -> None:
+    """`security -i` lit une commande par ligne : un retour à la ligne permettrait d'en glisser une autre."""
+    for v in valeurs:
+        if "\n" in v or "\r" in v or "\0" in v:
+            raise ValueError("Retour à la ligne interdit dans un nom, un identifiant ou un secret du Trousseau.")
+
+
 def ecrire(nom: str, compte: str, secret: str) -> None:
+    verifier_ligne(nom, compte, secret)
     if sys.platform == "darwin":
-        commande = f"add-generic-password -U -s {PREFIXE}{nom} -a {_echapper(compte)} -w {_echapper(secret)}\n"
+        commande = (f"add-generic-password -U -s {_echapper(PREFIXE + nom)} -a {_echapper(compte)} "
+                    f"-w {_echapper(secret)}\n")
         subprocess.run(["security", "-i"], input=commande, text=True, check=True, capture_output=True)
         return
     f = _fichier()

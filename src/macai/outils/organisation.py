@@ -11,26 +11,55 @@ from .base import ErreurOutil, Resultat, Risque, outil
 S = commun.chaine_as
 
 
+MOMENTS = (("apres-midi", "14:00"), ("après-midi", "14:00"), ("apres midi", "14:00"), ("après midi", "14:00"),
+           ("matin", "09:00"), ("midi", "12:00"), ("soir", "19:00"))
+JOURS = (("apres-demain", 2), ("après-demain", 2), ("demain", 1), ("aujourd'hui", 0), ("ce", 0), ("cet", 0))
+
+
+def _heure(texte: str):
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(texte, fmt).time()
+        except ValueError:
+            pass
+    raise ValueError(texte)
+
+
 def lire_date(texte: str) -> datetime:
-    """« 2026-10-15 09:30 », « 2026-10-15T09:30 », « 2026-10-15 » (9 h), « demain 14:00 »."""
-    t = re.sub(r"(\d{1,2})\s*h\s*(\d{2})?", lambda m: f"{m.group(1)}:{m.group(2) or '00'}",
-               (texte or "").strip().lower())
+    """« 2026-10-15 09:30 », « 2026-10-15T09:30 », « 2026-10-15 » (9 h), « 15/10/2026 14h », « demain 14:00 »,
+    « demain à 14h », « demain matin », « ce soir ». Lève ErreurOutil si la date n'est pas comprise."""
+    try:
+        return _lire_date(texte)
+    except (ValueError, OverflowError):
+        raise ErreurOutil(f"Date non comprise : « {texte} ». Utilise le format AAAA-MM-JJ HH:MM "
+                          "(ex. 2026-10-15 14:30), ou « demain 14:00 ».") from None
+
+
+def _lire_date(texte: str) -> datetime:
+    t = (texte or "").strip().lower().replace("’", "'")
+    t = re.sub(r"(?<=\d)z$", "", t)  # « …T14:00Z » : heure donnée telle quelle
+    t = re.sub(r"(\d{1,2})\s*h\s*(\d{2})?\b", lambda m: f"{m.group(1)}:{m.group(2) or '00'}", t)
+    for mot, heure in MOMENTS:
+        t = re.sub(rf"(?<![\w-]){re.escape(mot)}\b", heure, t)
+    t = re.sub(r"\s+(?:à|a|vers)\s+", " ", f" {t} ").strip().rstrip(":")
     base = datetime.now()
-    for mot, decalage in (("apres-demain", 2), ("après-demain", 2), ("demain", 1), ("aujourd'hui", 0), ("aujourd’hui", 0)):
-        if t.startswith(mot):
+    if not t:
+        raise ValueError(texte)
+    for mot, decalage in JOURS:
+        if t == mot or t.startswith(mot + " ") or (decalage and t.startswith(mot)):
             reste = t[len(mot):].strip().rstrip(":") or "09:00"
             if reste.count(":") == 0:
                 reste += ":00"
-            heure = datetime.strptime(reste, "%H:%M").time()
-            return datetime.combine((base + timedelta(days=decalage)).date(), heure)
-    t = t.rstrip(":")
+            return datetime.combine((base + timedelta(days=decalage)).date(), _heure(reste))
     if re.fullmatch(r"\d{1,2}:\d{2}", t):  # heure seule : aujourd'hui, ou demain si l'heure est passée
-        h = datetime.combine(base.date(), datetime.strptime(t, "%H:%M").time())
+        h = datetime.combine(base.date(), _heure(t))
         return h if h > base else h + timedelta(days=1)
-    try:
-        d = datetime.fromisoformat(t)
-    except ValueError:
-        raise ErreurOutil(f"Date non comprise : « {texte} ». Utilise le format AAAA-MM-JJ HH:MM.") from None
+    if m := re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}:\d{2}))?", t):  # 15/10/2026 14:00
+        return datetime.combine(datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).date(),
+                                _heure(m.group(4) or "09:00"))
+    d = datetime.fromisoformat(t)
+    if d.tzinfo is not None:  # « Z » ou « +02:00 » : heure gardée telle quelle (les petits modèles l'ajoutent)
+        d = d.replace(tzinfo=None)
     if len(t) <= 10:
         d = d.replace(hour=9)
     return d

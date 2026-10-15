@@ -135,22 +135,67 @@ def creer_document_word(ctx, chemin, contenu):
     return Resultat(True, f"Document Word créé : {p}", {"fichier": str(p)})
 
 
-NOMBRE = re.compile(r"^-?[\d\s  ]+([.,]\d+)?\s*(€|%|\$)?$")
+NOMBRE = re.compile(r"^-?[\d\s  ]+([.,]\d+)?\s*(€|%|\$)?$")
+# Gardés en texte : zéro initial (code postal, numéro de téléphone, matricule) — « 06000 », « 06 12 34 56 78 ».
+ZERO_INITIAL = re.compile(r"^-?0\d")
+TELEPHONE = re.compile(r"^\+?\d{1,3}([\s.\-]\d{2}){3,}$")
+FORMULE = ("=", "+", "-", "@")
 
 
 def _valeur(v):
-    """« 1 284,50 € » → 1284.5 ; le reste inchangé."""
+    """« 1 284,50 € » → 1284.5 ; « 06000 » et « 06 12 34 56 78 » restent du texte ; le reste inchangé."""
     if isinstance(v, (int, float)) or v is None:
         return v
     s = str(v).strip()
+    if ZERO_INITIAL.match(s) or TELEPHONE.match(s):
+        return s
     if NOMBRE.match(s) and any(c.isdigit() for c in s):
-        propre = re.sub(r"[\s  €$%]", "", s).replace(",", ".")
+        propre = re.sub(r"[\s  €$%]", "", s).replace(",", ".")
         try:
             n = float(propre)
             return int(n) if n.is_integer() and "." not in propre else n
         except ValueError:
             pass
     return s
+
+
+def _sans_formule(v):
+    """Injection de formules (CSV ouvert dans Excel) : « =HYPERLINK(…) », « +cmd… » → précédés d'une apostrophe."""
+    if isinstance(v, str) and v[:1] in FORMULE and not NOMBRE.match(v.strip()):
+        return "'" + v
+    return v
+
+
+def _decouper_ligne(texte: str) -> list[str]:
+    """« Marie;30 », « Marie\t30 » ou « Marie, 30 » → ["Marie", "30"]."""
+    for sep in (";", "\t", ","):
+        if sep in texte:
+            return [c.strip() for c in texte.split(sep)]
+    return [texte.strip()]
+
+
+def _tableau(colonnes, lignes) -> tuple[list[str], list[list]]:
+    """Accepte ce qu'un petit modèle produit : lignes en listes, en dictionnaires {colonne: valeur} ou en
+    chaînes « Marie;30 » ; colonnes en liste ou en chaîne."""
+    if isinstance(colonnes, str):
+        colonnes = _decouper_ligne(colonnes)
+    colonnes = [str(c) for c in (colonnes or [])]
+    if isinstance(lignes, (str, dict)):
+        lignes = lignes.splitlines() if isinstance(lignes, str) else [lignes]
+    sortie = []
+    for ligne in lignes or []:
+        if isinstance(ligne, dict):
+            if not colonnes:
+                colonnes = [str(k) for k in ligne]
+            minuscules = {str(k).strip().lower(): v for k, v in ligne.items()}
+            sortie.append([ligne.get(c, minuscules.get(c.strip().lower(), "")) for c in colonnes])
+        elif isinstance(ligne, str):
+            sortie += [_decouper_ligne(l) for l in ligne.splitlines() if l.strip()]
+        elif isinstance(ligne, (list, tuple)):
+            sortie.append(list(ligne))
+        else:
+            sortie.append([ligne])
+    return colonnes, sortie
 
 
 @outil("creer_tableur", "Crée un fichier Excel (.xlsx) à partir de colonnes et de lignes. Les nombres "
@@ -165,16 +210,21 @@ def creer_tableur(ctx, chemin, colonnes, lignes, total=False):
     import openpyxl
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
+    colonnes, lignes = _tableau(colonnes, lignes)
     p = destination(chemin, ".xlsx")
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Données"
     ws.append(list(colonnes))
     for c in ws[1]:
+        c.data_type = "s"  # un titre « =… » reste du texte
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor="2F5597")
     for ligne in lignes:
-        ws.append([_valeur(v) for v in (ligne if isinstance(ligne, list) else [ligne])])
+        ws.append([_valeur(v) for v in ligne])
+        for c in ws[ws.max_row]:
+            if isinstance(c.value, str) and c.value.startswith(FORMULE):
+                c.data_type = "s"  # texte, jamais une formule exécutée par Excel
     n = len(lignes)
     if total and n:
         ws.append([])
@@ -201,11 +251,12 @@ def creer_tableur(ctx, chemin, colonnes, lignes, total=False):
         "lignes": {"type": "array", "items": {"type": "array", "items": {}}, "description": "lignes"}},
        risque=Risque.CREATION, mac_seulement=False)
 def creer_csv(ctx, chemin, colonnes, lignes):
+    colonnes, lignes = _tableau(colonnes, lignes)
     p = destination(chemin, ".csv")
     with p.open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f, delimiter=";")
-        w.writerow(colonnes)
-        w.writerows(lignes)
+        w.writerow([_sans_formule(c) for c in colonnes])
+        w.writerows([[_sans_formule(v) for v in ligne] for ligne in lignes])
     return Resultat(True, f"CSV créé : {p}", {"fichier": str(p)})
 
 
@@ -230,7 +281,10 @@ def creer_presentation(ctx, chemin, titre, diapositives):
         s = prs.slides.add_slide(prs.slide_layouts[1])
         s.shapes.title.text = str(diapo.get("titre", ""))
         corps = s.placeholders[1].text_frame
-        for i, point in enumerate(diapo.get("points") or []):
+        points = diapo.get("points") or []
+        if isinstance(points, str):  # « - un\n- deux » ou une seule phrase
+            points = [l.strip().lstrip("-*•").strip() for l in points.splitlines() if l.strip()]
+        for i, point in enumerate(points):
             para = corps.paragraphs[0] if i == 0 else corps.add_paragraph()
             para.text = str(point)
             para.font.size = Pt(20)
