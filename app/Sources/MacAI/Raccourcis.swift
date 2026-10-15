@@ -2,10 +2,13 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 
-/// Option + Espace (raccourci global Carbon : aucune autorisation requise) et touche maintenue pour parler.
+/// Option + Espace : ouvre le panneau. Option + Maj + Espace maintenus : parler tant que les touches sont
+/// enfoncées (raccourcis globaux Carbon : aucune autorisation requise). Touche Fn maintenue : parler aussi.
 @MainActor
 final class Raccourcis {
     private var raccourci: EventHotKeyRef?
+    private var raccourciParole: EventHotKeyRef?
+    private var paroleRaccourciEnCours = false
     private var gestionnaire: EventHandlerRef?
     private var moniteurGlobal: Any?
     private var moniteurLocal: Any?
@@ -27,17 +30,47 @@ final class Raccourcis {
 
     // MARK: - Option + Espace
 
+    private static let idPanneau: UInt32 = 1
+    private static let idParole: UInt32 = 2
+
     private func installerOptionEspace() {
-        var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        var types = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+                     EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))]
         let soi = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, donnees in
-            guard let donnees else { return noErr }
+        InstallEventHandler(GetApplicationEventTarget(), { _, evenement, donnees in
+            guard let donnees, let evenement else { return noErr }
             let r = Unmanaged<Raccourcis>.fromOpaque(donnees).takeUnretainedValue()
-            Task { @MainActor in r.surRaccourci?() }
+            var id = EventHotKeyID()
+            GetEventParameter(evenement, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            let appui = GetEventKind(evenement) == UInt32(kEventHotKeyPressed)
+            Task { @MainActor in r.raccourciActive(id.id, appui: appui) }
             return noErr
-        }, 1, &type, soi, &gestionnaire)
-        let id = EventHotKeyID(signature: OSType(0x4D414149), id: 1)  // 'MAAI'
-        RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey), id, GetApplicationEventTarget(), 0, &raccourci)
+        }, types.count, &types, soi, &gestionnaire)
+        let signature = OSType(0x4D414149)  // 'MAAI'
+        RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey), EventHotKeyID(signature: signature, id: Raccourcis.idPanneau),
+                            GetApplicationEventTarget(), 0, &raccourci)
+        RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey | shiftKey),
+                            EventHotKeyID(signature: signature, id: Raccourcis.idParole),
+                            GetApplicationEventTarget(), 0, &raccourciParole)
+    }
+
+    private func raccourciActive(_ id: UInt32, appui: Bool) {
+        switch (id, appui) {
+        case (Raccourcis.idPanneau, true):
+            surRaccourci?()
+        case (Raccourcis.idParole, true):
+            // La répétition automatique du clavier renvoie des « appuis » : on n'écoute qu'une fois.
+            guard !paroleRaccourciEnCours else { return }
+            paroleRaccourciEnCours = true
+            surDebutParole?()
+        case (Raccourcis.idParole, false):
+            guard paroleRaccourciEnCours else { return }
+            paroleRaccourciEnCours = false
+            surFinParole?()
+        default:
+            break
+        }
     }
 
     // MARK: - Touche maintenue pour parler

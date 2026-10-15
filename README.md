@@ -25,7 +25,8 @@ Aucune IA dans le cloud : tout tourne sur la puce M2.
 ## Utilisation
 
 - **Option + Espace** : panneau pour écrire.
-- **Fn maintenue** : parler (relâcher envoie). Réglable : Option droite.
+- **Option + Maj + Espace maintenus** : parler, la transcription s'arrête et la demande part au relâchement.
+- **Fn maintenue** : parler aussi (réglable : Option droite).
 - Bouton **Écrit / Oral** : réponse écrite, ou écrite et lue à voix haute.
 - Actions sensibles (Corbeille, envoi, Terminal, rangement de masse) : une carte **Confirmer / Refuser** s'affiche.
 - Icône 🧠 dans la barre des menus : réglages, indexation, journal, redémarrage.

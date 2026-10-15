@@ -67,6 +67,7 @@ struct MenuMacAI: View {
         Button("Ouvrir le panneau   ⌥Espace") {
             Delegue.partage?.panneau.montrer()
         }
+        Text("Parler : ⌥⇧Espace maintenus (ou Fn)")
         Toggle("Réponses à l'oral", isOn: $etat.modeOral)
         Menu("Touche pour parler") {
             Button("Fn (maintenue)") { choisirTouche("fn") }

@@ -145,7 +145,8 @@ cat <<'FIN'
  5. Facultatif : `macai secret onshape` (clés API Onshape)
                  `macai mcp detecter`   (suite ArtCraft)
 
- Utilisation : Option + Espace pour écrire, Fn maintenue pour parler.
+ Utilisation : Option + Espace pour écrire ; Option + Maj + Espace maintenus
+ (ou Fn maintenue) pour parler.
  La recherche dans tes fichiers se construit Mac branché et inutilisé
  (ou tout de suite : menu 🧠 > Indexer mes fichiers maintenant).
 ========================================================================
