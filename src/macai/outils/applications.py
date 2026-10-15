@@ -78,13 +78,28 @@ def ouvrir_application(ctx, nom):
     return Resultat(True, f"{app.stem} est ouvert.", {"application": app.stem})
 
 
+# Jamais fermés par l'agent : le moteur d'IA lui-même et les éléments vitaux de macOS.
+PROTEGEES = {"ollama", "llamaserver", "llama", "macai", "python", "finder", "loginwindow", "windowserver",
+             "dock", "systemuiserver", "controlcenter", "kernel_task", "launchd"}
+
+
 @outil("quitter_application", "Quitte proprement une application (elle peut proposer d'enregistrer).",
        "applications", {"nom": ("string", "nom de l'application")}, risque=Risque.MODIFICATION,
        annonce=lambda a: f"Quitter {a['nom']}")
 def quitter_application(ctx, nom):
+    if normaliser(nom).replace(" ", "").replace("-", "") in PROTEGEES:
+        raise ErreurOutil(f"{nom} fait partie de MacAI ou de macOS : je ne le ferme pas. Le modèle d'IA se "
+                          "décharge tout seul 2 minutes après la dernière demande.")
     app = trouver_application(nom)
-    nom_reel = app.stem if app else nom
-    commun.osascript(f"tell application {commun.chaine_as(nom_reel)} to quit", delai=30)
+    if app is None:
+        raise ErreurOutil(f"Aucune application « {nom} » installée. Vérifie le nom avec applications_ouvertes.")
+    nom_reel = app.stem
+    commun.osascript(f'if application {commun.chaine_as(nom_reel)} is running then '
+                     f'tell application {commun.chaine_as(nom_reel)} to quit', delai=30)
+    time.sleep(1)
+    if nom_reel in commun.executer(["lsappinfo", "visibleProcessList"], verifier=False).replace("_", " "):
+        return Resultat(False, f"{nom_reel} est toujours ouvert (il attend peut-être une réponse : "
+                               "document à enregistrer ?).")
     return f"{nom_reel} est fermé."
 
 

@@ -4,8 +4,10 @@ Nécessite l'autorisation « Accessibilité » pour MacAI (Réglages Système > 
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..outils.base import ErreurOutil
 
@@ -17,8 +19,10 @@ ROLES = {
     "AXStaticText": "texte", "AXImage": "image", "AXSecureTextField": "mot de passe",
 }
 INTERACTIFS = set(ROLES) - {"AXStaticText", "AXImage"}
-PROFONDEUR_MAX = 12
+PROFONDEUR_MAX = 30   # les pages web (Chrome, applis Electron comme Claude) sont profondes
 ELEMENTS_MAX = 180
+ELEMENTS_LUS = 600    # on lit plus large, puis on garde d'abord boutons et champs (la saisie est souvent en bas)
+DUREE_MAX_S = 4.0     # une fenêtre énorme ne bloque pas l'agent : on rend ce qu'on a lu
 
 
 def _ax():
@@ -38,22 +42,77 @@ def attribut(el, nom):
     return val if err == 0 else None
 
 
+BLOC_LSAPPINFO = re.compile(r'^\s*\d+\) "(?P<nom>[^"]*)" ASN:[^\n]*\n(?P<corps>(?:(?!^\s*\d+\) ").*\n?)*)', re.M)
+
+
+def applis_ouvertes() -> list[dict]:
+    """Applications au premier plan possible (« Foreground »), lues à chaque appel avec lsappinfo.
+
+    NSWorkspace.runningApplications ne se met à jour que dans une boucle d'événements : dans le moteur (sans
+    boucle), la liste restait figée à son premier appel et les applis ouvertes ensuite étaient introuvables."""
+    import subprocess
+    sortie = subprocess.run(["lsappinfo", "list"], capture_output=True, text=True, timeout=10).stdout
+    applis = []
+    for m in BLOC_LSAPPINFO.finditer(sortie):
+        corps = m.group("corps")
+        if 'type="Foreground"' not in corps:
+            continue
+        pid = re.search(r"\bpid = (\d+)", corps)
+        chemin = re.search(r'bundle path="([^"]+)"', corps)
+        ident = re.search(r'bundleID="([^"]+)"', corps)
+        if pid:
+            applis.append({"nom": m.group("nom"), "pid": int(pid.group(1)),
+                           "paquet": Path(chemin.group(1)).stem if chemin else "",
+                           "id": ident.group(1) if ident else ""})
+    return applis
+
+
+def application_au_premier_plan() -> tuple[int, str]:
+    import subprocess
+    asn = subprocess.run(["lsappinfo", "front"], capture_output=True, text=True, timeout=5).stdout.strip()
+    info = subprocess.run(["lsappinfo", "info", "-only", "pid", "-only", "name", asn],
+                          capture_output=True, text=True, timeout=5).stdout
+    pid, nom = re.search(r'"pid"=(\d+)|pid = (\d+)', info), re.search(r'"LSDisplayName"="([^"]+)"|^"([^"]+)"', info.strip())
+    if not pid:
+        raise ErreurOutil("Impossible de savoir quelle application est au premier plan.")
+    return int(pid.group(1) or pid.group(2)), (nom.group(1) or nom.group(2)) if nom else "application"
+
+
 def pid_application(nom: str | None) -> tuple[int, str]:
-    from AppKit import NSWorkspace
-    ws = NSWorkspace.sharedWorkspace()
     if not nom:
-        app = ws.frontmostApplication()
-        return app.processIdentifier(), app.localizedName()
+        return application_au_premier_plan()
     from ..agent.routeur import normaliser
-    cible = normaliser(nom)
-    candidats = [a for a in ws.runningApplications() if a.localizedName()]
+    cible = normaliser(nom).removesuffix(".app")
+    candidats = applis_ouvertes()
+
+    def noms(a) -> list[str]:
+        # Nom affiché (« Réglages Système »), nom du paquet (« System Settings ») et identifiant :
+        # le modèle emploie l'un ou l'autre, en français ou en anglais.
+        return [normaliser(a["nom"]), normaliser(a["paquet"]), normaliser(a["id"].rsplit(".", 1)[-1])]
+
     for a in candidats:
-        if normaliser(a.localizedName()) == cible:
-            return a.processIdentifier(), a.localizedName()
+        if cible in noms(a):
+            return a["pid"], a["nom"]
     for a in candidats:
-        if cible in normaliser(a.localizedName()):
-            return a.processIdentifier(), a.localizedName()
+        if any(cible in n for n in noms(a)[:2] if n):
+            return a["pid"], a["nom"]
     raise ErreurOutil(f"L'application « {nom} » n'est pas ouverte.")
+
+
+_actives: set[int] = set()
+
+
+def activer_contenu_web(app_el, pid: int) -> bool:
+    """Chrome et les applis Electron (Claude, VS Code, Slack, Discord…) ne publient le contenu de leurs pages
+    qu'à un lecteur d'écran qui le demande : sans cela, lire_fenetre ne voit que les boutons de la fenêtre.
+    Renvoie True à la première activation (l'appli met ~1 s à construire son arbre)."""
+    if pid in _actives:
+        return False
+    AS = _ax()
+    _actives.add(pid)
+    for attr in ("AXManualAccessibility", "AXEnhancedUserInterface"):
+        AS.AXUIElementSetAttributeValue(app_el, attr, True)
+    return True
 
 
 @dataclass
@@ -82,28 +141,56 @@ def explorer_fenetre(nom_app: str | None = None, textes: bool = True) -> tuple[s
     AS = _ax()
     pid, nom = pid_application(nom_app)
     app = AS.AXUIElementCreateApplication(pid)
+    nouvelle = activer_contenu_web(app, pid)
+    for essai in range(6):
+        titre, elements = _lire(app, nom, textes)
+        # Juste après l'activation, une appli web n'expose encore que ses boutons de fenêtre : on attend.
+        if not nouvelle or len(elements) > 8:
+            break
+        time.sleep(0.5)
+    return f"{nom} — {titre}", elements
+
+
+def _lire(app, nom: str, textes: bool) -> tuple[str, list[Element]]:
     fenetre = attribut(app, "AXFocusedWindow") or (attribut(app, "AXWindows") or [None])[0]
     if fenetre is None:
         raise ErreurOutil(f"{nom} n'a pas de fenêtre ouverte.")
     titre = attribut(fenetre, "AXTitle") or nom
     elements: list[Element] = []
 
+    fin = time.monotonic() + DUREE_MAX_S
+
     def visiter(el, profondeur):
-        if len(elements) >= ELEMENTS_MAX or profondeur > PROFONDEUR_MAX:
+        if len(elements) >= ELEMENTS_LUS or profondeur > PROFONDEUR_MAX or time.monotonic() > fin:
             return
         role = attribut(el, "AXRole") or ""
         if role in INTERACTIFS or (textes and role == "AXStaticText"):
             libelle = _libelle(el)
             valeur = attribut(el, "AXValue")
             valeur = "" if valeur is None or role == "AXSecureTextField" else str(valeur)[:120]
-            if libelle or valeur or role in INTERACTIFS:
+            # Lignes et cellules sans texte (listes, barres latérales) : seuls leurs textes enfants comptent.
+            if role in ("AXRow", "AXCell") and not (libelle or valeur):
+                pass
+            elif libelle or valeur or role in INTERACTIFS:
                 if not (role == "AXStaticText" and not (valeur or libelle)):
                     elements.append(Element(el, role, libelle, valeur))
         for enfant in attribut(el, "AXChildren") or []:
             visiter(enfant, profondeur + 1)
 
     visiter(fenetre, 0)
-    return f"{nom} — {titre}", elements
+    if len(elements) > ELEMENTS_MAX:
+        # Tous les éléments interactifs, puis les textes dans l'ordre jusqu'à la limite (ordre d'origine gardé).
+        interactifs = sum(1 for e in elements if e.role in INTERACTIFS)
+        place_textes = max(0, ELEMENTS_MAX - interactifs)
+        gardes, textes_vus = [], 0
+        for e in elements:
+            if e.role in INTERACTIFS:
+                gardes.append(e)
+            elif textes_vus < place_textes:
+                gardes.append(e)
+                textes_vus += 1
+        elements = gardes[:ELEMENTS_MAX * 2]
+    return titre, elements
 
 
 def decrire(elements: list[Element]) -> str:
@@ -208,3 +295,30 @@ def taille_ecran() -> tuple[float, float]:
     import Quartz
     b = Quartz.CGDisplayBounds(Quartz.CGMainDisplayID())
     return b.size.width, b.size.height
+
+
+def menus(nom_app: str, menu: str = "", max_par_menu: int = 25) -> tuple[str, str]:
+    """Menus de l'application et leurs commandes (un seul appel suffit au modèle pour trouver la bonne)."""
+    from ..agent.routeur import normaliser
+    AS = _ax()
+    pid, nom = pid_application(nom_app)
+    barre = attribut(AS.AXUIElementCreateApplication(pid), "AXMenuBar")
+    if barre is None:
+        raise ErreurOutil(f"{nom} n'a pas de barre des menus lisible.")
+    lignes = []
+    for titre_el in (attribut(barre, "AXChildren") or [])[1:]:  # le premier est le menu Pomme
+        titre = str(attribut(titre_el, "AXTitle") or "")
+        if not titre or (menu and normaliser(menu) not in normaliser(titre)):
+            continue
+        commandes = []
+        for sous in attribut(titre_el, "AXChildren") or []:
+            for item in attribut(sous, "AXChildren") or []:
+                t = attribut(item, "AXTitle")
+                if t and attribut(item, "AXEnabled") is not False:
+                    commandes.append(str(t))
+        if not menu:
+            commandes = commandes[:max_par_menu]
+        lignes.append(f"{titre} : " + ", ".join(commandes))
+    if menu and not lignes:
+        raise ErreurOutil(f"Pas de menu « {menu} » dans {nom}.")
+    return nom, "\n".join(lignes)

@@ -15,7 +15,7 @@ import urllib.request
 from html.parser import HTMLParser
 
 from ..mac import commun
-from .base import ErreurOutil, Resultat, Risque, outil
+from .base import ErreurOutil, Resultat, Risque, interdire_achat, outil
 
 AIDE_JS = ("Chrome bloque le pilotage des pages. Active une fois : menu Chrome > Présentation > "
            "Options pour les développeurs > « Autoriser JavaScript à partir des Apple Events ».")
@@ -165,6 +165,9 @@ def _element(n) -> str:
        {"numero": ("integer", "numéro de l'élément")}, risque=Risque.MODIFICATION,
        annonce=lambda a: f"Cliquer sur l'élément {a['numero']} de la page")
 def cliquer_page(ctx, numero):
+    texte = chrome_js(ctx, f"(() => {{ const e = {_element(numero)}; if (!e) return ''; return ((e.innerText || '') "
+                           f"+ ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.value || '')).slice(0, 300); }})()")
+    interdire_achat(texte)
     r = chrome_js(ctx, f"(() => {{ const e = {_element(numero)}; if (!e) return 'absent'; "
                        f"e.scrollIntoView({{block: 'center'}}); e.click(); return 'ok'; }})()")
     if r == "absent":

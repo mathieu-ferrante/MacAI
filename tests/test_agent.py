@@ -1,8 +1,10 @@
+import pytest
+
 from macai.agent import consignes, routeur
 from macai.agent.orchestrateur import Orchestrateur
 from macai.agent.rapide import CommandesRapides
 from macai.llm.ollama import Reponse
-from macai.outils.base import Registre, Risque, outil
+from macai.outils.base import ErreurOutil, Registre, Risque, outil
 
 from .conftest import FauxOllama, appel
 
@@ -189,3 +191,13 @@ def test_heure_seule():
     from macai.outils.organisation import lire_date
     d = lire_date("09:00")
     assert d.hour == 9 and d > datetime.now()
+
+
+def test_jamais_d_achat_ni_de_credits():
+    from macai.outils.base import interdire_achat
+    for t in ["Acheter des crédits", "Get more usage", "Passer à Max", "Augmenter votre limite", "Buy credits",
+              "Utilisation supplémentaire", "Paramètres > Facturation", "Subscribe"]:
+        with pytest.raises(ErreurOutil):
+            interdire_achat(t)
+    for t in ["Chat et Cowork", "Nouveau", "Envoyer le message", "Fichier > Exporter", "Commandes"]:
+        interdire_achat(t)

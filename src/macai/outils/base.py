@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -34,6 +35,24 @@ class Resultat:
 
 class ErreurOutil(Exception):
     """Erreur attendue (fichier introuvable, appli absente…) : message montré tel quel."""
+
+
+# Jamais cliqué, choisi ni rempli par l'agent, quelle que soit l'application : rien qui dépense de l'argent
+# ou demande des crédits / une utilisation supplémentaire (règle de Mathieu, même si une limite est atteinte).
+ACHAT = re.compile(
+    r"achet|achat|payer|paiement|régler la|crédit|credit|abonne|souscri|upgrade|mettre à niveau|mise à niveau|"
+    r"passer (à|au) (pro|max|plus|team|premium)|forfait|facturation|billing|buy|purchase|subscribe|checkout|"
+    r"top.?up|recharg|utilisation supplémentaire|usage supplémentaire|extra usage|more usage|plus d.utilisation|"
+    r"augmenter (la|ma|votre) limite|increase (your )?limit|add funds|ajouter des fonds|commander|order now|"
+    r"panier|cart|pay\b|€|\$\d", re.I)
+
+
+def interdire_achat(*textes) -> None:
+    """Lève ErreurOutil si l'action vise un achat, des crédits ou une utilisation payante."""
+    for t in textes:
+        if t and ACHAT.search(str(t)):
+            raise ErreurOutil(f"Refusé : « {str(t)[:80]} » ressemble à un achat, des crédits ou une utilisation "
+                              "payante. MacAI ne fait jamais ce genre d'action ; c'est à toi de décider.")
 
 
 @dataclass

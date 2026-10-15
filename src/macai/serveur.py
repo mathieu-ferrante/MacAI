@@ -101,6 +101,18 @@ def creer_gestionnaire(app: Application, jeton: str):
             if self.path == "/indexer":
                 app._lancer_indexation(force=True)
                 return self._json(202, {"ok": True})
+            if self.path == "/diagnostic/outil":
+                # Essais et diagnostic : exécute un outil en LECTURE seule, avec les autorisations macOS de l'app
+                # (le Terminal ne les a pas). Tout outil qui agit passe par /demande et ses confirmations.
+                from .outils.base import Risque
+                o = app.ctx.registre.get(str(d.get("nom", "")))
+                args = d.get("arguments") or {}
+                if o is None or not isinstance(args, dict):
+                    return self._json(404, {"erreur": "outil inconnu"})
+                if o.toujours_confirmer or o.risque_pour(args) != Risque.LECTURE:
+                    return self._json(403, {"erreur": "réservé aux outils en lecture seule"})
+                r = o.executer(app.ctx, args)
+                return self._json(200, {"ok": r.ok, "texte": r.texte})
             self._json(404, {"erreur": "inconnu"})
 
         def _flux(self):

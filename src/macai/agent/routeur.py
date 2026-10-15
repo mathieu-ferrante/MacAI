@@ -41,6 +41,12 @@ GROUPES_DEFAUT = ["applications", "fichiers", "recherche", "web", "systeme"]
 TOUJOURS = ["memoire"]
 MAX_OUTILS = 14
 MAX_DESIGNES = 9
+PILOTAGE = ["ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
+            "raccourci_clavier", "attendre"]
+# Une deuxième action après l'ouverture d'une appli : il faudra lire sa fenêtre, cliquer, écrire.
+ACTION_DANS_APPLI = re.compile(r"\b(et|puis|ensuite|va|passe|demande|ecris|tape|envoie|mets|active|desactive|"
+                               r"choisis|selectionne|clique|appuie|remplis|pose|dis-lui|demande-lui|"
+                               r"ecris-lui)\b|,")
 # Les outils des logiciels tiers (MCP) sont décrits en anglais : verbes et noms français courants traduits.
 ANGLAIS: dict[str, list[str]] = {
     "ouvre": ["open"], "ouvrir": ["open"], "convertis": ["export", "convert", "open"],
@@ -80,6 +86,8 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
 
     scores = {g: sum(_contient(t, normaliser(m)) for m in ms) for g, ms in mots.items() if g in groupes}
     choisis = [g for g, s in sorted(scores.items(), key=lambda x: -x[1]) if s > 0]
+    # « Ouvre Claude et demande-lui… », « ouvre Réglages, va dans Wi-Fi » : agir DANS l'appli ouverte.
+    dans_appli = "applications" in choisis and "fenetres" in groupes and bool(ACTION_DANS_APPLI.search(t))
     if not choisis:
         choisis = [g for g in GROUPES_DEFAUT if g in groupes]
 
@@ -96,6 +104,8 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
                 if o.mots_cles and any(_contient(t, normaliser(m)) for m in o.mots_cles)]
     designes.sort(key=lambda o: -proximite(o))
     noms: list[str] = [o.nom for o in designes[:MAX_DESIGNES]]
+    if dans_appli:  # de quoi ouvrir l'appli, lire sa fenêtre, cliquer, écrire, valider
+        noms += [n for n in PILOTAGE if registre.get(n) is not None and n not in noms]
     # Dans les groupes retenus, les outils dont le nom et la description ressemblent le plus à la demande.
     candidats = []
     for rang, g in enumerate(choisis):

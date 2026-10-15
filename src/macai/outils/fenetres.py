@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import ErreurOutil, Resultat, Risque, outil
+from .base import ErreurOutil, Resultat, Risque, interdire_achat, outil
 
 
 def _elements(ctx) -> list:
@@ -51,6 +51,10 @@ def lire_fenetre(ctx, application=""):
        annonce=lambda a: f"Cliquer sur l'élément {a['numero']}")
 def cliquer_element(ctx, numero):
     e = _element(ctx, numero)
+    interdire_achat(e.libelle, e.valeur)
+    if e.role in ("AXStaticText", "AXImage"):
+        raise ErreurOutil(f"L'élément {numero} est un {ax.ROLES.get(e.role)}, pas un bouton : choisis un [bouton], "
+                          "[option], [case], [lien] ou [onglet] proche.")
     ax.appuyer(e.ref)
     time.sleep(0.4)
     return f"Clic sur « {e.libelle or e.valeur or ax.ROLES.get(e.role, e.role)} »."
@@ -62,6 +66,7 @@ def cliquer_element(ctx, numero):
        risque=Risque.MODIFICATION, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}")
 def saisir_element(ctx, numero, texte, valider=False):
     e = _element(ctx, numero)
+    interdire_achat(e.libelle)
     if e.role == "AXSecureTextField":
         raise ErreurOutil("C'est un champ de mot de passe : je ne le remplis pas, c'est à toi de le faire.")
     ax.definir_valeur(e.ref, str(texte))
@@ -79,6 +84,7 @@ def choisir_menu(ctx, application, chemin):
     from .applications import trouver_application
     app = trouver_application(application)
     nom = app.stem if app else application
+    interdire_achat(chemin)
     parties = [p.strip() for p in re.split(r"\s*>\s*", chemin) if p.strip()]
     if len(parties) < 2:
         raise ErreurOutil("Donne au moins un menu et une commande : « Fichier > Enregistrer ».")
@@ -99,19 +105,11 @@ tell application "System Events" to tell process {commun.chaine_as(nom)} to clic
 def lister_menus(ctx, application, menu=""):
     from .applications import trouver_application
     app = trouver_application(application)
-    nom = commun.chaine_as(app.stem if app else application)
-    if menu:
-        script = f'''tell application "System Events" to tell process {nom}
-    set res to ""
-    repeat with mi in menu items of menu 1 of menu bar item {commun.chaine_as(menu)} of menu bar 1
-        set n to name of mi
-        if n is not missing value then set res to res & n & linefeed
-    end repeat
-    return res
-end tell'''
-    else:
-        script = f'tell application "System Events" to tell process {nom} to get name of menu bar items of menu bar 1'
-    return commun.osascript(script)
+    if app is not None:
+        commun.executer(["open", "-a", str(app)])  # l'appli doit tourner pour avoir des menus
+        time.sleep(0.5)
+    nom, texte = ax.menus(app.stem if app else application, menu)
+    return f"Menus de {nom} (commande à passer à choisir_menu, ex. « Fichier > Exporter… ») :\n{texte}"
 
 
 @outil("raccourci_clavier", "Appuie sur un raccourci clavier dans l'application au premier plan, ex. "
@@ -128,12 +126,35 @@ def raccourci_clavier(ctx, touches):
     return f"Raccourci {touches} envoyé."
 
 
-@outil("taper_texte", "Tape un texte au clavier à l'endroit du curseur, dans n'importe quelle application.",
-       "fenetres", {"texte": ("string", "texte à taper")}, risque=Risque.MODIFICATION,
-       annonce=lambda a: f"Taper « {a['texte'][:60]} »")
-def taper_texte(ctx, texte):
+@outil("taper_texte", "Tape un texte au clavier à l'endroit du curseur, dans l'application indiquée. Préfère "
+       "saisir_element (champ précis) quand lire_fenetre montre le champ.",
+       "fenetres", {"texte": ("string", "texte à taper"),
+                    "application": ("string", "application où taper (elle doit être au premier plan)")},
+       requis=["texte", "application"], risque=Risque.MODIFICATION,
+       annonce=lambda a: f"Taper « {a['texte'][:60]} » dans {a.get('application', '?')}")
+def taper_texte(ctx, texte, application):
+    # Garde-fou : le texte part dans le champ qui a le focus. On vérifie que c'est bien l'appli voulue,
+    # sinon il atterrirait n'importe où (vu en essai : dans la saisie de l'utilisateur).
+    from .applications import trouver_application
+    app = trouver_application(application)
+    if app is not None:
+        commun.executer(["open", "-a", str(app)])
+        time.sleep(0.4)
+    pid_voulu, nom_voulu = ax.pid_application(app.stem if app else application)
+    pid_devant, devant = ax.application_au_premier_plan()
+    if pid_devant != pid_voulu:
+        raise ErreurOutil(f"{nom_voulu} n'est pas au premier plan ({devant} l'est) : je ne tape pas à l'aveugle.")
     ax.taper(str(texte))
-    return "Texte tapé."
+    return f"Texte tapé dans {nom_voulu} (vérifie avec lire_fenetre qu'il est au bon endroit)."
+
+
+@outil("attendre", "Attend quelques secondes (qu'une page charge, qu'une appli réponde), puis relis la fenêtre.",
+       "fenetres", {"secondes": ("integer", "durée, 1 à 60")}, mac_seulement=False)
+def attendre(ctx, secondes=5):
+    s = max(1, min(int(secondes or 5), 60))
+    if ctx.arret.wait(s):
+        raise ErreurOutil("Arrêt demandé.")
+    return f"{s} s écoulées."
 
 
 # --- Vision : dernier recours -----------------------------------------------------------
@@ -177,6 +198,7 @@ def extraire_coordonnees(texte: str) -> tuple[float, float]:
        annonce=lambda a: f"Cliquer à l'écran sur : {a['description']}")
 def cliquer_ecran(ctx, description, double=False):
     from .documents import demander_vision
+    interdire_achat(description)
     rep = demander_vision(ctx, capture_reduite(),
                           f"Trouve sur cette capture d'écran : {description}. Réponds UNIQUEMENT en JSON "
                           '{"x": <0-1000>, "y": <0-1000>} : position du centre de l\'élément, en millièmes de la '

@@ -94,8 +94,11 @@ def etat_memoire(ctx):
               f"RAM utilisée : {m.fmt_bytes(s.used)} / {m.fmt_bytes(s.ram_total)} "
               f"(applis {m.fmt_bytes(s.app_mem)}, compressée {m.fmt_bytes(s.compressed)})",
               f"Swap sur le SSD : {m.fmt_bytes(s.swap_used)}", "Applications les plus gourmandes :"]
-    lignes += [f"- {a['name']} : {m.fmt_bytes(a['rss'])}" + (" (appli)" if a.get("is_app") else "")
-               for a in s.apps[:8]]
+    for a in s.apps[:8]:
+        nom = a["name"]
+        if nom in ("llama-server", "ollama") or nom.startswith("ollama"):
+            nom += " (modèle d'IA de MacAI : se libère seul 2 min après la dernière demande, ne pas fermer)"
+        lignes.append(f"- {nom} : {m.fmt_bytes(a['rss'])}" + (" (appli)" if a.get("is_app") else ""))
     return "\n".join(lignes)
 
 

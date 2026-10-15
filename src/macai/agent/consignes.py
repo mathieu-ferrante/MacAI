@@ -20,6 +20,14 @@ Règles :
 - Dossiers : ~ = dossier personnel, Bureau = ~/Desktop, Téléchargements = ~/Downloads, Documents = ~/Documents.
 - Pour piloter un logiciel : connecteur dédié s'il existe, sinon menus et fenêtres (lire_fenetre puis
   cliquer/taper), et la vision de l'écran en dernier recours.
+- Tu peux utiliser N'IMPORTE QUELLE application comme l'utilisateur (Claude, ChatGPT, Messages, Réglages…) :
+  ouvre-la, lis sa fenêtre avec lire_fenetre, clique, écris (saisir_element ou taper_texte), valide avec
+  raccourci_clavier « entree ». Ne dis jamais que tu n'as pas accès à une interface sans l'avoir lue.
+- Ne réponds jamais « je vais faire… » : fais-le maintenant avec les outils, ou explique ce qui bloque.
+- Après avoir cliqué ou changé de mode, relis la fenêtre (lire_fenetre) pour VÉRIFIER le résultat avant de
+  continuer ou d'annoncer un succès. Clique sur des [bouton], [option], [onglet], jamais sur un [texte].
+- INTERDIT, même si l'utilisateur atteint une limite : acheter, payer, demander des crédits ou une utilisation
+  supplémentaire, changer d'abonnement. Dans ce cas, dis-le simplement à l'utilisateur.
 - Ne demande pas de confirmation toi-même : le système s'en charge pour les actions sensibles.
 - La date, l'heure et ce que tu sais de l'utilisateur sont donnés à la fin de chaque demande, entre [ ]."""
 
@@ -30,12 +38,35 @@ def construire(utilisateur: str | None = None) -> str:
     return CONSIGNES.format(utilisateur=utilisateur or getpass.getuser())
 
 
-def contexte(souvenirs: list[str] | None = None, maintenant: datetime | None = None) -> str:
+# Repères pour piloter certaines applications (ajoutés seulement quand la demande les cite).
+ASTUCES = {
+    "claude": "Claude : en haut de la fenêtre, l'option « Chat et Cowork » donne le mode chat et l'option « Code » "
+              "le mode Claude Code. Après le clic, relis la fenêtre : la zone de texte du bas sert à écrire, "
+              "saisir_element avec valider=true envoie. Attends puis relis la fenêtre pour lire la réponse.",
+    "chatgpt": "ChatGPT : écris dans la zone de texte du bas (saisir_element, valider=true), puis relis la fenêtre.",
+    "reglages": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",
+    "settings": "Réglages Système : les rubriques sont dans la colonne de gauche (ou menu Présentation).",
+}
+
+
+def astuces(demande: str) -> str:
+    from .routeur import normaliser
+    t = normaliser(demande)
+    vues = []
+    for cle, texte in ASTUCES.items():
+        if cle in t and texte not in vues:
+            vues.append(texte)
+    return " ".join(vues)
+
+
+def contexte(souvenirs: list[str] | None = None, maintenant: datetime | None = None, demande: str = "") -> str:
     """Informations variables, ajoutées à la fin du message de l'utilisateur."""
     m = maintenant or datetime.now()
     texte = f"[Nous sommes le {JOURS[m.weekday()]} {m.day} {MOIS[m.month - 1]} {m.year}, il est {m:%H:%M}."
     if souvenirs:
         texte += " Ce que tu sais de l'utilisateur : " + " ; ".join(souvenirs)
+    if demande and (a := astuces(demande)):
+        texte += " Repères : " + a
     return texte + "]"
 
 

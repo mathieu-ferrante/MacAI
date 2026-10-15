@@ -79,11 +79,14 @@ def test_lire_page_et_cliquer(ctx, scripts, monkeypatch):
                                        "texte": "Bienvenue"})]
     r = chrome.lire_page(ctx)
     assert "1 [button] Créer" in r.texte and r.donnees["titre"] == "Onshape"
-    scripts["reponses"] = ["ok", "complete"]
+    scripts["reponses"] = ["Créer", "ok", "complete"]
     assert "Clic" in chrome.cliquer_page(ctx, 1)
-    scripts["reponses"] = ["absent"]
+    scripts["reponses"] = ["", "absent"]
     with pytest.raises(ErreurOutil, match="relis la page"):
         chrome.cliquer_page(ctx, 99)
+    scripts["reponses"] = ["Acheter plus de crédits d'utilisation", "ok"]
+    with pytest.raises(ErreurOutil, match="achat"):
+        chrome.cliquer_page(ctx, 3)
 
 
 def test_remplir_refuse_donnees_bancaires(ctx, scripts):
