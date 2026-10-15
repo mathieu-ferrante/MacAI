@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import time
 
-from .base import ErreurOutil, Resultat, Risque, outil
+from .base import ErreurOutil, Resultat, Risque, interdire_donnees_bancaires, outil
 
 # La demande de l'utilisateur parle de mémoire ou de lui-même : « retenir » va de soi. Sinon (le fait vient
 # d'une page web, d'un document, d'un mail…), rien n'est mémorisé sans son accord.
@@ -21,10 +21,20 @@ def _memoire(ctx):
     return m
 
 
+SECRET = re.compile(r"mot de passe|password|passcode|code (pin|secret|d.acc[eè]s|de carte|confidentiel)|\bpin\b|"
+                    r"\bcvv\b|\bcvc\b|cryptogramme|num[ée]ro de (carte|s[ée]cu|s[ée]curit[ée] sociale|passeport)|"
+                    r"\biban\b|\bbic\b|cl[ée] (api|priv[ée]e|secr[eè]te)|\btoken\b|identifiants?", re.I)
+
+
 @outil("retenir", "Retient durablement un fait sur l'utilisateur (préférence, information personnelle, habitude).",
        "memoire", {"fait": ("string", "le fait, à la 3e personne, ex. « Mathieu préfère les réponses courtes »")},
        risque=Risque.CREATION, mac_seulement=False)
 def retenir(ctx, fait):
+    # Jamais de secrets en mémoire (elle est relue dans chaque demande) : cartes, IBAN, mots de passe, codes.
+    interdire_donnees_bancaires(fait)
+    if SECRET.search(str(fait)):
+        raise ErreurOutil("Je ne retiens pas les mots de passe, codes ou numéros confidentiels : garde-les dans "
+                          "ton gestionnaire de mots de passe.")
     memoire = _memoire(ctx)
     demande = ctx.services.get("demande")  # posée par l'orchestrateur à chaque demande
     if demande is not None:

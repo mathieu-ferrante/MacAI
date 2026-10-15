@@ -39,6 +39,10 @@ OUTIL_EXPLOITE_CAR = 600  # résultat d'outil ancien, déjà exploité par le mo
 INACHEVE = re.compile(r"\b(je vais|il me reste a|je dois (encore|maintenant)|"
                       r"il reste a (valider|envoyer|cliquer|saisir|appuyer|taper))\b")
 ACTION_AFFIRMEE = re.compile(r"\bj['’]ai\b")
+# Demande d'explication, pas d'action : « comment faire… », « pourquoi… », « explique… », « c'est quoi… ».
+SAVOIR = re.compile(r"^(comment (on |faire|faut|puis|je peux|est-ce|ca marche|fonctionne)|comment\b(?!.*\b(ouvre|lance|"
+                    r"cree|mets|fais|range|envoie)\b)|pourquoi\b|explique|c'est quoi|qu'est-ce que c'est|a quoi sert|"
+                    r"quelle est la difference|quel est l'interet)")
 QUESTION = re.compile(r"^(comment|pourquoi|est-ce que|qu'est-ce|quels?|quelles?|quand|ou)\b")
 
 
@@ -70,11 +74,13 @@ class Orchestrateur:
             return Resultat.echec(f"Outil inconnu : {nom}. Utilise uniquement les outils fournis.")
         # Arguments corrigés UNE fois : le risque, la phrase, la confirmation et l'exécution portent sur les
         # mêmes valeurs (jamais un risque calculé sur des arguments bruts différents de ce qui tourne).
+        brut = args
         args, erreur = preparer(o, args)
         phrase = o.phrase(args)
         ctx.emettre("outil_debut", outil=nom, arguments=args, phrase=phrase)
         if erreur:
             r = Resultat.echec(erreur)
+            ctx.journal.ecrire("outil", outil=nom, arguments=_abreger(brut), ok=False, texte=erreur[:500], duree=0)
             ctx.emettre("outil_fin", outil=nom, ok=False, texte=r.texte)
             return r
         risque = _risque(o, args)
@@ -171,6 +177,11 @@ class Orchestrateur:
         ctx = self.ctx
         cfg = ctx.config
         noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
+        if SAVOIR.search(routeur.normaliser(demande).strip()):
+            # « Comment envoyer un mail ? » : on explique, on n'agit pas (vu en essai : brouillons préparés et
+            # mails lus pour une simple question). Seuls les outils de lecture restent.
+            noms = [n for n in noms if (o := ctx.registre.get(n)) is not None and not o.toujours_confirmer
+                    and _risque_fixe(o) == Risque.LECTURE and o.groupe not in ("organisation",)]
         ctx.emettre("routage", mode="agent", outils=noms)
         outils = ctx.registre.schemas(noms)
 
@@ -334,6 +345,11 @@ def _imperatif(demande: str) -> bool:
     """« Envoie… », « ouvre… » : oui. « Comment… ? », « quel… » : non (une réponse suffit)."""
     t = routeur.normaliser(demande).strip()
     return "?" not in t and not QUESTION.match(t)
+
+
+def _risque_fixe(o: Outil) -> Risque:
+    """Risque d'un outil hors arguments (une fonction de risque est comptée comme une action possible)."""
+    return o.risque if isinstance(o.risque, Risque) else Risque.MODIFICATION
 
 
 def _action_reussie(trace: list) -> bool:

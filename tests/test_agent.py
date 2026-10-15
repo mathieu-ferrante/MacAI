@@ -231,3 +231,31 @@ def test_discussions_attente_reponse_et_risque(ctx, monkeypatch):
     assert d._risque_ecrire({"application": "Claude", "texte": "x"}) == Risque.MODIFICATION
     assert d._risque_ecrire({"application": "Messages", "texte": "x"}) == Risque.SENSIBLE
     assert d._risque_ecrire({"application": "Messages", "texte": "x", "envoyer": False}) == Risque.MODIFICATION
+
+
+def test_question_explicative_sans_outil_d_action(ctx):
+    reg = Registre()
+
+    @outil("preparer_mail", "", "organisation", risque=Risque.CREATION, mac_seulement=False, registre=reg,
+           mots_cles=["mail"])
+    def preparer_mail(ctx):
+        return "brouillon"
+
+    @outil("lister_souvenirs", "", "memoire", mac_seulement=False, registre=reg)
+    def lister_souvenirs(ctx):
+        return "rien"
+    ctx.registre = reg
+    ctx.ollama = FauxOllama([Reponse(texte="Dans Mail, cliquez sur le trombone.")])
+    Orchestrateur(ctx, CommandesRapides()).traiter("comment envoyer un mail avec pièce jointe ?")
+    proposes = [o["function"]["name"] for o in ctx.ollama.recus[0]["outils"] or []]
+    assert "preparer_mail" not in proposes
+
+
+def test_retenir_refuse_les_secrets(ctx, tmp_path):
+    from macai.memoire.memoire import Memoire
+    from macai.outils import memoire_outils
+    ctx.services["memoire"] = Memoire(tmp_path)
+    for fait in ["Mathieu a la carte 4111 1111 1111 1111", "le mot de passe du wifi est azerty",
+                 "son code PIN est 1234"]:
+        with pytest.raises(ErreurOutil):
+            memoire_outils.retenir(ctx, fait)

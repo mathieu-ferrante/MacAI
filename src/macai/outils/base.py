@@ -106,6 +106,22 @@ def nom_appli(nom: str) -> str:
     return "".join(c for c in t if unicodedata.category(c) != "Mn").replace("’", "'").strip()
 
 
+SYNONYMES_ARGS = {
+    "path": ("chemin", "source"), "file": ("chemin", "source"), "fichier": ("chemin", "source"),
+    "filepath": ("chemin",), "chemin_fichier": ("chemin",), "src": ("source",), "from": ("source",),
+    "de": ("source",), "origine": ("source",), "to": ("destination",), "dest": ("destination",),
+    "vers": ("destination",), "cible": ("destination",), "dossier_destination": ("destination",),
+    "target": ("destination",), "name": ("nom",), "application": ("nom", "application"), "app": ("nom", "application"),
+    "appli": ("nom", "application"), "logiciel": ("nom", "application"), "text": ("texte",), "message": ("texte",),
+    "content": ("contenu", "texte"), "body": ("corps", "contenu"), "query": ("requete",), "q": ("requete",),
+    "recherche": ("requete",), "search": ("requete",), "link": ("url",), "lien": ("url",), "adresse": ("url",),
+    "keys": ("touches",), "shortcut": ("touches",), "raccourci": ("touches",), "touche": ("touches",),
+    "level": ("niveau",), "volume": ("niveau",), "number": ("numero",), "num": ("numero",), "element": ("numero",),
+    "id": ("numero",), "command": ("commande",), "cmd": ("commande",), "question": ("question",),
+    "title": ("titre",), "date": ("date",), "folder": ("dossier", "chemin"), "directory": ("dossier", "chemin"),
+}
+
+
 @dataclass
 class Outil:
     nom: str
@@ -149,12 +165,21 @@ class Outil:
         signature = inspect.signature(self.fonction)
         accepte_tout = any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values())
         propres = {k: v for k, v in args.items() if accepte_tout or k in signature.parameters}
-        inconnus = [k for k in args if k not in propres]
+        # Noms de paramètres que les petits modèles emploient à la place des vrais (anglais, synonymes).
+        for k, v in args.items():
+            if k not in propres:
+                cible = next((c for c in SYNONYMES_ARGS.get(nom_appli(k), ()) if c in self.parametres
+                              and c not in propres), None)
+                if cible:
+                    propres[cible] = v
+        inconnus = [k for k in args if k not in propres and not any(
+            c in self.parametres and propres.get(c) is args[k] for c in SYNONYMES_ARGS.get(nom_appli(k), ()))]
         manquants = [r for r in self.requis if r not in propres or str(propres[r]).strip() in ("", "None")]
         # Petit modèle : « application » au lieu de « nom », « path » au lieu de « chemin »… Un seul paramètre
         # obligatoire manquant et un seul argument inconnu : c'est forcément lui.
-        if len(manquants) == 1 and len(inconnus) == 1:
-            propres[manquants[0]] = args[inconnus[0]]
+        if manquants and len(manquants) == len(inconnus):  # dans l'ordre : (source, destination) ← (a, b)
+            for m, i in zip(manquants, inconnus):
+                propres[m] = args[i]
         propres, invalides = self._corriger(propres)
         if invalides:
             return propres, "Valeur invalide : " + " ; ".join(invalides)
