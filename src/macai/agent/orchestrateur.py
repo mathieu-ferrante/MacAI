@@ -68,6 +68,7 @@ class Orchestrateur:
     def traiter(self, demande: str) -> str:
         ctx = self.ctx
         ctx.arret.clear()
+        ctx.services["demande"] = demande  # certains garde-fous dépendent de ce que l'utilisateur a demandé
         ctx.emettre("debut", demande=demande)
         ctx.journal.ecrire("demande", texte=demande)
         trace: list[dict] = []

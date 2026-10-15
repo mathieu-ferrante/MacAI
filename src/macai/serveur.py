@@ -101,6 +101,12 @@ def creer_gestionnaire(app: Application, jeton: str):
             if self.path == "/indexer":
                 app._lancer_indexation(force=True)
                 return self._json(202, {"ok": True})
+            if self.path == "/diagnostic/arbre":
+                from .mac import accessibilite
+                try:
+                    return self._json(200, accessibilite.inventaire(str(d.get("application", ""))))
+                except Exception as e:  # noqa: BLE001 - diagnostic : on renvoie l'erreur telle quelle
+                    return self._json(500, {"erreur": str(e)})
             if self.path == "/diagnostic/outil":
                 # Essais et diagnostic : exécute un outil en LECTURE seule, avec les autorisations macOS de l'app
                 # (le Terminal ne les a pas). Tout outil qui agit passe par /demande et ses confirmations.

@@ -14,6 +14,24 @@ from ..mac import commun
 from .base import ErreurOutil, Resultat, Risque, interdire_achat, outil
 
 
+def _pas_dans_claude_code(ctx, application: str = "") -> None:
+    """Écrire dans Claude en mode Code = donner des ordres à Claude Code, qui agit sur le Mac : seulement si
+    l'utilisateur parle de Claude Code dans sa demande."""
+    from ..agent.routeur import normaliser
+    demande = normaliser(ctx.services.get("demande", ""))
+    if "code" in demande:
+        return
+    try:
+        pid, nom = ax.pid_application(application) if application else ax.application_au_premier_plan()
+    except ErreurOutil:
+        return
+    if normaliser(nom) != "claude":
+        return
+    if ax.option_cochee(pid, "Code"):
+        raise ErreurOutil("Claude est en mode Code : clique d'abord sur l'option « Chat et Cowork », relis la "
+                          "fenêtre pour vérifier, puis écris.")
+
+
 def _elements(ctx) -> list:
     els = ctx.services.get("ax_elements")
     if not els:
@@ -41,6 +59,7 @@ def lire_fenetre(ctx, application=""):
         time.sleep(0.6)
     titre, elements = ax.explorer_fenetre(application or None)
     ctx.services["ax_elements"] = elements
+    ctx.services["ax_application"] = titre.split(" — ", 1)[0]
     if not elements:
         return Resultat(True, f"{titre} : aucun élément lisible. Essaie voir_ecran (vision).")
     return Resultat(True, f"Fenêtre : {titre}\n{ax.decrire(elements)}", {"nb": len(elements)})
@@ -62,11 +81,20 @@ def cliquer_element(ctx, numero):
 
 @outil("saisir_element", "Écrit un texte dans un champ de fenêtre par son numéro (donné par lire_fenetre).",
        "fenetres", {"numero": ("integer", "numéro du champ"), "texte": ("string", "texte à écrire"),
-                    "valider": ("boolean", "appuyer sur Entrée ensuite")}, requis=["numero", "texte"],
+                    "valider": ("boolean", "appuyer sur Entrée ensuite"),
+                    "remplacer": ("boolean", "effacer le texte déjà présent (seulement si l'utilisateur le demande)")},
+       requis=["numero", "texte"],
        risque=Risque.MODIFICATION, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}")
-def saisir_element(ctx, numero, texte, valider=False):
+def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
     e = _element(ctx, numero)
     interdire_achat(e.libelle)
+    _pas_dans_claude_code(ctx, ctx.services.get("ax_application", ""))
+    deja = (ax.attribut(e.ref, "AXValue") or "").strip() if e.role in ("AXTextArea", "AXTextField", "AXComboBox",
+                                                                     "AXSearchField") else ""
+    if deja and not remplacer:
+        # Probablement un texte que l'utilisateur est en train d'écrire : on n'y touche pas.
+        raise ErreurOutil(f"Le champ « {e.libelle or numero} » contient déjà "
+                          f"du texte (« {deja[:60]} ») : ce n'est sans doute pas le bon champ. Relis la fenêtre.")
     if e.role == "AXSecureTextField":
         raise ErreurOutil("C'est un champ de mot de passe : je ne le remplis pas, c'est à toi de le faire.")
     ax.definir_valeur(e.ref, str(texte))
@@ -144,6 +172,11 @@ def taper_texte(ctx, texte, application):
     pid_devant, devant = ax.application_au_premier_plan()
     if pid_devant != pid_voulu:
         raise ErreurOutil(f"{nom_voulu} n'est pas au premier plan ({devant} l'est) : je ne tape pas à l'aveugle.")
+    _pas_dans_claude_code(ctx, nom_voulu)
+    focus = ax.champ_actif(pid_voulu)
+    if focus and focus.strip():
+        raise ErreurOutil(f"Le champ actif de {nom_voulu} contient déjà du texte (« {focus.strip()[:60]} ») : "
+                          "c'est peut-être ce que l'utilisateur écrit. Utilise lire_fenetre puis saisir_element.")
     ax.taper(str(texte))
     return f"Texte tapé dans {nom_voulu} (vérifie avec lire_fenetre qu'il est au bon endroit)."
 

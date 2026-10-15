@@ -19,7 +19,7 @@ ROLES = {
     "AXStaticText": "texte", "AXImage": "image", "AXSecureTextField": "mot de passe",
 }
 INTERACTIFS = set(ROLES) - {"AXStaticText", "AXImage"}
-PROFONDEUR_MAX = 30   # les pages web (Chrome, applis Electron comme Claude) sont profondes
+PROFONDEUR_MAX = 50   # pages web et applis Electron : la saisie de Claude est à 34 niveaux (mesuré)
 ELEMENTS_MAX = 180
 ELEMENTS_LUS = 600    # on lit plus large, puis on garde d'abord boutons et champs (la saisie est souvent en bas)
 DUREE_MAX_S = 4.0     # une fenêtre énorme ne bloque pas l'agent : on rend ce qu'on a lu
@@ -99,6 +99,20 @@ def pid_application(nom: str | None) -> tuple[int, str]:
     raise ErreurOutil(f"L'application « {nom} » n'est pas ouverte.")
 
 
+def fenetre_principale(app):
+    """Fenêtre active de l'application, en ignorant un menu ouvert ou une bulle (vus comme « fenêtre »)."""
+    def vraie(f) -> bool:
+        # Sans fenêtre (réduite, plein écran ailleurs), macOS renvoie parfois l'application ou un menu ouvert.
+        return f is not None and attribut(f, "AXRole") == "AXWindow"
+
+    for attr in ("AXFocusedWindow", "AXMainWindow"):
+        f = attribut(app, attr)
+        if vraie(f):
+            return f
+    fenetres = [f for f in attribut(app, "AXWindows") or [] if vraie(f)]
+    return fenetres[0] if fenetres else None
+
+
 _actives: set[int] = set()
 
 
@@ -152,9 +166,11 @@ def explorer_fenetre(nom_app: str | None = None, textes: bool = True) -> tuple[s
 
 
 def _lire(app, nom: str, textes: bool) -> tuple[str, list[Element]]:
-    fenetre = attribut(app, "AXFocusedWindow") or (attribut(app, "AXWindows") or [None])[0]
+    fenetre = fenetre_principale(app)
     if fenetre is None:
-        raise ErreurOutil(f"{nom} n'a pas de fenêtre ouverte.")
+        raise ErreurOutil(f"{nom} n'a pas de fenêtre visible (fermée, réduite dans le Dock ou en plein écran sur "
+                          "un autre bureau). Essaie raccourci_clavier « cmd+n » pour en ouvrir une, ou demande à "
+                          "l'utilisateur de l'afficher.")
     titre = attribut(fenetre, "AXTitle") or nom
     elements: list[Element] = []
 
@@ -322,3 +338,59 @@ def menus(nom_app: str, menu: str = "", max_par_menu: int = 25) -> tuple[str, st
     if menu and not lignes:
         raise ErreurOutil(f"Pas de menu « {menu} » dans {nom}.")
     return nom, "\n".join(lignes)
+
+
+def inventaire(nom_app: str, noeuds_max: int = 4000) -> dict:
+    """Diagnostic : rôles présents dans la fenêtre, profondeur atteinte, éléments modifiables."""
+    from collections import Counter
+    AS = _ax()
+    pid, nom = pid_application(nom_app)
+    app = AS.AXUIElementCreateApplication(pid)
+    activer_contenu_web(app, pid)
+    fenetre = fenetre_principale(app)
+    roles, modifiables, vus, prof_max = Counter(), [], 0, 0
+    pile = [(fenetre, 0)] if fenetre is not None else []
+    while pile and vus < noeuds_max:
+        el, p = pile.pop()
+        vus += 1
+        prof_max = max(prof_max, p)
+        role = attribut(el, "AXRole") or "?"
+        roles[role] += 1
+        sous = attribut(el, "AXSubrole") or ""
+        if role in ("AXTextArea", "AXTextField") or attribut(el, "AXEditable") or sous == "AXContentEditable":
+            modifiables.append({"role": role, "sous_role": sous, "profondeur": p, "libelle": _libelle(el),
+                                "focus": bool(attribut(el, "AXFocused"))})
+        pile += [(e, p + 1) for e in reversed(attribut(el, "AXChildren") or [])]
+    return {"application": nom, "noeuds": vus, "profondeur_max": prof_max, "roles": dict(roles.most_common(25)),
+            "modifiables": modifiables[:20], "mode_code": option_cochee(pid, "Code"),
+            "fenetres": [{"role": attribut(w, "AXRole"), "sous_role": attribut(w, "AXSubrole"),
+                          "titre": attribut(w, "AXTitle"),
+                          "enfants": [attribut(e, "AXRole") for e in (attribut(w, "AXChildren") or [])[:5]]}
+                         for w in attribut(app, "AXWindows") or []],
+            "focus": attribut(attribut(app, "AXFocusedWindow"), "AXRole") if attribut(app, "AXFocusedWindow") else None}
+
+
+def champ_actif(pid: int) -> str | None:
+    """Texte du champ qui a le focus dans l'application (None si ce n'est pas un champ de texte)."""
+    AS = _ax()
+    el = attribut(AS.AXUIElementCreateApplication(pid), "AXFocusedUIElement")
+    if el is None or attribut(el, "AXRole") not in ("AXTextArea", "AXTextField", "AXComboBox", "AXSearchField"):
+        return None
+    v = attribut(el, "AXValue")
+    return "" if v is None else str(v)
+
+
+def option_cochee(pid: int, libelle: str) -> bool:
+    """Vrai si un bouton radio (AXRadioButton) portant ce libellé est sélectionné dans la fenêtre."""
+    AS = _ax()
+    app = AS.AXUIElementCreateApplication(pid)
+    fenetre = fenetre_principale(app)
+    pile, vus = ([(fenetre, 0)] if fenetre is not None else []), 0
+    while pile and vus < 3000:
+        el, p = pile.pop()
+        vus += 1
+        if attribut(el, "AXRole") == "AXRadioButton" and _libelle(el) == libelle:
+            return str(attribut(el, "AXValue")) in ("1", "True", "true")
+        if p < PROFONDEUR_MAX:
+            pile += [(e, p + 1) for e in attribut(el, "AXChildren") or []]
+    return False
