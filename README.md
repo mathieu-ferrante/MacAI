@@ -101,5 +101,5 @@ Choix des modèles et optimisations : [MODELES.md](MODELES.md). Voir aussi [PLAN
 ```bash
 python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest                      # tests rapides (tout OS)
-MACAI_TOUS_OUTILS=1 macai banc qwen3.5:4b   # justesse et vitesse d'un modèle
+MACAI_TOUS_OUTILS=1 macai banc qwen3.5:4b-q4_K_M   # justesse et vitesse d'un modèle
 ```

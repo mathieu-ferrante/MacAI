@@ -32,8 +32,8 @@ BATTERIE = [
 
 # Meilleurs candidats pour un Mac 8 Go (recherche d'octobre 2026, voir MODELES.md). Tailles approximatives.
 CANDIDATS = [
-    ("qwen3.5:4b", "3,3 Go", "défaut : outils + vision + réflexion en un seul modèle"),
-    ("qwen3.5:2b", "~1,9 Go", "plus rapide et plus léger, moins fiable sur les tâches en plusieurs étapes"),
+    ("qwen3.5:4b-q4_K_M", "3,3 Go", "défaut : outils + vision + réflexion en un seul modèle"),
+    ("qwen3.5:2b-q4_K_M", "1,9 Go", "plus rapide et plus léger, moins fiable sur les tâches en plusieurs étapes"),
     ("gemma4:e4b", "~3,5 Go", "Google, multimodal, nettement moins bon en tâches d'agent (TAU2)"),
     ("phi4-mini", "~2,5 Go", "appels d'outils solides, pas de vision"),
     ("qwen3:4b", "~2,5 Go", "génération précédente, référence"),

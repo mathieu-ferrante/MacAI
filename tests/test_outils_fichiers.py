@@ -127,7 +127,7 @@ def test_decrire_image_decharge_l_agent(ctx, tmp_path):
     ctx.ollama.decharger = decharges.append
     r = documents.decrire_image(ctx, str(img))
     assert "chat" in r and decharges == ["gros-agent"]          # modèles distincts : l'agent libère la place
-    ctx.config.modeles.update(agent="qwen3.5:4b", vision="qwen3.5:4b")
+    ctx.config.modeles.update(agent="qwen3.5:4b-q4_K_M", vision="qwen3.5:4b-q4_K_M")
     ctx.ollama = FauxOllama([Reponse(texte="Un chien.")])
     ctx.ollama.decharger = decharges.append
     documents.decrire_image(ctx, str(img))

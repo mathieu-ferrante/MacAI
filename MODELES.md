@@ -7,10 +7,16 @@ estimés) : **à confirmer sur ton Mac avec `macai banc --candidats`**.
 
 | Rôle | Modèle | Taille | Pourquoi |
 |---|---|---|---|
-| Agent **et** vision | **`qwen3.5:4b`** | 3,3 Go (Q4_K_M) | Meilleur de sa taille en appels d'outils ; multimodal natif (texte + image), donc **un seul modèle** pour agir et regarder l'écran |
+| Agent **et** vision | **`qwen3.5:4b-q4_K_M`** | 3,3 Go (Q4_K_M) | Meilleur de sa taille en appels d'outils ; multimodal natif (texte + image), donc **un seul modèle** pour agir et regarder l'écran |
 | Embeddings (recherche) | **`qwen3-embedding:0.6b`** | ~640 Mo | Meilleur score multilingue sous 1 milliard de paramètres ; dimensions réductibles (256 utilisées) |
 
 Total à télécharger : ~4 Go (contre ~5 Go avant, pour trois modèles).
+
+> **Mesuré sur le Mac (15/10/2026) :** le tag `qwen3.5:4b` sans précision télécharge sur Apple Silicon la
+> version **MLX `nvfp4` de 4,0 Go**. Avec le modèle d'embeddings chargé à côté, elle a saturé la mémoire
+> graphique (`kIOGPUCommandBufferCallbackErrorOutOfMemory`) dès la deuxième étape d'une tâche. On utilise donc
+> explicitement **`qwen3.5:4b-q4_K_M`** (mêmes poids, format GGUF, 3,3 Go). Le moteur réessaie aussi une fois
+> après avoir déchargé les modèles si Ollama signale une saturation.
 
 ## Pourquoi un seul modèle multimodal change tout sur 8 Go
 

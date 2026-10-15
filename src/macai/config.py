@@ -22,9 +22,10 @@ CONFIG_PAR_DEFAUT = """\
 
 [modeles]
 # Modèles Ollama (locaux). Voir MODELES.md ; `macai banc --candidats` compare sur ton Mac.
-# qwen3.5:4b fait outils + vision + réflexion en un seul modèle (3,3 Go) : rien à échanger en mémoire.
-agent = "qwen3.5:4b"
-vision = "qwen3.5:4b"
+# qwen3.5:4b fait outils + vision + réflexion en un seul modèle : rien à échanger en mémoire. Variante
+# q4_K_M (3,3 Go) : le tag par défaut donne sur Mac la version MLX de 4 Go, qui sature la mémoire graphique d'un 8 Go.
+agent = "qwen3.5:4b-q4_K_M"
+vision = "qwen3.5:4b-q4_K_M"
 embeddings = "qwen3-embedding:0.6b"
 # Durée pendant laquelle un modèle reste en mémoire après usage.
 garder_en_memoire = "2m"

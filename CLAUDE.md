@@ -22,13 +22,14 @@ le Mac : [A_VALIDER.md](A_VALIDER.md).
 
 ## Environnement
 
-- Poste de développement **Windows, sans Mac** : l'app Swift ne peut pas être compilée ici ; le code propre
-  au Mac est testé avec AppleScript simulé (`tests/test_mac_simule.py`).
-- Ollama est installé sur le poste (modèle `llama3.2:1b`, CPU seulement, lent) : sert aux essais réels.
+- Deux postes : le **MacBook Air** (installé, `./installer.sh` pour mettre à jour, `.venv/bin/python -m pytest`)
+  et un poste **Windows** sans Mac (code Mac testé avec AppleScript simulé, `tests/test_mac_simule.py`).
+  Faire `git pull` avant de travailler : les deux poussent sur `main`.
+- Sur le Mac, Ollama tourne en service (`qwen3.5:4b-q4_K_M` + `qwen3-embedding:0.6b`) ; sur Windows, `llama3.2:1b` (CPU, lent).
 - `MACAI_TOUS_OUTILS=1` montre aussi les outils macOS ailleurs que sur Mac ; `MACAI_HOME` change le dossier de données.
 
 ```
-.venv\Scripts\python -m pytest            # 67 tests, ~4 s
+.venv\Scripts\python -m pytest            # 71 tests, ~3 s (Mac : .venv/bin/python -m pytest)
 ```
 
 ## Structure

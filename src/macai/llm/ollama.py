@@ -15,7 +15,9 @@ if not HOTE.startswith("http"):
     HOTE = "http://" + HOTE
 
 
-MEMOIRE_SATUREE = re.compile(r"Insufficient Memory|out of memory|OutOfMemory|OOM", re.I)
+# « Compute error » : message de llama.cpp quand la mémoire graphique est saturée (vu dans ollama.log).
+MEMOIRE_SATUREE = re.compile(r"Insufficient Memory|out of memory|OutOfMemory|OOM|Compute error", re.I)
+CONTEXTE_EMBEDDINGS = 512
 
 
 class ErreurOllama(RuntimeError):
@@ -79,16 +81,19 @@ class Ollama:
         }
         if outils:
             corps["tools"] = outils
+        return self._sans_saturation(lambda: self._discuter(corps, sur_texte))
+
+    def _sans_saturation(self, appel: Callable):
+        """Mémoire graphique saturée (8 Go) : on décharge tous les modèles et on réessaie une fois."""
         try:
-            return self._discuter(corps, sur_texte)
+            return appel()
         except ErreurOllama as e:
-            # Mémoire graphique saturée (8 Go) : Ollama libère ses modèles, on décharge le reste et on réessaie.
             if not MEMOIRE_SATUREE.search(str(e)):
                 raise
             for m in self.charges():
                 self.decharger(m.get("name", ""))
             time.sleep(2)
-            return self._discuter(corps, sur_texte)
+            return appel()
 
     def _discuter(self, corps: dict, sur_texte: Callable[[str], None] | None) -> Reponse:
         rep = Reponse()
@@ -128,10 +133,13 @@ class Ollama:
     # --- Embeddings ---------------------------------------------------------
 
     def vecteurs(self, modele: str, textes: list[str], dimensions: int | None = None) -> list[list[float]]:
-        corps = {"model": modele, "input": textes, "keep_alive": self.garder, "truncate": True}
+        # Contexte 512 : les extraits font ~250 jetons ; avec le contexte par défaut (4 096), le modèle
+        # d'embeddings occupe 2,2 Go au lieu de 1 Go et sature la mémoire graphique à côté de l'agent (mesuré).
+        corps = {"model": modele, "input": textes, "keep_alive": self.garder, "truncate": True,
+                 "options": {"num_ctx": CONTEXTE_EMBEDDINGS}}
         if dimensions:
             corps["dimensions"] = dimensions
-        vecs = self._json("/api/embed", corps)["embeddings"]
+        vecs = self._sans_saturation(lambda: self._json("/api/embed", corps))["embeddings"]
         if dimensions and vecs and len(vecs[0]) > dimensions:
             vecs = [v[:dimensions] for v in vecs]  # troncature Matryoshka si non gérée côté serveur
         return vecs

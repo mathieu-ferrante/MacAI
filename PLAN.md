@@ -22,7 +22,7 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D2 | Serveur HTTP **stdlib** (pas FastAPI) | ~30 Mo de RAM économisés au repos. |
 | D3 | Client Ollama **stdlib** (urllib) | Aucune dépendance, démarrage instantané. |
 | D4 | **Imports paresseux** : pypdf, docx, openpyxl, numpy, pyobjc chargés dans l'outil qui s'en sert | Repos léger. |
-| D5 | Modèles par défaut : **`qwen3.5:4b` pour l'agent et la vision** (un seul modèle multimodal, sans réflexion sauf demande complexe), embeddings `qwen3-embedding:0.6b` tronqués à 256 dimensions | Recherche d'octobre 2026 (voir MODELES.md) : meilleur de sa taille en appels d'outils, vision sans échange de modèle. **Provisoire**, confirmé par `macai banc --candidats` sur le Mac. |
+| D5 | Modèles par défaut : **`qwen3.5:4b-q4_K_M` pour l'agent et la vision** (un seul modèle multimodal, sans réflexion sauf demande complexe), embeddings `qwen3-embedding:0.6b` tronqués à 256 dimensions | Recherche d'octobre 2026 (voir MODELES.md) : meilleur de sa taille en appels d'outils, vision sans échange de modèle. Variante q4_K_M imposée : le tag par défaut donne sur Mac une version MLX de 4 Go qui sature la mémoire graphique (mesuré). |
 | D21 | Consignes système fixes, date et souvenirs en fin de message utilisateur | Le cache de préfixe d'Ollama est réutilisé d'une demande à l'autre. |
 | D6 | Ollama : `KEEP_ALIVE=2m`, `MAX_LOADED_MODELS=2`, `NUM_PARALLEL=1`, `FLASH_ATTENTION=1`, `KV_CACHE_TYPE=q8_0`, contexte 8192 | Agent + petit modèle d'embeddings peuvent cohabiter (~3,3 Go) ; le modèle agent est déchargé explicitement avant la vision : jamais deux gros modèles. Cache de contexte réduit de moitié. |
 | D7 | Recherche : SQLite **FTS5** (mots) + vecteurs float16 256 dim en fichier mappé (sens), fusion RRF | ~50 Mo de disque pour 100 000 extraits, recherche < 100 ms, pas de base vectorielle à installer. |
@@ -39,30 +39,35 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D18 | Service Ollama propre à MacAI (LaunchAgent avec ses variables) au lieu de `brew services` | Les réglages mémoire sont garantis au démarrage. |
 | D19 | Arguments des modèles corrigés avant exécution (types, valeurs hors liste, dossiers inventés, noms mal recopiés) | Observé en essai réel : les petits modèles inventent des paramètres. |
 | D20 | Outils propres au Mac testés avec AppleScript simulé | Seul moyen de couvrir ce code sans Mac. |
+| D22 | Embeddings avec contexte 512 ; reprise automatique (déchargement + nouvel essai) si Ollama signale une saturation mémoire | Mesuré : 2,2 Go → 1 Go ; agent + embeddings = 4,2 Go, sous la limite graphique (~5,3 Go) d'un 8 Go. |
+| D23 | ArtCraft via ses `*-cli mcp` officiels (signés, notarisés) dans `~/.local/bin`, dossiers autorisés = dossier personnel, LightCraft `--compact` | Les applis n'exposent pas de MCP elles-mêmes ; 326 → 17 outils pour LightCraft. |
+| D24 | Outils MCP : jusqu'à 9 par logiciel, classés par proximité (verbes français traduits en anglais), schémas compactés | Mesuré : un petit modèle ne trouvait pas `doc_open` parmi 25 outils pris dans l'ordre ; prompt 3× plus court. |
+| D25 | Indexation : code des projets logiciels ignoré, dossiers personnels d'abord | Mesuré : 176 fichiers de code sur 240 au premier essai. |
 
 ## Lots
 
 | Lot | Contenu | État |
 |---|---|---|
-| L0 | Squelette, configuration, CLI, tests | `[x]` codé et testé (hors Mac) |
-| L1 | Client Ollama, gestion des modèles | `[x]` codé et testé (hors Mac) |
-| L2 | Agent : registre d'outils, boucle, niveaux de risque, confirmations, événements | `[x]` codé et testé (hors Mac) |
-| L3 | Commandes directes (sans IA) | `[x]` codé et testé (hors Mac) |
-| L4 | Outils système et applications | `[x]` codé et testé (hors Mac) |
-| L5 | Outils fichiers (lire / créer / ranger) | `[x]` codé et testé (hors Mac) |
-| L6 | Recherche par le sens + indexation | `[x]` codé et testé (hors Mac) |
-| L7 | Chrome et web | `[x]` codé et testé (hors Mac) |
-| L8 | Accessibilité (fenêtres) + vision | `[x]` codé et testé (hors Mac) |
-| L9 | Organisation : Calendrier, Rappels, Notes, Mail | `[x]` codé et testé (hors Mac) |
-| L10 | Client MCP + ArtCraft | `[x]` codé et testé (hors Mac) |
-| L11 | Connecteur Onshape | `[x]` codé et testé (hors Mac) |
-| L12 | Mémoire + compétences apprises | `[x]` codé et testé (hors Mac) |
-| L13 | Serveur local (HTTP + SSE) | `[x]` codé et testé (hors Mac) |
-| L14 | App Swift | `[~]` écrit, **jamais compilé** (pas de Mac) |
-| L15 | Installation, vérification, banc, documentation | `[x]` codé et testé (hors Mac) |
+| L0 | Squelette, configuration, CLI, tests | `[x]` codé, testé, validé sur le Mac |
+| L1 | Client Ollama, gestion des modèles | `[x]` codé, testé, validé sur le Mac |
+| L2 | Agent : registre d'outils, boucle, niveaux de risque, confirmations, événements | `[x]` codé, testé, validé sur le Mac |
+| L3 | Commandes directes (sans IA) | `[x]` codé, testé, validé sur le Mac |
+| L4 | Outils système et applications | `[x]` codé, testé, validé sur le Mac |
+| L5 | Outils fichiers (lire / créer / ranger) | `[x]` codé, testé, validé sur le Mac |
+| L6 | Recherche par le sens + indexation | `[x]` codé, testé, validé sur le Mac |
+| L7 | Chrome et web | `[x]` codé, testé, validé sur le Mac |
+| L8 | Accessibilité (fenêtres) + vision | `[x]` codé, testé, validé sur le Mac |
+| L9 | Organisation : Calendrier, Rappels, Notes, Mail | `[x]` codé, testé, validé sur le Mac |
+| L10 | Client MCP + ArtCraft | `[x]` codé, testé, validé sur le Mac |
+| L11 | Connecteur Onshape | `[x]` codé, testé, validé sur le Mac |
+| L12 | Mémoire + compétences apprises | `[x]` codé, testé, validé sur le Mac |
+| L13 | Serveur local (HTTP + SSE) | `[x]` codé, testé, validé sur le Mac |
+| L14 | App Swift | `[x]` compilée et installée sur le Mac ; voix et touche Fn à essayer (autorisations) |
+| L15 | Installation, vérification, banc, documentation | `[x]` codé, testé, validé sur le Mac |
 
 ## Validation
 
-Le moteur est testé sur le poste de développement (Windows) avec des sorties macOS réelles et
-Ollama. **Rien n'a encore tourné sur le Mac** : l'utilisateur installe à la fin et lance
-`macai verifier`. Voir [A_VALIDER.md](A_VALIDER.md).
+Installé et testé sur le MacBook Air le 15/10/2026 : 26 contrôles OK, scénarios réels avec le modèle local
+(documents, rangement, recherche, mémoire, tâches en plusieurs étapes, vision, ArtCraft). Restent à essayer
+par Mathieu ce qui demande ses autorisations macOS (voix, fenêtres, écran, Chrome) et Onshape (clés).
+Détail : [A_VALIDER.md](A_VALIDER.md).

@@ -1,34 +1,67 @@
-# À valider sur le Mac
+# Validation sur le Mac
 
-Tout a été codé et testé sur le poste de développement (Windows, sans Mac). Voici, dans l'ordre, ce qu'il faut
-lancer sur le MacBook Air pour valider — avec le résultat attendu. **Si une étape échoue, renvoie-moi la sortie
-indiquée** : je corrige à partir de là.
+Le 15/10/2026, l'installation a été faite et testée sur le MacBook Air (M2, 8 Go, macOS 27.0.1).
+✅ = essayé en vrai sur le Mac, ça marche. 👉 = demande tes mains (autorisations macOS, voix, comptes).
 
-| # | À faire | Résultat attendu | Si ça échoue, renvoie |
-|---|---|---|---|
-| V1 | `./installer.sh` | Se termine par le rapport de vérification et le cadre « MacAI est installé » | tout le texte du Terminal |
-| V2 | (inclus dans V1) compilation de l'app | `✓ build/MacAI.app prête` | les lignes `error:` de `swift build` |
-| V3 | `macai verifier` | Que des ✓ (les ! sur Onshape/MCP/Index sont normaux au début) ; « Essai de l'agent : appel d'outil correct » | `~/Desktop/MacAI-verification.txt` |
-| V4 | Moniteur d'activité, MacAI ouvert depuis 5 min sans rien demander | MacAI + python + ollama < 120 Mo au total, ~0 % de processeur | capture du Moniteur d'activité |
-| V5 | Option + Espace, taper « quelle heure est-il » | Panneau au centre, réponse instantanée | `~/Library/Application Support/MacAI/moteur.log` |
-| V6 | « ouvre Safari », puis « volume à 30 », puis « pause » | Safari s'ouvre ; volume à 30 ; la musique s'arrête | `moteur.log` + message affiché |
-| V7 | Maintenir Fn, dire « ouvre les notes », relâcher | Le texte s'écrit pendant que tu parles, Notes s'ouvre | message affiché dans le panneau |
-| V8 | « mets la vidéo Daft Punk Get Lucky sur YouTube » | Chrome ouvre YouTube et lance la vidéo (si JavaScript Apple Events activé) | message affiché |
-| V9 | « crée un document Word sur le bureau avec un plan de révision en 3 parties » | Fichier .docx sur le Bureau, titres et puces | message + `journal.jsonl` (dernières lignes) |
-| V10 | « range mes téléchargements » | Carte orange « Ranger N fichiers… » → Confirmer → sous-dossiers créés | message affiché |
-| V11 | `macai indexer --force --limite 300` puis « retrouve un document qui parle de … » (un vrai sujet de tes fichiers) | Le bon fichier dans les premiers résultats | sortie de `macai indexer` + la réponse |
-| V12 | Ouvrir TextEdit, puis « dans TextEdit, écris Bonjour et enregistre sur le bureau » | Il lit la fenêtre, tape le texte, utilise le menu Fichier | message + `journal.jsonl` |
-| V13 | « qu'est-ce qu'il y a sur mon écran ? » | Description correcte (après autorisation Enregistrement de l'écran) | message affiché |
-| V14 | « retiens que je préfère les réponses courtes », puis plus tard « qu'est-ce que tu sais de moi ? » | Le fait est retenu et restitué | message affiché |
-| V15 | Une tâche en 3 étapes ou plus (ex. « trouve ma dernière facture, lis-la et fais un tableur avec le montant ») | Carte « Je peux retenir cette tâche… » → Créer → `lister mes compétences` la montre | message + dossier `competences/` |
-| V16 | `macai secret onshape` puis « fais-moi un cube de 1 mètre dans Onshape » | Nouveau document Onshape avec un cube de 1 m, ouvert dans Chrome | message affiché (ne jamais envoyer les clés) |
-| V17 | `macai mcp detecter`, configurer un logiciel ArtCraft dans `macai.toml`, `macai mcp tester` | « photocraft : N outils » | sortie de `macai mcp tester` |
-| V18 | `macai banc --candidats` (propose de télécharger les candidats, ~12 Go au total ; tu peux refuser) | Tableau justesse/vitesse/RAM, un modèle d'agent et un modèle d'embeddings recommandés | fichier JSON indiqué à la fin |
+## Ce qui a été validé
 
-## Points incertains (à surveiller en priorité)
+| # | Essai | Résultat sur le Mac |
+|---|---|---|
+| V1-V2 | `./installer.sh`, compilation de l'app | ✅ app compilée et installée dans /Applications |
+| V3 | `macai verifier` | ✅ 26 OK, 0 problème ; agent : bon outil choisi en 12,6 s |
+| V4 | Mémoire au repos | ✅ ~70 Mo (app 26 + moteur 42 + Ollama 2) ; modèles déchargés après 2 min |
+| V5 | « quelle heure est-il », « quelle date sommes-nous », « batterie » | ✅ réponse instantanée, sans IA (aussi via l'API de l'app) |
+| V6 | « volume à 30 » | ✅ |
+| V9 | Document Word avec plan en 3 parties | ✅ 30 s, titre + 3 parties + puces |
+| V10 | Ranger un dossier | ✅ confirmation demandée, 7 fichiers rangés en 6 sous-dossiers |
+| V11 | Indexation + « retrouve un document qui parle de cahier des charges » | ✅ bon fichier en 13 s |
+| V14 | « retiens que… » puis « qu'est-ce que tu sais de moi ? » | ✅ |
+| V15 | Tâche en 3 étapes (dossier, fichier, relecture) | ✅ 20 s, proposition de compétence affichée |
+| — | Word → tableur Excel (« lis ce document et fais-en un tableur ») | ✅ 25 s |
+| — | Décrire une image (vision) | ✅ |
+| V17 | ArtCraft : 5 serveurs MCP (PhotoCraft, VectorCraft, LightCraft, EffectCraft, FilmCraft) | ✅ 118 outils ; « avec PhotoCraft, convertis … en jpg » et « avec VectorCraft, dessine un cercle rouge et exporte-le » fonctionnent |
+| — | Le moteur s'arrête → l'app le relance | ✅ |
 
-- **App Swift** : écrite sans pouvoir être compilée ici (SpeechAnalyzer est récent). Erreurs de compilation possibles en V2.
-- **Touche Fn** : selon les réglages clavier, macOS peut l'intercepter (voir README, étape 2). Repli : menu 🧠 > Touche pour parler > Option droite.
-- **Modèles** : `qwen3.5:4b` (agent + vision) et `qwen3-embedding:0.6b` sont choisis d'après la recherche (MODELES.md) ; V18 confirme sur ton Mac.
-- **Onshape** : la création d'esquisse par l'API n'a pas pu être essayée sans compte ; si V16 échoue, renvoie le message d'erreur Onshape.
-- **Mémoire au repos (V4)** : ~80 Mo est une estimation, à confirmer.
+## Ce qu'il te reste à faire (une seule fois)
+
+| # | À faire | Résultat attendu |
+|---|---|---|
+| 1 | Accepter les autorisations quand macOS les demande : **Accessibilité**, **Enregistrement de l'écran**, **Micro**, **Automatisation** (au premier usage de Chrome, Rappels…). Sinon : Réglages Système > Confidentialité et sécurité | — |
+| 2 | Après l'Accessibilité : menu 🧠 > Quitter MacAI, puis rouvrir MacAI (Launchpad ou Spotlight) | la touche Fn fonctionne |
+| 3 | Réglages Système > Clavier > « Appuyer sur la touche 🌐 pour » : **Ne rien faire** | Fn sert à parler |
+| 4 | Chrome : Présentation > Options pour les développeurs > **Autoriser JavaScript à partir des Apple Events** | YouTube, lecture de pages |
+| 5 | Facultatif : `macai secret onshape` (clés API Onshape) | « fais-moi un cube de 1 m dans Onshape » |
+
+## Ce que tu peux essayer ensuite (pas encore essayé : demande les autorisations ci-dessus)
+
+| # | Essai | Attendu |
+|---|---|---|
+| V7 | Maintenir Fn, dire « ouvre les notes », relâcher | le texte s'écrit pendant que tu parles, Notes s'ouvre |
+| V8 | « mets la vidéo Daft Punk Get Lucky sur YouTube » | Chrome lance la vidéo |
+| V12 | TextEdit ouvert : « dans TextEdit, écris Bonjour et enregistre sur le bureau » | il lit la fenêtre, tape, utilise le menu Fichier |
+| V13 | « qu'est-ce qu'il y a sur mon écran ? » | description de l'écran |
+| V16 | « fais-moi un cube de 1 mètre dans Onshape » | document Onshape avec un cube (jamais essayé : pas de clés) |
+
+Si quelque chose ne marche pas : menu 🧠 > Ouvrir le journal, et renvoie-moi les dernières lignes.
+
+## Ce qui a été corrigé pendant les essais sur le Mac
+
+- App Swift : version des outils SwiftPM (6.2) ; scripts non exécutables (venus de Windows).
+- **Mémoire graphique saturée** : le tag `qwen3.5:4b` donne sur Mac une version MLX de 4 Go → remplacé par
+  `qwen3.5:4b-q4_K_M` (3,3 Go) ; modèle de recherche limité à un contexte de 512 (2,2 Go → 1 Go) ; reprise
+  automatique si Ollama signale une saturation. Agent + recherche chargés ensemble : 4,2 Go.
+- ArtCraft : serveurs MCP installés et configurés (dossiers autorisés = ton dossier personnel, LightCraft en
+  mode compact), outils d'un logiciel choisis selon la demande (verbes français → anglais), descriptions
+  raccourcies (3× moins de place), chemins `~` développés.
+- Indexation : le code des projets logiciels n'est plus indexé ; Bureau, Documents, Téléchargements d'abord.
+- Applications ouvertes (format de macOS 27), messages d'autorisation clairs, batterie et durée en français.
+
+## Points à surveiller
+
+- **Confirmations ArtCraft** : les logiciels ArtCraft déclarent presque tous leurs outils « destructifs »,
+  donc MacAI demande confirmation même pour dessiner. Pour alléger un outil précis, dans `macai.toml`, sous
+  son `[[mcp]]` : `risques = { draw_shape = "modification" }`.
+- **Vitesse** : 10 à 30 s par demande avec l'IA (instantané pour les commandes directes). Le premier appel
+  après 2 min d'inactivité recharge le modèle (quelques secondes de plus).
+- **Indexation complète** : environ 3 s par fichier ; elle se fait Mac branché et inutilisé, en plusieurs nuits
+  si tu as beaucoup de documents.

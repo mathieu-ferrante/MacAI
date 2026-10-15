@@ -6,7 +6,7 @@ DONNEES="$HOME/Library/Application Support/MacAI"
 OLLAMA="$(brew --prefix 2>/dev/null || echo /opt/homebrew)/bin/ollama"
 read -r -p "Supprimer les modèles d'IA téléchargés (~4 Go) ? [o/N] " MODELES
 if [[ "$MODELES" =~ ^[oOyY] ]]; then   # avant d'arrêter Ollama : `ollama rm` passe par le serveur
-    for m in qwen3.5:4b qwen3-embedding:0.6b; do "$OLLAMA" rm "$m" && echo "✓ $m supprimé"; done
+    for m in qwen3.5:4b-q4_K_M qwen3.5:4b qwen3-embedding:0.6b; do "$OLLAMA" rm "$m" && echo "✓ $m supprimé"; done
 fi
 pgrep -xq MacAI && osascript -e 'tell application "MacAI" to quit' >/dev/null 2>&1
 pkill -f "macai serveur" >/dev/null 2>&1

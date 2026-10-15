@@ -91,7 +91,7 @@ ok "Ollama démarré (modèles déchargés après 2 min, cache réduit, un seul 
 
 # --- 3. Modèles locaux ---------------------------------------------------------------------------
 titre "Modèles d'IA locaux (~4 Go à télécharger la première fois)"
-MODELES="qwen3.5:4b qwen3-embedding:0.6b"
+MODELES="qwen3.5:4b-q4_K_M qwen3-embedding:0.6b"
 if [ -f "$DONNEES/macai.toml" ]; then  # modèles personnalisés (bash 3.2 de macOS : pas de mapfile)
     PERSO=$(sed -nE 's/^(agent|vision|embeddings) *= *"([^"]+)".*/\2/p' "$DONNEES/macai.toml" | sort -u | tr '\n' ' ')
     if [ -n "$(echo "$PERSO" | tr -d ' ')" ]; then MODELES="$PERSO"; fi
