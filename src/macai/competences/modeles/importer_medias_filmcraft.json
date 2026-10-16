@@ -1,0 +1,12 @@
+{
+  "nom": "importer_medias_filmcraft",
+  "description": "Importe un fichier vidéo, audio ou image dans le projet FilmCraft ouvert.",
+  "source": "modele",
+  "parametres": {
+    "fichier": "chemin absolu du média, ex. ~/Films/clip.mov"
+  },
+  "declencheurs": ["importe cette vidéo dans filmcraft", "ajoute ce clip au montage"],
+  "etapes": [
+    {"outil": "filmcraft__media_import", "arguments": {"paths": ["{fichier}"]}}
+  ]
+}

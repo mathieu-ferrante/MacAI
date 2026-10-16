@@ -1,0 +1,12 @@
+{
+  "nom": "image_composition_effectcraft",
+  "description": "Enregistre en PNG l'image actuelle de la composition EffectCraft active (taille réelle).",
+  "source": "modele",
+  "parametres": {
+    "destination": "fichier PNG à créer, ex. ~/Bureau/apercu.png"
+  },
+  "declencheurs": ["exporte l'image de la composition", "enregistre une image de l'animation"],
+  "etapes": [
+    {"outil": "effectcraft__render_frame", "arguments": {"path": "{destination}", "max_side": 0, "inline": false}}
+  ]
+}

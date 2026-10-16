@@ -1,0 +1,15 @@
+{
+  "nom": "convertir_image_jpg",
+  "description": "Convertit une image (PNG, PSD, TIFF, WebP…) en JPEG avec PhotoCraft.",
+  "source": "modele",
+  "parametres": {
+    "image": "chemin de l'image à convertir, ex. ~/Bureau/photo.png",
+    "destination": "chemin du JPEG à créer, ex. ~/Bureau/photo.jpg"
+  },
+  "declencheurs": ["convertis cette image en jpg", "convertir une image en jpeg", "transforme le png en jpg"],
+  "etapes": [
+    {"outil": "photocraft__doc_open", "arguments": {"path": "{image}"}},
+    {"outil": "photocraft__doc_export", "arguments": {"path": "{destination}", "format": "jpg", "quality": 90}},
+    {"outil": "photocraft__doc_close", "arguments": {}}
+  ]
+}

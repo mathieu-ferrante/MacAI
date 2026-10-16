@@ -106,11 +106,15 @@ def test_boucle_infinie_coupee(ctx):
 
 def test_proposition_competence(ctx):
     ctx.registre, _ = registre_test()
-    ctx.ollama = FauxOllama([appel("lire", chemin="a"), appel("lire", chemin="b"),
-                             appel("deplacer", src="a", dest="b"), Reponse(texte="fini")])
+    tache = [appel("lire", chemin="a"), appel("lire", chemin="b"), appel("deplacer", src="a", dest="b"),
+             Reponse(texte="fini")]
+    ctx.ollama = FauxOllama(tache * 2)
     o = Orchestrateur(ctx)
     o.traiter("range le fichier a")
     assert o.derniere_trace and len(o.derniere_trace["actions"]) == 3
+    # Première fois : pas de proposition (seulement les tâches refaites valent une compétence).
+    assert not any(e[0] == "proposition_competence" for e in ctx.evenements)
+    o.traiter("range le fichier a")
     assert any(e[0] == "proposition_competence" for e in ctx.evenements)
 
 

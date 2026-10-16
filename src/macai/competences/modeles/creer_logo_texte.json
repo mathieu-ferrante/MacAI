@@ -1,0 +1,15 @@
+{
+  "nom": "creer_logo_texte",
+  "description": "Crée un logo texte simple dans VectorCraft (nouveau document 800 × 400, texte centré à gauche) et l'exporte (SVG, PNG ou PDF selon l'extension).",
+  "source": "modele",
+  "parametres": {
+    "texte": "texte du logo, ex. le nom de l'entreprise",
+    "destination": "fichier à créer : ~/Bureau/logo.svg, .png ou .pdf"
+  },
+  "declencheurs": ["crée un logo texte", "fais-moi un logo avec le nom", "créer un logo"],
+  "etapes": [
+    {"outil": "vectorcraft__run_command", "arguments": {"command": "file.new", "params": {"width": 800, "height": 400}}},
+    {"outil": "vectorcraft__add_text", "arguments": {"text": "{texte}", "x": 60, "y": 230, "size": 96}},
+    {"outil": "vectorcraft__export", "arguments": {"path": "{destination}", "outlineText": true}}
+  ]
+}

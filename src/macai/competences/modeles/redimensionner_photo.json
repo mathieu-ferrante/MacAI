@@ -1,0 +1,15 @@
+{
+  "nom": "redimensionner_photo",
+  "description": "Redimensionne une photo avec LightCraft : l'ajoute à la bibliothèque puis l'exporte en JPEG dans un dossier, avec le plus grand côté à la taille voulue (en pixels).",
+  "source": "modele",
+  "parametres": {
+    "image": "chemin de la photo",
+    "dossier": "dossier où écrire la photo redimensionnée",
+    "taille": "plus grand côté en pixels, ex. 1600"
+  },
+  "declencheurs": ["redimensionne cette photo", "réduis la taille de l'image", "redimensionner une image"],
+  "etapes": [
+    {"outil": "lightcraft__import", "arguments": {"paths": ["{image}"], "mode": "add"}},
+    {"outil": "lightcraft__export", "arguments": {"dir": "{dossier}", "format": "jpeg", "longEdge": "{taille}", "quality": 90}}
+  ]
+}

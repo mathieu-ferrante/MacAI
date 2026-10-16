@@ -1,0 +1,12 @@
+{
+  "nom": "importer_photos_lightcraft",
+  "description": "Importe un dossier de photos dans la bibliothèque LightCraft (les fichiers restent à leur place).",
+  "source": "modele",
+  "parametres": {
+    "dossier": "dossier de photos à importer, ex. ~/Images/Vacances"
+  },
+  "declencheurs": ["importe ce dossier de photos dans lightcraft", "ajoute mes photos à lightcraft"],
+  "etapes": [
+    {"outil": "lightcraft__import", "arguments": {"paths": ["{dossier}"], "mode": "add"}}
+  ]
+}

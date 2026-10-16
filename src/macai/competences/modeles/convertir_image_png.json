@@ -1,0 +1,15 @@
+{
+  "nom": "convertir_image_png",
+  "description": "Convertit une image (JPEG, PSD, TIFF, WebP…) en PNG avec PhotoCraft.",
+  "source": "modele",
+  "parametres": {
+    "image": "chemin de l'image à convertir",
+    "destination": "chemin du PNG à créer, ex. ~/Bureau/image.png"
+  },
+  "declencheurs": ["convertis cette image en png", "convertir une image en png"],
+  "etapes": [
+    {"outil": "photocraft__doc_open", "arguments": {"path": "{image}"}},
+    {"outil": "photocraft__doc_export", "arguments": {"path": "{destination}", "format": "png"}},
+    {"outil": "photocraft__doc_close", "arguments": {}}
+  ]
+}
