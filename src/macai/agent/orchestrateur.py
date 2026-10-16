@@ -45,6 +45,8 @@ OUTIL_EXPLOITE_CAR = 600  # résultat d'outil ancien, déjà exploité par le mo
 # Réponse qui annonce une suite au lieu de la faire (« je vais envoyer », « il me reste à valider »).
 INACHEVE = re.compile(r"\b(je vais|il me reste a|je dois (encore|maintenant)|"
                       r"il reste a (valider|envoyer|cliquer|saisir|appuyer|taper))\b")
+PAS_ACCES = re.compile(r"(n'ai pas|n'avons pas|pas d') ?acces|ne (peux|puis) pas (acceder|utiliser|controler|"
+                       r"piloter|interagir)|pas la possibilite d'(acceder|utiliser|interagir)|pas acces a")
 ACTION_AFFIRMEE = re.compile(r"\bj['’]ai\b")
 # Demande d'explication, pas d'action : « comment faire… », « pourquoi… », « explique… », « c'est quoi… ».
 SAVOIR = re.compile(r"^(comment (on |faire|faut|puis|je peux|est-ce|ca marche|fonctionne)|comment\b(?!.*\b(ouvre|lance|"
@@ -296,7 +298,7 @@ class Orchestrateur:
         deja_vus: dict[str, int] = {}  # appel identique dans le même état
         observations: dict[str, int] = {}  # même observation sans action entre deux
         appels_faits = 0
-        relance = vide_relance = False
+        relance = vide_relance = relance_acces = False
 
         for _etape in range(int(cfg.agent.get("etapes_max", 10))):
             ctx.verifier_arret()
@@ -322,6 +324,15 @@ class Orchestrateur:
                     messages += [{"role": "assistant", "content": rep.texte},
                                  {"role": "user", "content": "Fais-le maintenant avec les outils, jusqu'au bout "
                                                              "(par exemple appuyer sur Entrée pour envoyer)."}]
+                    continue
+                # « Je n'ai pas accès à l'interface de Pages » sans avoir rien essayé (vu au banc) : il a pourtant
+                # les outils pour lire la fenêtre et les menus. Une relance.
+                if not relance_acces and imperatif and not appels_faits and outils and PAS_ACCES.search(norme):
+                    relance_acces = True
+                    messages += [{"role": "assistant", "content": rep.texte},
+                                 {"role": "user", "content": "Tu as les outils pour le faire (ouvrir l'application, "
+                                                             "lire sa fenêtre et ses menus, cliquer, taper). "
+                                                             "Essaie maintenant avec eux."}]
                     continue
                 # Garde-fou d'honnêteté : « J'ai ouvert TextEdit et écrit… » alors qu'aucun outil n'a réussi
                 # (vu en essai réel). On ne laisse pas passer une action inventée.

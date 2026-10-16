@@ -284,3 +284,16 @@ def test_commandes_directes_reglages_et_claude():
     assert r.reconnaitre("demande à Claude quels sont les meilleurs claviers").actions == [
         ("demander_a_claude", {"question": "Quels sont les meilleurs claviers"})]
     assert r.reconnaitre("demande à Paul s'il vient") is None
+
+
+def test_relance_quand_il_pretend_ne_pas_avoir_acces(ctx):
+    reg = Registre()
+
+    @outil("lister_menus", "Exporter un document PDF", "fichiers", mac_seulement=False, registre=reg)
+    def lister_menus(ctx):
+        return "Fichier : Exporter"
+    ctx.registre = reg
+    ctx.ollama = FauxOllama([Reponse(texte="Je n'ai pas accès à l'interface de Pages."), appel("lister_menus"),
+                             Reponse(texte="Menu Fichier > Exporter.")])
+    assert Orchestrateur(ctx, CommandesRapides()).traiter("dans Pages, exporte le document en PDF") == \
+        "Menu Fichier > Exporter."

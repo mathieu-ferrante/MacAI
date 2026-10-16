@@ -45,7 +45,7 @@ MAX_OUTILS = 14
 MAX_DESIGNES = 9
 # Outils de haut niveau d'abord (s'ils existent) : ils doivent survivre à la limite du nombre d'outils.
 PILOTAGE = ["demander_a_claude", "ecrire_et_envoyer", "ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
-            "raccourci_clavier", "attendre"]
+            "raccourci_clavier", "choisir_menu", "lister_menus", "attendre"]
 # Une deuxième action après l'ouverture d'une appli : il faudra lire sa fenêtre, cliquer, écrire.
 ACTION_DANS_APPLI = re.compile(r"\b(et|puis|ensuite|va|passe|demande|ecris|tape|envoie|mets|active|desactive|"
                                r"choisis|selectionne|clique|appuie|remplis|pose|dis-lui|demande-lui|"
@@ -57,6 +57,24 @@ APPS_CONNUES = sorted({"claude", "chatgpt", "gemini", "le chat", "mistral", "per
 VERS_APPLI = re.compile(r"\b(ecris|ecrire|ecris-lui|demande|demander|demande-lui|pose|poser|dis(?!-moi)|dire|envoie|"
                         r"envoyer|envoie-lui|reponds|repondre)\b.*?\b(a|au|sur|dans|via|avec)\s+"
                         r"(?:l'(?:appli(?:cation)?\s+)?)?(" + "|".join(map(re.escape, APPS_CONNUES)) + r")\b")
+DANS_APPLI = re.compile(r"\b(?:dans|sur|avec) (?:l'appli(?:cation)? |le logiciel )?([a-z][a-z0-9 .+-]{1,25}?)"
+                        r"(?:[,.:;!?]| et | puis |$)")
+
+
+def _nomme_une_appli(t: str) -> bool:
+    """« Dans Pages, exporte… », « avec Keynote mets… » : une appli installée est citée, il faudra la piloter."""
+    m = DANS_APPLI.search(t)
+    if not m:
+        return False
+    try:
+        from ..outils.applications import trouver_application
+    except ImportError:
+        return False
+    nom = m.group(1).strip()
+    return len(nom) >= 3 and nom not in ("le bureau", "bureau", "mes documents", "documents", "le dossier") and \
+        trouver_application(nom) is not None
+
+
 # Les outils des logiciels tiers (MCP) sont décrits en anglais : verbes et noms français courants traduits.
 ANGLAIS: dict[str, list[str]] = {
     "ouvre": ["open"], "ouvrir": ["open"], "convertis": ["export", "convert", "open"],
@@ -100,7 +118,7 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
     choisis = [g for g, s in sorted(scores.items(), key=lambda x: -x[1]) if s > 0]
     # « Ouvre Claude et demande-lui… », « ouvre Réglages, va dans Wi-Fi » : agir DANS l'appli ouverte.
     dans_appli = "fenetres" in groupes and (("applications" in choisis and bool(ACTION_DANS_APPLI.search(t)))
-                                            or bool(VERS_APPLI.search(t)))
+                                            or bool(VERS_APPLI.search(t)) or _nomme_une_appli(t))
     if not choisis:
         choisis = [g for g in GROUPES_DEFAUT if g in groupes]
 
