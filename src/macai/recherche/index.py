@@ -106,8 +106,14 @@ class Index:
 
     def enregistrer(self, chemin: Path, mtime: float, taille: int, genre: str, texte: str | None) -> int:
         """Remplace l'entrée d'un fichier. `texte` None = nom seulement (format non lisible)."""
-        import numpy as np
         entete = f"{chemin.name} — dossier {chemin.parent.name} ({chemin.parent})"
+        return self.enregistrer_entree(str(chemin), mtime, taille, genre, entete, texte)
+
+    def enregistrer_entree(self, chemin: str, mtime: float, taille: int, genre: str, entete: str,
+                           texte: str | None) -> int:
+        """Entrée quelconque : fichier, ou mail / note sous une pseudo-adresse (« mail://… », « note://… »).
+        `entete` (nom, expéditeur, date…) précède le premier extrait : il est cherchable et affiché."""
+        import numpy as np
         extraits = decouper(texte) if texte else []
         textes = [entete + ("\n" + extraits[0] if extraits else "")] + extraits[1:]
         vecs = None
@@ -119,10 +125,10 @@ class Index:
             vecs /= np.linalg.norm(vecs, axis=1, keepdims=True) + 1e-9
             vecs = vecs.astype(np.float16)
         with self._verrou, self.conn:
-            self.conn.execute("DELETE FROM fichiers WHERE chemin = ?", (str(chemin),))
+            self.conn.execute("DELETE FROM fichiers WHERE chemin = ?", (chemin,))
             cur = self.conn.execute(
                 "INSERT INTO fichiers (chemin, mtime, taille, genre, indexe_le, contenu) VALUES (?,?,?,?,?,?)",
-                (str(chemin), mtime, taille, genre, time.time(), int(bool(extraits))))
+                (chemin, mtime, taille, genre, time.time(), int(bool(extraits))))
             fid = cur.lastrowid
             self.conn.executemany(
                 "INSERT INTO extraits (fichier_id, n, texte, vecteur) VALUES (?,?,?,?)",
@@ -135,8 +141,39 @@ class Index:
             self.conn.executemany("DELETE FROM fichiers WHERE chemin = ?", [(c,) for c in chemins])
             self._matrice = None
 
-    def chemins(self) -> dict[str, tuple[float, int]]:
-        return {r["chemin"]: (r["mtime"], r["taille"]) for r in self.conn.execute("SELECT chemin, mtime, taille FROM fichiers")}
+    def chemins(self, prefixe: str | None = None) -> dict[str, tuple[float, int]]:
+        if prefixe:
+            lignes = self.conn.execute("SELECT chemin, mtime, taille FROM fichiers WHERE substr(chemin, 1, ?) = ?",
+                                       (len(prefixe), prefixe))
+        else:
+            lignes = self.conn.execute("SELECT chemin, mtime, taille FROM fichiers")
+        return {r["chemin"]: (r["mtime"], r["taille"]) for r in lignes}
+
+    def documents(self, requete: str, genres: list[str] | None = None, apres: float | None = None,
+                  limite: int = 400) -> list[dict]:
+        """Entrées dont le texte contient l'un des mots de `requete` (syntaxe FTS5), avec leur texte complet
+        reconstitué : {chemin, genre, mtime, entete, texte}. Sert aux relevés (factures, tickets…)."""
+        sql = ("SELECT DISTINCT f.id, f.chemin, f.genre, f.mtime FROM extraits_fts "
+               "JOIN extraits e ON e.id = extraits_fts.rowid JOIN fichiers f ON f.id = e.fichier_id "
+               "WHERE extraits_fts MATCH ?")
+        params: list = [requete]
+        if genres:
+            sql += f" AND f.genre IN ({','.join('?' * len(genres))})"
+            params += list(genres)
+        if apres:
+            sql += " AND f.mtime >= ?"
+            params.append(apres)
+        sql += " ORDER BY f.mtime DESC LIMIT ?"
+        params.append(int(limite))
+        sortie = []
+        for f in self.conn.execute(sql, params).fetchall():
+            morceaux = [r["texte"] for r in self.conn.execute(
+                "SELECT texte FROM extraits WHERE fichier_id = ? ORDER BY n", (f["id"],))]
+            premier = morceaux[0] if morceaux else ""
+            entete, _, debut = premier.partition("\n")
+            sortie.append({"chemin": f["chemin"], "genre": f["genre"], "mtime": f["mtime"], "entete": entete,
+                           "texte": "\n".join([debut] + morceaux[1:])})
+        return sortie
 
     def stats(self) -> dict:
         r = self.conn.execute("SELECT COUNT(*) n, SUM(contenu) c FROM fichiers").fetchone()
@@ -180,15 +217,18 @@ class Index:
             self._matrice = None
 
     def rechercher(self, requete: str, nombre: int = 8, genres: list[str] | None = None,
-                   dossier: str | None = None, apres: float | None = None) -> list[Trouvaille]:
+                   dossier: str | None = None, apres: float | None = None,
+                   exclure: list[str] | None = None) -> list[Trouvaille]:
         import numpy as np
         rangs: dict[int, list[int]] = {}
+        # Avec un filtre (genre, dossier, date), plus de candidats : les mails ne doivent pas évincer les fichiers.
+        candidats = 150 if (genres or exclure or dossier or apres) else 60
 
         # 1. Mots-clés (BM25).
         fts = _requete_fts(requete)
         if fts:
             for rang, r in enumerate(self.conn.execute(
-                    "SELECT rowid FROM extraits_fts WHERE extraits_fts MATCH ? ORDER BY rank LIMIT 60", (fts,))):
+                    "SELECT rowid FROM extraits_fts WHERE extraits_fts MATCH ? ORDER BY rank LIMIT ?", (fts, candidats))):
                 rangs.setdefault(r["rowid"], []).append(rang)
 
         # 2. Sens (cosinus).
@@ -199,7 +239,7 @@ class Index:
                            dtype=np.float32)
             q /= np.linalg.norm(q) + 1e-9
             scores = mat.astype(np.float32) @ q if len(ids) < 50_000 else (mat @ q.astype(np.float16)).astype(np.float32)
-            meilleurs = np.argsort(-scores)[:60]
+            meilleurs = np.argsort(-scores)[:candidats]
             for rang, i in enumerate(meilleurs):
                 if scores[i] > 0.2:
                     rangs.setdefault(int(ids[i]), []).append(rang)
@@ -215,6 +255,8 @@ class Index:
         par_fichier: dict[str, Trouvaille] = {}
         for l in lignes:
             if genres and l["genre"] not in genres:
+                continue
+            if exclure and l["genre"] in exclure:
                 continue
             if dossier and not l["chemin"].startswith(dossier):
                 continue

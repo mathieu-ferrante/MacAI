@@ -702,3 +702,256 @@ def envoyer_message(ctx, destinataire, texte):
     service = commun.osascript(script_message(ident, texte), delai=60).strip() or "iMessage"
     qui = nom if nom == ident else f"{nom} ({ident})"
     return f"Message envoyé à {qui} par {service}."
+
+
+# --- Tri des mails -----------------------------------------------------------------------------------------
+# Classement déterministe d'abord (aucun modèle) : le petit modèle n'a plus qu'à résumer et proposer.
+
+CATEGORIES_MAILS = {"a_traiter": "À traiter", "a_lire": "À lire", "notifications": "Notifications",
+                    "pubs": "Pubs et newsletters"}
+SANS_REPONSE = re.compile(r"no[-_.]?reply|ne[-_.]?pas[-_.]?repondre|donotreply|do[-_.]not[-_.]reply|"
+                          r"nepasrepondre|notifications?@|alerts?@|info@|news(letter)?@|marketing@|"
+                          r"promo(tions?)?@|offres?@|bonjour@|hello@|contact@|mailer@|bounce", re.I)
+PUB = re.compile(r"d[ée]sinscri|se d[ée]sabonner|unsubscribe|newsletter|lettre d.information|\bpromo|"
+                 r"\bsoldes\b|-\s?\d{1,2}\s?%|\boffre(s)? (sp[ée]ciale|exclusive|limit)|code promo|black friday|"
+                 r"\bremise\b|r[ée]duction|\bgratuit|nouvelle collection|d[ée]couvrez|ne manquez pas|"
+                 r"derniers jours|vente priv[ée]e|bon plan|jusqu.[àa] -?\d", re.I)
+NOTIF = re.compile(r"votre commande|commande (n°|no|#)|exp[ée]di[ée]|livraison|votre colis|suivi de colis|"
+                   r"facture (est )?disponible|votre facture|re[çc]u de paiement|confirmation de (commande|paiement|"
+                   r"r[ée]servation)|code de (v[ée]rification|confirmation|s[ée]curit[ée])|mot de passe|"
+                   r"connexion|nouvel appareil|alerte de s[ée]curit[ée]|identifiant|votre compte|"
+                   r"rendez-vous (confirm|le)|rappel :|pr[ée]l[èe]vement|virement|relev[ée]|votre abonnement|"
+                   r"verification code|sign[- ]in|security alert|your order|has shipped|receipt", re.I)
+SERVICES = re.compile(r"amazon|laposte|colissimo|chronopost|dpd|ups\.|fedex|mondialrelay|relaiscolis|sncf|"
+                      r"ouigo|ameli|impots\.gouv|caf\.fr|urssaf|paypal|apple\.com|icloud\.com|google\.com|"
+                      r"accounts\.google|microsoft|github|gitlab|linkedin|facebook|instagram|twitter|x\.com|"
+                      r"doctolib|edf|engie|totalenergies|orange\.fr|sfr|free\.fr|bouygues|leboncoin|vinted|"
+                      r"netflix|spotify|uber|airbnb|booking|banque|credit|bnp|societegenerale|lcl|"
+                      r"caisse-epargne|labanquepostale|boursorama|revolut|qonto|cdiscount|fnac|darty", re.I)
+FOURNISSEURS_PERSO = re.compile(r"@(gmail|googlemail|yahoo|hotmail|outlook|live|msn|icloud|me|mac|orange|"
+                                r"wanadoo|free|sfr|neuf|laposte|bbox|aol|proton(mail)?|gmx)\.", re.I)
+ACTION = re.compile(r"\?|peux[- ]tu|pourrais[- ]tu|pouvez[- ]vous|pourriez[- ]vous|merci de|urgent|asap|"
+                    r"avant (le|demain|ce soir|lundi|mardi|mercredi|jeudi|vendredi)|d[èe]s que possible|"
+                    r"[àa] (rendre|renvoyer|signer|valider)|confirme[rz]?\b|r[ée]pond|devis|rendez-vous|"
+                    r"dispo(nible)?s?\b|ton avis|votre avis|relance", re.I)
+
+# Derniers mails triés : numéro affiché → mail (pour classer_mail(numero)). Mémoire du processus seulement.
+DERNIER_TRI: dict[int, dict] = {}
+_CONTACTS: dict = {"quand": 0.0, "adresses": set()}
+
+
+def adresse_de(expediteur: str) -> str:
+    m = re.search(r"<([^<>@\s]+@[^<>\s]+)>", str(expediteur or "")) or \
+        re.search(r"[^<>\s\"']+@[^<>\s\"']+", str(expediteur or ""))
+    return (m.group(1) if m and m.groups() else m.group(0) if m else "").strip().lower()
+
+
+def nom_de(expediteur: str) -> str:
+    e = str(expediteur or "").strip()
+    nom = re.sub(r"<[^>]*>", "", e).strip().strip('"').strip()
+    return nom or adresse_de(e) or "?"
+
+
+def classer_un_mail(x: dict, contacts: set[str] | None = None) -> tuple[str, str]:
+    """(catégorie, raison) d'un mail {de, sujet, extrait, desabonnement} — règles fixes, aucun modèle."""
+    adresse = adresse_de(x.get("de", ""))
+    sujet = str(x.get("sujet") or "")
+    texte = f"{sujet}\n{x.get('extrait') or ''}"
+    connu = bool(adresse) and adresse in (contacts or set())
+    reponse = bool(re.match(r"^\s*(re|tr|fwd?|réf)\s*:", sujet, re.I))
+    automatique = bool(SANS_REPONSE.search(adresse))
+    if connu or (reponse and not automatique):
+        return ("a_traiter" if ACTION.search(texte) else "a_lire",
+                "contact" if connu else "réponse à un échange")
+    notif = NOTIF.search(texte)
+    if x.get("desabonnement") or PUB.search(texte):
+        if notif and not x.get("desabonnement"):
+            return "notifications", "message de service"
+        return "pubs", "désinscription possible" if x.get("desabonnement") else "publicité"
+    if notif or SERVICES.search(adresse) or automatique:
+        return "notifications", "message automatique"
+    if FOURNISSEURS_PERSO.search(adresse):
+        return ("a_traiter" if ACTION.search(texte) else "a_lire"), "adresse personnelle"
+    return ("a_traiter" if ACTION.search(sujet) else "a_lire"), "expéditeur inconnu"
+
+
+def script_trier_mails(nombre: int, extrait: int = 600) -> str:
+    n = max(1, min(int(nombre or 30), 60))
+    return f'''on t(x)
+    if x is missing value then return ""
+    return x as text
+end t
+tell application "Mail"
+    set lignes to {{}}
+    set msgs to (messages of inbox whose read status is false)
+    set n to count of msgs
+    if n > {n} then set n to {n}
+    repeat with i from 1 to n
+        set m to item i of msgs
+        set c to ""
+        try
+            set c to content of m
+            if (length of c) > {extrait} then set c to text 1 thru {extrait} of c
+        end try
+        set desab to "0"
+        try
+            if (count of (headers of m whose name is "list-unsubscribe")) > 0 then set desab to "1"
+        end try
+        set end of lignes to (message id of m) & {US_AS} & (my t(sender of m)) & {US_AS} & (my t(subject of m)) & {US_AS} & ((current date) - (date received of m)) & {US_AS} & desab & {US_AS} & c
+    end repeat
+    set AppleScript's text item delimiters to {RS_AS}
+    return lignes as text
+end tell'''
+
+
+def lire_mails_a_trier(brut: str, maintenant: datetime | None = None) -> list[dict]:
+    m = maintenant or datetime.now()
+    mails = []
+    for bloc in str(brut or "").split(RS):
+        if not bloc.strip():
+            continue
+        c = (bloc.split(US) + [""] * 6)[:6]
+        mails.append({"id": c[0].strip().strip("<>"), "de": c[1].strip(), "sujet": c[2].strip() or "(sans sujet)",
+                      "date": _age(c[3].strip(), m), "desabonnement": c[4].strip() == "1",
+                      "extrait": " ".join(c[5].split())})
+    return mails
+
+
+def adresses_contacts(delai_cache: float = 600) -> set[str]:
+    """Adresses e-mail de Contacts (mises en cache 10 min) ; ensemble vide si Contacts est inaccessible."""
+    import time as _time
+    if _time.time() - _CONTACTS["quand"] < delai_cache:
+        return _CONTACTS["adresses"]
+    try:
+        brut = commun.osascript('tell application "Contacts" to get value of emails of people', delai=30)
+        adresses = {a.lower() for a in re.findall(r"[^\s,{}\"]+@[^\s,{}\"]+", brut)}
+    except Exception:  # noqa: BLE001 - le tri reste utile sans les contacts
+        adresses = set()
+    _CONTACTS.update(quand=_time.time(), adresses=adresses)
+    return adresses
+
+
+def resume_tri(mails: list[dict]) -> tuple[str, dict[int, dict]]:
+    """Texte groupé et numéroté, et la correspondance numéro → mail."""
+    if not mails:
+        return "Aucun mail non lu dans la boîte de réception.", {}
+    groupes: dict[str, list[dict]] = {k: [] for k in CATEGORIES_MAILS}
+    for x in mails:
+        groupes[x["categorie"]].append(x)
+    lignes, numeros, i = [f"Tri de {len(mails)} mail(s) non lu(s) (règles fixes, à confirmer) :"], {}, 0
+    for cle, titre in CATEGORIES_MAILS.items():
+        liste = groupes[cle]
+        if not liste:
+            continue
+        if cle == "pubs":
+            desab = sum(1 for x in liste if x.get("desabonnement"))
+            lignes.append(f"{titre} ({len(liste)}" + (f", désinscription possible pour {desab}" if desab else "")
+                          + ") :")
+        else:
+            lignes.append(f"{titre} ({len(liste)}) :")
+        for x in liste:
+            i += 1
+            numeros[i] = x
+            base = f"{i}. {nom_de(x['de'])} — {x['date']} — « {x['sujet']} »"
+            if cle in ("a_traiter", "a_lire") and x.get("extrait"):
+                base += f"\n   {x['extrait'][:160]}"
+            lignes.append(base)
+    lignes.append("Pour ranger un mail : classer_mail(numero_ou_id=<numéro>, boite=<nom de boîte>). Rien n'est "
+                  "supprimé ; pour répondre : repondre_mail.")
+    return "\n".join(lignes), numeros
+
+
+@outil("trier_mails", "Trie les mails non lus de la boîte de réception en « À traiter », « À lire », "
+       "« Notifications » et « Pubs et newsletters » (règles fixes, numérotés). Résume ensuite et propose quoi "
+       "faire ; classer_mail range un mail dans une boîte.", "organisation",
+       {"nombre": ("integer", "combien de mails non lus examiner (30 par défaut, 60 au plus)")}, requis=[],
+       mots_cles=["trie mes mails", "trier mes mails", "tri des mails", "tri de mes mails", "newsletter",
+                  "desinscri", "mails importants", "mails a traiter", "pubs dans mes mails", "fais le tri"],
+       delai_max=200)
+def trier_mails(ctx, nombre=30):
+    mails = lire_mails_a_trier(commun.osascript(script_trier_mails(nombre), delai=180))
+    contacts = adresses_contacts() if mails else set()
+    for x in mails:
+        x["categorie"], x["raison"] = classer_un_mail(x, contacts)
+    texte, numeros = resume_tri(mails)
+    DERNIER_TRI.clear()
+    DERNIER_TRI.update(numeros)
+    compte = {k: sum(1 for x in mails if x["categorie"] == k) for k in CATEGORIES_MAILS}
+    return Resultat(True, texte, {"categories": compte,
+                                  "mails": {n: {"id": x["id"], "categorie": x["categorie"]} for n, x in numeros.items()}})
+
+
+BOITES_INTERDITES = re.compile(r"corbeille|trash|poubelle|supprim|deleted|ind[ée]sirable|junk|spam|bin\b", re.I)
+
+
+def identifiant_mail(numero_ou_id) -> tuple[str, dict]:
+    """Identifiant de message à partir d'un numéro du dernier tri, d'une adresse mail://… ou d'un identifiant."""
+    v = str(numero_ou_id or "").strip()
+    if re.fullmatch(r"\d{1,3}", v):
+        x = DERNIER_TRI.get(int(v))
+        if x is None:
+            raise ErreurOutil(f"Mail n° {v} inconnu : lance d'abord trier_mails (les numéros viennent du dernier tri).")
+        return x["id"], x
+    v = v.removeprefix("mail://").strip().strip("<>")
+    if "@" not in v:
+        raise ErreurOutil("Donne le numéro affiché par trier_mails ou l'adresse mail://… du message.")
+    return v, {}
+
+
+def script_classer_mail(ident: str, boite: str) -> str:
+    return f'''tell application "Mail"
+    set trouves to (messages of inbox whose message id is {S(ident)})
+    if (count of trouves) = 0 then return "INTROUVABLE"
+    set m to item 1 of trouves
+    set origine to name of mailbox of m
+    set a to account of mailbox of m
+    set cree to "0"
+    try
+        set cible to mailbox {S(boite)} of a
+        get name of cible
+    on error
+        try
+            set cible to mailbox {S(boite)}
+            get name of cible
+        on error
+            tell a to make new mailbox with properties {{name:{S(boite)}}}
+            set cible to mailbox {S(boite)} of a
+            set cree to "1"
+        end try
+    end try
+    move m to cible
+    return origine & {US_AS} & cree & {US_AS} & (my t(subject of m))
+end tell
+on t(x)
+    if x is missing value then return ""
+    return x as text
+end t'''
+
+
+@outil("classer_mail", "Range un mail de la boîte de réception dans une autre boîte de Mail (créée si besoin). "
+       "Ne supprime jamais. Le mail se désigne par son numéro dans le dernier trier_mails ou son adresse mail://….",
+       "organisation", {"numero_ou_id": ("string", "numéro donné par trier_mails, ou adresse mail://…"),
+                        "boite": ("string", "nom de la boîte de destination, ex. Newsletters, Factures")},
+       risque=Risque.MODIFICATION, delai_max=120,
+       annonce=lambda a: f"Ranger le mail {a['numero_ou_id']}" + (
+           f" (« {DERNIER_TRI[int(a['numero_ou_id'])]['sujet']} »)"
+           if str(a['numero_ou_id']).strip().isdigit() and int(a['numero_ou_id']) in DERNIER_TRI else "")
+           + f" dans la boîte « {a['boite']} »",
+       mots_cles=["classe le mail", "range le mail", "deplace le mail", "archive le mail", "classer le mail",
+                  "ranger le mail", "classe les mails", "range les mails"])
+def classer_mail(ctx, numero_ou_id, boite):
+    boite = str(boite or "").strip()
+    if not boite:
+        raise ErreurOutil("Indique la boîte de destination (ex. Newsletters).")
+    if BOITES_INTERDITES.search(boite):
+        raise ErreurOutil(f"Refusé : « {boite} » revient à supprimer le mail. Je range, je ne supprime pas.")
+    ident, x = identifiant_mail(numero_ou_id)
+    brut = commun.osascript(script_classer_mail(ident, boite), delai=90)
+    if brut.strip() in ("", "INTROUVABLE"):
+        raise ErreurOutil("Mail introuvable dans la boîte de réception (déjà rangé ou supprimé ?).")
+    origine, cree, sujet = (brut.split(US) + ["", ""])[:3]
+    sujet = sujet.strip() or x.get("sujet", "")
+    # Pas d'entrée dans « annuler » (réservé aux fichiers) : la marche inverse est donnée.
+    return (f"Mail « {sujet} » rangé dans « {boite} »" + (" (boîte créée)" if cree.strip() == "1" else "")
+            + f". Pour revenir en arrière : le remettre dans « {origine.strip() or 'Réception'} » "
+            f"(adresse mail://{ident}).")

@@ -157,6 +157,9 @@ def _risque_ouvrir(args: dict) -> Risque:
        risque=_risque_ouvrir, annonce=lambda a: f"Ouvrir {a['chemin']}"
                                                 + (f" avec {a['application']}" if a.get("application") else ""))
 def ouvrir_fichier(ctx, chemin, application=""):
+    if str(chemin).startswith(("mail://", "note://")):  # résultat de recherche dans les mails ou les notes
+        from .recherche_outils import ouvrir_mail
+        return ouvrir_mail(ctx, chemin)
     from .fichiers import verifier_chemin
     p = verifier_chemin(commun.chemin(chemin))
     if not p.exists():

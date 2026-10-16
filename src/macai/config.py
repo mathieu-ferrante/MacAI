@@ -41,6 +41,10 @@ competence_apres_actions = 3
 plan = "complexe"
 
 [recherche]
+# Mails (Réception et Envoyés) et notes indexés aussi ; Mail et Notes ne sont jamais lancés pour ça.
+mails = true
+notes = true
+lancer_apps = false
 # Dossiers indexés (~ = dossier personnel).
 dossiers = ["~"]
 ignorer = ["Library", ".Trash", "node_modules", ".git", ".venv", "venv", "__pycache__",

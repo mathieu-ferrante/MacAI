@@ -78,6 +78,14 @@ ASTUCES = {
     "chaque": "Tâche régulière : planifier_tache(demande, frequence, heure) ; lister_taches pour voir les tâches.",
     "annule": "Annuler : annuler_derniere_action remet en place la dernière action sur des fichiers (déplacement, "
               "rangement, Corbeille, renommage, création).",
+    "retrouve": "Un mail ou une note : chercher_partout(requete), puis ouvrir_mail(chemin) pour l'ouvrir.",
+    "depense": "Dépenses : releve_depenses(periode, categorie), puis donne le total ; rappelle que seuls les "
+               "justificatifs indexés (factures, tickets) sont comptés. Tableur : exporter_depenses.",
+    "depensé": "Dépenses : releve_depenses(periode, categorie), puis donne le total.",
+    "trie": "Tri des mails : trier_mails, résume chaque groupe, propose classer_mail ; ne supprime jamais.",
+    "classe": "Papiers : classer_document(chemin) ou classer_telechargements() (facture, impôts, banque…).",
+    "comment faire": "Aide sur un logiciel : guider(application, objectif), puis montrer_element(numero) pour "
+                     "surligner où cliquer.",
     "horaire": "Information précise : rechercher_et_lire(question), puis réponds en citant la source.",
     "prix": "Information précise : rechercher_et_lire(question), puis réponds en citant la source.",
 }

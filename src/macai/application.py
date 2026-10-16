@@ -312,8 +312,13 @@ class Application:
             if time.time() - dernier_index > INDEXATION_TOUTES_S and not self.occupe():
                 dernier_index = time.time()
                 self._lancer_indexation()
-            if getattr(self, "classement_actif", False) and not self.occupe():
-                self._classer_telechargements()
+            # Classement des papiers téléchargés : toutes les 3 minutes, sur secteur (lecture et OCR des PDF).
+            if getattr(self, "classement_actif", False) and not self.occupe() \
+                    and time.time() - getattr(self, "_dernier_classement", 0) > 180:
+                from .recherche.indexeur import sur_secteur
+                if sur_secteur():
+                    self._dernier_classement = time.time()
+                    self._classer_telechargements()
 
     def _classer_telechargements(self) -> None:
         """Range les nouveaux documents des Téléchargements (factures, impôts…) quand c'est sûr ; annulable."""

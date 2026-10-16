@@ -1,4 +1,4 @@
-"""Recherche de fichiers par le sens (index local) + Spotlight en complément."""
+"""Recherche de fichiers, de mails et de notes par le sens (index local) + Spotlight en complément."""
 from __future__ import annotations
 
 import re
@@ -8,9 +8,11 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .base import Resultat, outil
+from .base import ErreurOutil, Resultat, Risque, outil
 
-GENRES = ["image", "capture", "pdf", "document", "tableur", "presentation", "code", "autre"]
+GENRES = ["image", "capture", "pdf", "document", "tableur", "presentation", "code", "autre", "mail", "note"]
+APPLE = ["mail", "note"]  # entrées « mail://… » et « note://… » (indexées depuis Mail et Notes)
+SOURCES = ["tout", "fichiers", "mails", "notes"]
 
 
 def _date_min(periode: str) -> float | None:
@@ -68,12 +70,9 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
         if d is not None and not d.is_dir():
             d = None  # dossier inventé par le modèle : ignoré plutôt que de tout filtrer
         trouvailles = index.rechercher(requete, int(nombre or 8), genres=genres,
-                                       dossier=str(d) if d else None, apres=_date_min(periode))
-    lignes = []
-    for t in trouvailles:
-        date = time.strftime("%d/%m/%Y", time.localtime(t.mtime or 0))
-        extrait = re.sub(r"\s+", " ", t.extrait.split("\n", 1)[-1])[:220]
-        lignes.append(f"- {t.chemin}  ({t.genre}, modifié le {date})\n  « {extrait} »")
+                                       dossier=str(d) if d else None, apres=_date_min(periode),
+                                       exclure=None if genres else APPLE)
+    lignes = [ligne_trouvaille(t) for t in trouvailles]
     deja = {t.chemin for t in trouvailles}
     complements = [c for c in spotlight(requete) if c not in deja][: max(0, 5 - len(trouvailles))]
     lignes += [f"- {c}  (trouvé par Spotlight)" for c in complements]
@@ -86,6 +85,81 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
     return Resultat(True, "\n".join(lignes), {"resultats": [t.chemin for t in trouvailles] + complements})
 
 
+def ligne_trouvaille(t) -> str:
+    """Fichier : chemin, genre, date, extrait. Mail / note : l'en-tête (expéditeur, sujet, date) d'abord."""
+    entete, _, corps = t.extrait.partition("\n")
+    if t.genre in APPLE:
+        extrait = re.sub(r"\s+", " ", corps)[:220]
+        return f"- {entete}\n  adresse : {t.chemin}" + (f"\n  « {extrait} »" if extrait else "")
+    date = time.strftime("%d/%m/%Y", time.localtime(t.mtime or 0))
+    extrait = re.sub(r"\s+", " ", corps or entete)[:220]
+    return f"- {t.chemin}  ({t.genre}, modifié le {date})\n  « {extrait} »"
+
+
+def genres_de_sources(sources: str) -> tuple[list[str] | None, list[str] | None]:
+    """(genres retenus, genres exclus) pour « tout », « fichiers », « mails », « notes » (ou « mails, notes »)."""
+    s = str(sources or "tout").lower()
+    voulus = set()
+    if "mail" in s or "courriel" in s:
+        voulus.add("mail")
+    if "note" in s:
+        voulus.add("note")
+    if "fichier" in s or "document" in s:
+        if voulus:
+            return None, [g for g in APPLE if g not in voulus]
+        return None, APPLE
+    return (sorted(voulus), None) if voulus else (None, None)
+
+
+@outil("chercher_partout", "Cherche à la fois dans les fichiers, les mails (Réception et Envoyés) et les notes, par "
+       "le sens ou par mots (ex. « le devis de la cuisine », « mail de Paul sur les vacances »). Donne "
+       "l'expéditeur, le sujet et la date des mails ; ouvrir_mail ouvre un résultat mail:// ou note://.",
+       "recherche", {"requete": ("string", "description de ce qu'on cherche"),
+                     "sources": ("string", "où chercher", SOURCES),
+                     "periode": ("string", "ex. « cette semaine », « 3 mois », facultatif"),
+                     "nombre": ("integer", "nombre de résultats (8 par défaut)")}, requis=["requete"],
+       mac_seulement=False, mots_cles=["dans mes mails", "dans mes notes", "un mail de", "le mail de", "mail sur",
+                                       "partout", "dans une note", "mail ou", "mails recus", "mail envoye"])
+def chercher_partout(ctx, requete, sources="tout", periode="", nombre=8):
+    index = ctx.service("index")
+    if index is None:
+        return Resultat(False, "Recherche indisponible (index absent).")
+    genres, exclus = genres_de_sources(sources)
+    trouvailles = index.rechercher(requete, int(nombre or 8), genres=genres, exclure=exclus,
+                                   apres=_date_min(periode))
+    if not trouvailles:
+        n_apple = len(index.chemins("mail://")) + len(index.chemins("note://"))
+        conseil = "" if n_apple else (" Aucun mail ni note n'est encore indexé (indexation Mac branché et inutilisé, "
+                                      "Mail et Notes ouverts).")
+        return Resultat(True, f"Rien trouvé pour « {requete} ».{conseil}", {"resultats": []})
+    return Resultat(True, "\n".join(ligne_trouvaille(t) for t in trouvailles),
+                    {"resultats": [t.chemin for t in trouvailles]})
+
+
+def url_message(ident: str) -> str:
+    """Adresse « message:// » que Mail sait ouvrir (identifiant entre chevrons, encodé)."""
+    from urllib.parse import quote
+    ident = str(ident).strip().removeprefix("mail://").strip().strip("<>")
+    return "message://" + quote(f"<{ident}>", safe="@")
+
+
+@outil("ouvrir_mail", "Ouvre dans Mail (ou Notes) un résultat de chercher_partout : adresse mail://… ou note://….",
+       "recherche", {"chemin": ("string", "adresse mail://… ou note://… donnée par chercher_partout")},
+       risque=Risque.CREATION, annonce=lambda a: f"Ouvrir {a['chemin']}")
+def ouvrir_mail(ctx, chemin):
+    from ..mac import commun
+    c = str(chemin or "").strip()
+    if c.startswith("note://"):
+        ident = c.removeprefix("note://")
+        commun.osascript(f'tell application "Notes"\n    show note id {commun.chaine_as(ident)}\n    activate\n'
+                         'end tell', delai=30)
+        return "Note ouverte dans Notes."
+    if not c.startswith("mail://") and "@" not in c:
+        raise ErreurOutil("Donne l'adresse mail://… ou note://… indiquée par chercher_partout.")
+    subprocess.run(["open", url_message(c)], capture_output=True, timeout=15, check=False)
+    return "Mail ouvert dans Mail."
+
+
 @outil("etat_index", "Indique combien de fichiers sont indexés pour la recherche et quand date le dernier passage.",
        "recherche", {}, mac_seulement=False)
 def etat_index(ctx):
@@ -95,8 +169,11 @@ def etat_index(ctx):
     s = index.stats()
     dernier = index.etat("dernier_passage")
     quand = time.strftime("%d/%m à %H:%M", time.localtime(float(dernier))) if dernier else "jamais"
-    return (f"{s['fichiers']} fichiers indexés ({s['avec_contenu']} avec leur contenu, {s['extraits']} extraits, "
-            f"{s['taille_mo']} Mo). Dernier passage : {quand}.")
+    mails, notes = len(index.chemins("mail://")), len(index.chemins("note://"))
+    fichiers = s["fichiers"] - mails - notes
+    apple = f" Mails : {mails}, notes : {notes}." if mails or notes else ""
+    return (f"{fichiers} fichiers indexés ({s['extraits']} extraits au total, {s['taille_mo']} Mo).{apple} "
+            f"Dernier passage : {quand}.")
 
 
 @outil("indexer_maintenant", "Lance l'indexation des fichiers tout de suite, même si le Mac est utilisé "

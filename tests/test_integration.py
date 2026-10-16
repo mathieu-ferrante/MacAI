@@ -53,3 +53,10 @@ def test_reglages_plan_et_briefing_par_http(cfg):
         assert req("/plan", {"id": "inconnu", "accepter": True})[0] == 404
     finally:
         srv.shutdown()
+
+
+def test_ouvrir_fichier_redirige_les_mails(ctx, monkeypatch):
+    from macai.outils import applications, recherche_outils
+    vus = []
+    monkeypatch.setattr(recherche_outils, "ouvrir_mail", lambda ctx, chemin: vus.append(chemin) or "ouvert")
+    assert applications.ouvrir_fichier(ctx, "mail://abc@exemple") == "ouvert" and vus == ["mail://abc@exemple"]
