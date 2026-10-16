@@ -1,6 +1,8 @@
 """Assemblage du moteur : configuration, modèle, outils, services, agent, tâches de fond."""
 from __future__ import annotations
 
+import json
+import os
 import queue
 import threading
 import time
@@ -37,19 +39,26 @@ class Application:
         self._abonnes: list[queue.Queue] = []
         self._verrou_abonnes = threading.Lock()
         self._confirmations: dict[str, dict] = {}
+        self._plans: dict[str, dict] = {}
+        self._appliquer_reglages()
         self._occupe = threading.Lock()
         self._arret_avant_debut = False   # arrêt demandé entre l'envoi de la demande et son démarrage
         self.ctx = Contexte(config=self.cfg, ollama=self.ollama, registre=self.registre, journal=self.journal,
                             emettre=self.emettre, demander_confirmation=self._demander_confirmation)
+        self.ctx.demander_plan = self._demander_plan
         self._services()
         self.orchestrateur = Orchestrateur(self.ctx, CommandesRapides())
         self._indexeur = None
         annulation.definir_fichier(self.cfg.chemin("annulations.json"))
         self.planificateur = planificateur.Planificateur(self.cfg.chemin("taches.json"), self._occupe,
                                                          self.executer_tache, self.journal)
+        self.surveillance = None
         if avec_fond:
             threading.Thread(target=self._fond, daemon=True, name="taches-de-fond").start()
             self.planificateur.demarrer()
+            from .surveillance import Surveillance
+            self.surveillance = Surveillance(self.cfg, self.emettre, self.ctx)
+            self.surveillance.demarrer()
 
     def _services(self) -> None:
         s, cfg = self.ctx.services, self.cfg
@@ -119,6 +128,84 @@ class Application:
         attente["reponse"] = bool(accepter)
         attente["evenement"].set()
         return True
+
+    # --- Plan proposé avant d'agir ---------------------------------------------------------
+
+    def _demander_plan(self, ident: str, etapes: list) -> tuple[str, str]:
+        """Attend la décision de l'utilisateur sur un plan (événement plan_propose déjà émis)."""
+        attente = {"evenement": threading.Event(), "decision": ("refuser", "")}
+        self._plans[ident] = attente
+        repondu = attente["evenement"].wait(DELAI_CONFIRMATION_S)
+        self._plans.pop(ident, None)
+        return attente["decision"] if repondu else ("refuser", "")
+
+    def repondre_plan(self, ident: str, accepter: bool, correction: str = "") -> bool:
+        attente = self._plans.get(ident)
+        if attente is None:
+            return False
+        attente["decision"] = ("corriger", correction.strip()) if correction.strip() else \
+            ("accepter" if accepter else "refuser", "")
+        attente["evenement"].set()
+        return True
+
+    # --- Réglages modifiables depuis le menu (gardés dans reglages.json) -------------------
+
+    def _appliquer_reglages(self) -> None:
+        try:
+            r = json.loads(self.cfg.chemin("reglages.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if isinstance(r.get("alertes"), dict):
+            self.cfg.alertes.update({k: bool(v) for k, v in r["alertes"].items() if k in self.cfg.alertes})
+        if r.get("plan") in ("complexe", "toujours", "jamais"):
+            self.cfg.agent["plan"] = r["plan"]
+        if r.get("autonomie") in ("prudent", "equilibre", "autonome"):
+            self.cfg.agent["autonomie"] = r["autonomie"]
+        self.classement_actif = bool(r.get("classement", False))
+
+    def reglages(self) -> dict:
+        from . import planificateur as pl
+        return {"autonomie": self.cfg.agent.get("autonomie", "equilibre"), "alertes": dict(self.cfg.alertes),
+                "plan": self.cfg.agent.get("plan", "complexe"), "briefing": pl.briefing_etat(self),
+                "classement": getattr(self, "classement_actif", False)}
+
+    def changer_reglages(self, d: dict) -> dict:
+        """Applique et enregistre les réglages reçus (sous-ensemble de reglages())."""
+        from . import planificateur as pl
+        if isinstance(d.get("alertes"), dict):
+            self.cfg.alertes.update({k: bool(v) for k, v in d["alertes"].items() if k in self.cfg.alertes})
+        if d.get("plan") in ("complexe", "toujours", "jamais"):
+            self.cfg.agent["plan"] = d["plan"]
+        if d.get("autonomie") in ("prudent", "equilibre", "autonome"):
+            self.cfg.agent["autonomie"] = d["autonomie"]
+        if "classement" in d:
+            self.classement_actif = bool(d["classement"])
+        if isinstance(d.get("briefing"), dict):
+            b = d["briefing"]
+            pl.regler_briefing(self, bool(b.get("actif")), str(b.get("heure") or "08:00"))
+        r = self.reglages()
+        fichier = self.cfg.chemin("reglages.json")
+        fichier.write_text(json.dumps({k: v for k, v in r.items() if k != "briefing"}, ensure_ascii=False),
+                           encoding="utf-8")
+        os.chmod(fichier, 0o600)
+        return r
+
+    # --- Démonstration (enregistrer une tâche faite à la main) ------------------------------
+
+    def demonstration(self, debut: bool, nom: str = "") -> dict:
+        from . import demonstration as demo
+        from .outils.base import ErreurOutil
+        enregistreur = demo.obtenir(self.ctx)
+        try:
+            if debut:
+                return enregistreur.demarrer()
+            r = enregistreur.arreter(nom)
+        except ErreurOutil as e:
+            return {"ok": False, "texte": str(e), "etapes": []}
+        if r.get("competence"):
+            # Proposée, jamais enregistrée d'office : l'utilisateur ne veut pas de compétences inutiles.
+            self.orchestrateur.proposer_depuis_demonstration(r["competence"], nom)
+        return {k: v for k, v in r.items() if k != "competence"}
 
     # --- Demandes ----------------------------------------------------------------------
 
@@ -225,6 +312,25 @@ class Application:
             if time.time() - dernier_index > INDEXATION_TOUTES_S and not self.occupe():
                 dernier_index = time.time()
                 self._lancer_indexation()
+            if getattr(self, "classement_actif", False) and not self.occupe():
+                self._classer_telechargements()
+
+    def _classer_telechargements(self) -> None:
+        """Range les nouveaux documents des Téléchargements (factures, impôts…) quand c'est sûr ; annulable."""
+        try:
+            from . import classement
+        except ImportError:
+            return
+        if not self._occupe.acquire(blocking=False):
+            return
+        try:
+            self._deja_vus = getattr(self, "_deja_vus", set())
+            for texte in classement.verifier_telechargements(self.ctx, self._deja_vus) or []:
+                self.emettre("alerte", titre="Document rangé", texte=texte, type="classement")
+        except Exception as e:  # noqa: BLE001 - le fond ne doit jamais s'arrêter
+            self.journal.ecrire("erreur_classement", texte=str(e)[:300])
+        finally:
+            self._occupe.release()
 
     def _lancer_indexation(self, force: bool = False) -> None:
         from .recherche.indexeur import Indexeur, lancer_en_arriere_plan
@@ -251,6 +357,8 @@ class Application:
 
     def fermer(self) -> None:
         self.planificateur.arreter()
+        if self.surveillance is not None:
+            self.surveillance.arreter()
         mcp = self.ctx.service("mcp")
         if mcp:
             mcp.fermer()

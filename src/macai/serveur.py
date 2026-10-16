@@ -96,6 +96,8 @@ def creer_gestionnaire(app: Application, jeton: str):
                 b = app.ctx.service("competences")
                 return self._json(200, [{"nom": c.nom, "description": c.description, "parametres": c.parametres,
                                          "utilisations": c.utilisations} for c in (b.competences.values() if b else [])])
+            if self.path == "/reglages":
+                return self._json(200, app.reglages())
             if self.path == "/taches":
                 return self._json(200, app.taches() if hasattr(app, "taches") else [])
             if self.path == "/journal":
@@ -136,9 +138,16 @@ def creer_gestionnaire(app: Application, jeton: str):
                     m.oublier_id(ident)
                 return self._json(200, {"ok": True})
             if self.path == "/reglages":
-                if d.get("autonomie") in ("prudent", "equilibre", "autonome"):
-                    app.cfg.agent["autonomie"] = d["autonomie"]
-                return self._json(200, app.etat())
+                try:
+                    return self._json(200, app.changer_reglages(d))
+                except ValueError as e:  # heure de briefing illisible…
+                    return self._json(400, {"erreur": str(e)})
+            if self.path == "/plan":
+                ok = app.repondre_plan(str(d.get("id", "")), bool(d.get("accepter")), str(d.get("correction", "")))
+                return self._json(200 if ok else 404, {"ok": ok})
+            if self.path in ("/demonstration/debut", "/demonstration/fin"):
+                r = app.demonstration(self.path.endswith("debut"), str(d.get("nom", "")))
+                return self._json(200, r)
             if self.path == "/indexer":
                 app._lancer_indexation(force=True)
                 return self._json(202, {"ok": True})

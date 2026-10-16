@@ -28,13 +28,24 @@ def cmd_demander(args) -> int:
             diffuse["texte"] = True
             print(d["morceau"], end="", flush=True)
         elif type_ == "proposition_competence":
-            print("\n  (Je peux en faire une compétence : tape « crée une compétence ».)")
+            raison = f"{d['raison']} : " if d.get("raison") else ""
+            print(f"\n  ({raison}je peux en faire une compétence, tape « crée une compétence ».)")
 
     def confirmer(phrase, outil, a):
         return input(f"\n  ⚠ {phrase} — confirmer ? [o/N] ").strip().lower() in ("o", "oui", "y")
 
+    def valider_plan(ident, etapes):
+        print("\n  Voici ce que je vais faire :")
+        for i, e in enumerate(etapes, 1):
+            print(f"    {i}. {e}")
+        r = input("  On y va ? [o/N, ou tape une correction] ").strip()
+        if r.lower() in ("o", "oui", "y"):
+            return ("accepter", "")
+        return ("refuser", "") if r.lower() in ("", "n", "non") else ("corriger", r)
+
     app.ctx.emettre = afficher
     app.ctx.demander_confirmation = confirmer
+    app.ctx.demander_plan = valider_plan
     demandes = [" ".join(args.texte)] if args.texte else iter(lambda: input("\n> "), "quitter")
     try:
         for demande in demandes:
