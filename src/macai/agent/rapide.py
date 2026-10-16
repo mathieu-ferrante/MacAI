@@ -22,6 +22,12 @@ NE_PAS_INTERCEPTER = re.compile(r"\b(fichier|dossier|document|pdf|photo|image|et
 # Le « nom » cache une suite d'actions (« Safari puis cherche… », « Notes, crée… ») ou désigne autre chose
 # qu'une appli (« un nouvel onglet », « mes mails », « le dernier fichier ») : c'est pour l'agent.
 NOM_COMPLEXE = re.compile(r"\b(puis|ensuite|et)\b|[,;]|:(?!//)")
+# « Annule » seul (ou presque) : la dernière action sur les fichiers. « Annule mon rendez-vous » part vers l'agent.
+ANNULER = (r"^(?:peux-tu |tu peux )?(?:annule|annuler|annule ca|annule cela|annule-la|annule la derniere action|"
+           r"annule ma derniere action|annule ce que tu viens de faire|annule la derniere chose|defais ca|defais|"
+           r"reviens en arriere|retour en arriere|fais marche arriere|(?:ctrl|cmd|commande)[ +-]?z|undo)"
+           r"(?: stp| s'il te plait)?$")
+RESUME_MATIN = "résume mes mails non lus et mon agenda du jour"
 NOM_NON_APPLI = re.compile(r"^(tout|toutes|mes|ma|mon|un|une|le dernier|la derniere|nouvel|nouveau|nouvelle|"
                            r"l['’]onglet|onglet)\b")
 
@@ -53,6 +59,10 @@ class CommandesRapides:
         P = re.compile
         demande = r"(?:peux-tu |tu peux |stp |s'il te plait )?"
         self.motifs = [
+            (P(ANNULER), lambda m, t: Plan([("annuler_derniere_action", {})])),
+            (P(rf"^{demande}(?:fais|fait|prepare|donne)[- ]moi (?:un|le) (?:resume|point|briefing)"
+               r"(?: de (?:ma|la) journee| du jour| du matin)? (?:chaque matin|tous les matins)"
+               r"(?: (?:a|vers) (?P<h>\d{1,2}) ?(?:h|:|heures?)? ?(?P<mn>\d{2})?)?$"), self._resume_matin),
             (P(rf"^{demande}(?:lance|ouvre|va sur) youtube et (?:cherche|recherche|trouve)(?: moi)? (?:une |des )?(?:videos? (?:de |sur |d')?)?(?P<q>.+)$"),
              self._youtube_chercher),
             (P(rf"^{demande}(?:mets|joue|lance|regarde)(?: moi)? (?:la |une )?(?:video|musique|chanson|clip)? ?(?:de |d')?(?P<q>.+?) sur youtube$"),
@@ -134,6 +144,15 @@ class CommandesRapides:
         if not nom or len(nom.split()) > 4 or _norm(nom) in ("tout", "toutes les applis", "tout le monde"):
             return None
         return Plan([("quitter_application", {"nom": nom})])
+
+    @staticmethod
+    def _resume_matin(m, original):
+        h = int(m.group("h") or 8)
+        mn = int(m.group("mn") or 0)
+        if h > 23 or mn > 59:
+            return None
+        return Plan([("planifier_tache", {"demande": RESUME_MATIN, "frequence": "quotidien",
+                                          "heure": f"{h:02d}:{mn:02d}"})])
 
     def _volume(self, m, original):
         return Plan([("regler_volume", {"niveau": min(int(m.group("n")), 100)})])

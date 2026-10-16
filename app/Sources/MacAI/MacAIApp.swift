@@ -22,6 +22,9 @@ final class Delegue: NSObject, NSApplicationDelegate {
     let etat = Etat()
     let raccourcis = Raccourcis()
     lazy var panneau = Panneau(etat: etat)
+    lazy var indicateur = Indicateur()
+    lazy var actions = Actions(etat: etat, panneau: panneau, indicateur: indicateur)
+    let notifications = Notifications()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Delegue.partage = self
@@ -35,7 +38,27 @@ final class Delegue: NSObject, NSApplicationDelegate {
             self.etat.commencerEcoute()
         }
         raccourcis.surFinParole = { [weak self] in self?.etat.finirEcoute() }
+        raccourcis.surDebutTouche = { [weak self] in self?.actions.debutToucheMaintenue() }
+        raccourcis.surFinTouche = { [weak self] in self?.actions.finToucheMaintenue() }
+        raccourcis.surTexte = { [weak self] in self?.actions.menuTexte() }
+        raccourcis.surZone = { [weak self] in self?.actions.regarderZone() }
         raccourcis.installer()
+        // Tâches planifiées terminées en arrière-plan : notification macOS ; un clic montre le résultat.
+        notifications.installer()
+        notifications.surClic = { [weak self] description, texte in
+            self?.actions.afficherResultatTache(description, texte)
+        }
+        etat.surTacheTerminee = { [weak self] description, texte, ok in
+            self?.notifications.publier(description: description, texte: texte, ok: ok)
+        }
+        // Liste des tâches planifiées rafraîchie à l'ouverture d'un menu (dont le menu 🧠).
+        NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil,
+                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.etat.connecte else { return }
+                Task { await self.etat.rafraichirTaches() }
+            }
+        }
         // Démarrage automatique à l'ouverture de session.
         // Une seule fois : si l'utilisateur le désactive dans Réglages > Ouverture, on respecte son choix.
         // Le drapeau n'est posé que si l'inscription a vraiment réussi (sinon on réessaiera au prochain lancement).
@@ -70,6 +93,10 @@ final class Delegue: NSObject, NSApplicationDelegate {
 
 struct MenuMacAI: View {
     @EnvironmentObject var etat: Etat
+    /// Rôle de la touche maintenue ("dicter" ou "parler") et touche choisie ("fn" ou "option_droite") :
+    /// relus par Actions et Raccourcis à chaque appui.
+    @AppStorage("roleFn") private var roleFn = "dicter"
+    @AppStorage("touchePourParler") private var touche = "fn"
 
     var body: some View {
         Text(etat.connecte ? "MacAI — prêt (100 % local)" : "MacAI — \(etat.statutMoteur)")
@@ -77,11 +104,33 @@ struct MenuMacAI: View {
         Button("Ouvrir le panneau   ⌥Espace") {
             Delegue.partage?.panneau.montrer()
         }
-        Text("Parler : ⌥⇧Espace maintenus (ou Fn)")
+        Button("Annuler la dernière action") { Delegue.partage?.actions.annulerDerniereAction() }
+            .disabled(!etat.connecte)
+        Menu("Tâches planifiées") {
+            if etat.taches.isEmpty { Text("Aucune tâche planifiée") }
+            ForEach(etat.taches) { t in
+                Menu(t.prochaine.isEmpty ? t.description : "\(t.description) — \(t.prochaine)") {
+                    if !t.frequence.isEmpty { Text("Fréquence : \(t.frequence)") }
+                    Button("Supprimer") { Delegue.partage?.actions.supprimerTache(t) }
+                }
+            }
+        }
+        Divider()
+        Text("Écrire : ⌥Espace")
+        Text(roleFn == "parler" ? "Parler à MacAI : ⌥⇧Espace ou \(nomTouche) maintenus"
+                                : "Parler à MacAI : ⌥⇧Espace maintenus")
+        if roleFn != "parler" { Text("Dicter : \(nomTouche) maintenue") }
+        Text("Texte sélectionné : ⌥⇧T")
+        Text("Zone de l'écran : ⌥⇧S")
         Toggle("Réponses à l'oral", isOn: $etat.modeOral)
-        Menu("Touche pour parler") {
-            Button("Fn (maintenue)") { choisirTouche("fn") }
-            Button("Option droite (maintenue)") { choisirTouche("option_droite") }
+        Menu("Touche \(nomTouche) maintenue") {
+            Toggle("Dicter dans l'application", isOn: Binding(get: { roleFn != "parler" },
+                                                               set: { if $0 { roleFn = "dicter" } }))
+            Toggle("Parler à MacAI", isOn: Binding(get: { roleFn == "parler" },
+                                                    set: { if $0 { roleFn = "parler" } }))
+            Divider()
+            Toggle("Utiliser Option droite au lieu de Fn", isOn: Binding(get: { touche == "option_droite" },
+                                                                          set: { touche = $0 ? "option_droite" : "fn" }))
         }
         Divider()
         Button("Indexer mes fichiers maintenant") { Task { await etat.client.envoyer("/indexer") } }
@@ -96,8 +145,5 @@ struct MenuMacAI: View {
         Button("Quitter MacAI") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 
-    private func choisirTouche(_ t: String) {
-        UserDefaults.standard.set(t, forKey: "touchePourParler")
-        Delegue.partage?.raccourcis.touchePourParler = t
-    }
+    private var nomTouche: String { touche == "option_droite" ? "Option droite" : "Fn" }
 }

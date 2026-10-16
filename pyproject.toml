@@ -14,6 +14,7 @@ mac = [
     "pyobjc-framework-Quartz>=10; sys_platform == 'darwin'",
     "pyobjc-framework-ApplicationServices>=10; sys_platform == 'darwin'",
     "pyobjc-framework-Vision>=10; sys_platform == 'darwin'",
+    "pyobjc-framework-EventKit>=10; sys_platform == 'darwin'",
 ]
 tout = ["macai[fichiers,recherche,securite,mac]"]
 dev = ["macai[fichiers,recherche,securite]", "pytest>=8"]

@@ -2,12 +2,15 @@ import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
 
-/// Option + Espace : ouvre le panneau. Option + Maj + Espace maintenus : parler tant que les touches sont
-/// enfoncées (raccourcis globaux Carbon : aucune autorisation requise). Touche Fn maintenue : parler aussi.
+/// Option + Espace : ouvre le panneau. Option + Maj + Espace maintenus : parler à MacAI tant que les touches
+/// sont enfoncées. Option + Maj + T : texte sélectionné. Option + Maj + S : zone de l'écran (raccourcis globaux
+/// Carbon : aucune autorisation requise). Touche Fn (ou Option droite) maintenue : dicter, ou parler à MacAI.
 @MainActor
 final class Raccourcis {
     private var raccourci: EventHotKeyRef?
     private var raccourciParole: EventHotKeyRef?
+    private var raccourciTexte: EventHotKeyRef?
+    private var raccourciZone: EventHotKeyRef?
     private var paroleRaccourciEnCours = false
     private var gestionnaire: EventHandlerRef?
     private var moniteurGlobal: Any?
@@ -21,9 +24,14 @@ final class Raccourcis {
     var surRaccourci: (@MainActor () -> Void)?
     var surDebutParole: (@MainActor () -> Void)?
     var surFinParole: (@MainActor () -> Void)?
+    /// Touche maintenue (Fn ou Option droite) : son rôle (dicter ou parler) est choisi par l'appelant.
+    var surDebutTouche: (@MainActor () -> Void)?
+    var surFinTouche: (@MainActor () -> Void)?
+    var surTexte: (@MainActor () -> Void)?
+    var surZone: (@MainActor () -> Void)?
 
-    /// Touche pour parler : "fn" (défaut) ou "option_droite".
-    var touchePourParler: String = UserDefaults.standard.string(forKey: "touchePourParler") ?? "fn"
+    /// Touche maintenue : "fn" (défaut) ou "option_droite". Relue à chaque appui (réglée depuis le menu).
+    var touchePourParler: String { UserDefaults.standard.string(forKey: "touchePourParler") ?? "fn" }
 
     func installer() {
         installerOptionEspace()
@@ -34,6 +42,8 @@ final class Raccourcis {
 
     private static let idPanneau: UInt32 = 1
     private static let idParole: UInt32 = 2
+    private static let idTexte: UInt32 = 3
+    private static let idZone: UInt32 = 4
 
     private func installerOptionEspace() {
         var types = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
@@ -55,6 +65,12 @@ final class Raccourcis {
         RegisterEventHotKey(UInt32(kVK_Space), UInt32(optionKey | shiftKey),
                             EventHotKeyID(signature: signature, id: Raccourcis.idParole),
                             GetApplicationEventTarget(), 0, &raccourciParole)
+        RegisterEventHotKey(UInt32(kVK_ANSI_T), UInt32(optionKey | shiftKey),
+                            EventHotKeyID(signature: signature, id: Raccourcis.idTexte),
+                            GetApplicationEventTarget(), 0, &raccourciTexte)
+        RegisterEventHotKey(UInt32(kVK_ANSI_S), UInt32(optionKey | shiftKey),
+                            EventHotKeyID(signature: signature, id: Raccourcis.idZone),
+                            GetApplicationEventTarget(), 0, &raccourciZone)
     }
 
     private func raccourciActive(_ id: UInt32, appui: Bool) {
@@ -70,6 +86,10 @@ final class Raccourcis {
             guard paroleRaccourciEnCours else { return }
             paroleRaccourciEnCours = false
             surFinParole?()
+        case (Raccourcis.idTexte, true):
+            surTexte?()
+        case (Raccourcis.idZone, true):
+            surZone?()
         default:
             break
         }
@@ -147,11 +167,11 @@ final class Raccourcis {
                 MainActor.assumeIsolated {
                     guard let self, self.appuiDepuis != nil else { return }
                     self.ecouteLancee = true
-                    self.surDebutParole?()
+                    self.surDebutTouche?()
                 }
             }
         } else {
-            if ecouteLancee { surFinParole?() }
+            if ecouteLancee { surFinTouche?() }
             annulerAppui()
         }
     }

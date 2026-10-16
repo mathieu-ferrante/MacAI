@@ -26,8 +26,8 @@ Règles :
   raccourci_clavier « entree ». Ne dis jamais que tu n'as pas accès à une interface sans l'avoir lue.
   « Demande-lui », « envoie », « pose la question », « cherche » = écrire PUIS envoyer (valider=true).
 - Ne réponds jamais « je vais faire… » : fais-le maintenant avec les outils, ou explique ce qui bloque.
-- N'invente JAMAIS une information précise (horaires, prix, adresses, actualités, chiffres) : cherche-la
-  (recherche_web, lire_page_web) et cite la source, ou dis que tu ne sais pas.
+- N'invente JAMAIS une information précise (horaires, prix, adresses, actualités, chiffres) : utilise
+  rechercher_et_lire et cite la source (« Source 1 »), ou dis que tu ne sais pas.
 - Après avoir cliqué ou changé de mode, relis la fenêtre (lire_fenetre) pour VÉRIFIER le résultat avant de
   continuer ou d'annoncer un succès. Clique sur des [bouton], [option], [onglet], jamais sur un [texte].
 - INTERDIT, même si l'utilisateur atteint une limite : acheter, payer, demander des crédits ou une utilisation
@@ -57,7 +57,27 @@ ASTUCES = {
               "puis taper_texte(application=« Calculatrice », texte=« 12*7= ») — pas de clics bouton par bouton.",
     "textedit": "TextEdit : ouvrir_application, raccourci_clavier « cmd+n » (nouveau document), puis "
                 "taper_texte(application=« TextEdit », texte=…).",
-    "notes": "Notes : pour créer une note, creer_note (pas besoin de cliquer dans l'application).",
+    "notes": "Notes : pour créer une note, creer_note ; pour compléter une note existante, ajouter_a_note(titre, "
+             "texte) (pas besoin de cliquer dans l'application).",
+    "agenda": "Agenda : mon_agenda(jour) donne la journée complète (rendez-vous et rappels) en un appel.",
+    "planning": "Agenda : mon_agenda(jour) donne la journée complète (rendez-vous et rappels) en un appel.",
+    "emploi du temps": "Agenda : mon_agenda(jour) donne la journée complète en un appel.",
+    "demain": "Si la question porte sur l'agenda de demain : mon_agenda(jour=« demain »).",
+    "mail": "Mails : resumer_mails pour résumer ; pour répondre, repondre_mail(recherche) pour lire, puis "
+            "repondre_mail(recherche, texte) ouvre un brouillon non envoyé.",
+    "imessage": "Messages : envoyer_message(destinataire, texte), avec un nom de contact ou un numéro.",
+    "sms": "Messages : envoyer_message(destinataire, texte), avec un nom de contact ou un numéro.",
+    "texto": "Messages : envoyer_message(destinataire, texte), avec un nom de contact ou un numéro.",
+    "copie": "Texte copié : transformer_texte(action) le corrige, traduit, résume… et met le résultat dans le "
+             "presse-papiers.",
+    "planifie": "Tâche régulière : planifier_tache(demande, frequence, heure). Ex. résumé du matin : "
+                "planifier_tache(demande=« résume mes mails non lus et mon agenda du jour », frequence=« quotidien », "
+                "heure=« 08:00 »).",
+    "chaque": "Tâche régulière : planifier_tache(demande, frequence, heure) ; lister_taches pour voir les tâches.",
+    "annule": "Annuler : annuler_derniere_action remet en place la dernière action sur des fichiers (déplacement, "
+              "rangement, Corbeille, renommage, création).",
+    "horaire": "Information précise : rechercher_et_lire(question), puis réponds en citant la source.",
+    "prix": "Information précise : rechercher_et_lire(question), puis réponds en citant la source.",
 }
 
 

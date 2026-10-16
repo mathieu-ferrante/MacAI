@@ -123,6 +123,9 @@ def cmd_verifier(args) -> int:
 
 
 def cmd_banc(args) -> int:
+    if args.scenarios is not None:
+        from .banc_scenarios import banc_scenarios
+        return banc_scenarios(args.scenarios)
     from .banc import banc
     return banc(args.modeles, candidats=args.candidats)
 
@@ -162,6 +165,8 @@ def main(argv=None) -> int:
     s.add_argument("modeles", nargs="*")
     s.add_argument("--candidats", action="store_true",
                    help="compare les meilleurs modèles pour 8 Go (propose de les télécharger)")
+    s.add_argument("--scenarios", nargs="?", const="", default=None, metavar="FILTRE",
+                   help="50 demandes réelles dans le vrai moteur, outils simulés (filtre : catégorie ou mot)")
     s.set_defaults(func=cmd_banc)
 
     args = p.parse_args(argv)

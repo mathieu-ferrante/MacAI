@@ -25,8 +25,15 @@ Aucune IA dans le cloud : tout tourne sur la puce M2.
 ## Utilisation
 
 - **Option + Espace** : panneau pour écrire.
-- **Option + Maj + Espace maintenus** : parler, la transcription s'arrête et la demande part au relâchement.
-- **Fn maintenue** : parler aussi (réglable : Option droite).
+- **Option + Maj + Espace maintenus** : parler à MacAI, la transcription s'arrête et la demande part au relâchement.
+- **Fn maintenue** : dicter dans l'application de devant ; le texte s'écrit au curseur au relâchement
+  (réglable dans 🧠 > Touche Fn maintenue : parler à MacAI à la place, ou Option droite au lieu de Fn).
+- **Option + Maj + T** : menu sur le texte sélectionné (corriger, reformuler, traduire à la place ; résumer,
+  expliquer, répondre ; autre consigne).
+- **Option + Maj + S** : sélectionner une zone de l'écran, puis l'expliquer, la traduire, en extraire le texte
+  ou le tableau (Excel), ou poser une question.
+- Menu 🧠 : **Annuler la dernière action** (fichiers) et **Tâches planifiées** (liste, suppression) ; une
+  notification s'affiche quand une tâche planifiée se termine.
 - Bouton **Écrit / Oral** : réponse écrite, ou écrite et lue à voix haute.
 - Actions sensibles (Corbeille, envoi, Terminal, rangement de masse) : une carte **Confirmer / Refuser** s'affiche.
 - Icône 🧠 dans la barre des menus : réglages, indexation, journal, redémarrage.

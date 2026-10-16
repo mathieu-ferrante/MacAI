@@ -6,7 +6,9 @@ import threading
 import time
 import uuid
 
+from . import annulation
 from . import config as config_mod
+from . import planificateur
 from .agent.contexte import Contexte
 from .agent.orchestrateur import Orchestrateur
 from .agent.rapide import CommandesRapides
@@ -16,6 +18,13 @@ from .outils.base import charger_tous
 
 DELAI_CONFIRMATION_S = 120
 INDEXATION_TOUTES_S = 30 * 60
+ECHECS = ("Erreur interne", "Le modèle local ne répond pas", "Arrêté.", "Je n'ai pas réussi",
+          "Je n'ai pas pu", "Je ne peux pas")
+
+
+def _refus_sans_temoin(phrase: str, outil: str, args: dict) -> bool:
+    """Tâche planifiée : personne n'est là pour accepter, toute confirmation est refusée."""
+    return False
 
 
 class Application:
@@ -35,8 +44,12 @@ class Application:
         self._services()
         self.orchestrateur = Orchestrateur(self.ctx, CommandesRapides())
         self._indexeur = None
+        annulation.definir_fichier(self.cfg.chemin("annulations.json"))
+        self.planificateur = planificateur.Planificateur(self.cfg.chemin("taches.json"), self._occupe,
+                                                         self.executer_tache, self.journal)
         if avec_fond:
             threading.Thread(target=self._fond, daemon=True, name="taches-de-fond").start()
+            self.planificateur.demarrer()
 
     def _services(self) -> None:
         s, cfg = self.ctx.services, self.cfg
@@ -150,6 +163,56 @@ class Application:
             self.emettre("fin", texte=r.texte, actions=[])
             return r.texte
 
+    def annuler(self) -> dict:
+        """Annule la dernière action sur les fichiers (bouton « Annuler » de l'interface)."""
+        if not self._occupe.acquire(blocking=False):
+            return {"ok": False, "texte": "Une demande est en cours : réessaie quand elle sera finie."}
+        try:
+            r = self.orchestrateur.executer_outil("annuler_derniere_action", {})
+            donnees = r.donnees if isinstance(r.donnees, dict) else {}
+            ok = r.ok and not (donnees.get("echecs") and not donnees.get("restaures"))
+            self.emettre("fin", texte=r.texte, actions=[])
+            return {"ok": ok, "texte": r.texte}
+        finally:
+            self._occupe.release()
+
+    # --- Tâches planifiées ---------------------------------------------------------------
+
+    def taches(self) -> list[dict]:
+        fichier = self.cfg.chemin("taches.json")
+        return [planificateur.resume(t) for t in planificateur.charger(fichier) if t.get("active", True)]
+
+    def supprimer_tache(self, ident: str) -> bool:
+        return planificateur.supprimer(self.cfg.chemin("taches.json"), str(ident))
+
+    def executer_tache(self, tache: dict) -> tuple[bool, str]:
+        """Joue une tâche planifiée. Appelée verrou du moteur PRIS (par le planificateur). Personne devant
+        l'écran : confirmations refusées d'office, au moins le mode « equilibre », pas de proposition de
+        compétence, et la conversation de l'utilisateur n'est pas polluée."""
+        ctx, agent = self.ctx, self.cfg.agent
+        sauve = (ctx.demander_confirmation, dict(agent), list(self.orchestrateur.historique))
+        ctx.demander_confirmation = _refus_sans_temoin
+        if agent.get("autonomie") not in ("prudent", "equilibre"):
+            agent["autonomie"] = "equilibre"
+        agent["competence_apres_actions"] = 10 ** 6
+        ctx.services["tache_planifiee"] = tache.get("id") or True
+        self._arret_avant_debut = False
+        try:
+            self.journal.ecrire("tache_planifiee", id=tache.get("id"), demande=tache.get("demande"))
+            texte = self.orchestrateur.traiter(tache["demande"]) or ""
+            ok = not texte.startswith(ECHECS)
+        except Exception as e:  # noqa: BLE001 - une tâche ratée devient une notification, jamais un blocage
+            texte, ok = f"Erreur interne ({type(e).__name__}) : {e}", False
+        finally:
+            ctx.demander_confirmation = sauve[0]
+            agent.clear()
+            agent.update(sauve[1])
+            self.orchestrateur.historique = sauve[2]
+            ctx.services.pop("tache_planifiee", None)
+        description = tache.get("description") or tache.get("demande", "")
+        self.emettre("tache_terminee", description=description, texte=texte[:planificateur.RESULTAT_MAX], ok=ok)
+        return ok, texte
+
     # --- Tâches de fond ------------------------------------------------------------------
 
     def _fond(self) -> None:
@@ -187,6 +250,7 @@ class Application:
         }
 
     def fermer(self) -> None:
+        self.planificateur.arreter()
         mcp = self.ctx.service("mcp")
         if mcp:
             mcp.fermer()

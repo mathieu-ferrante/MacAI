@@ -48,13 +48,19 @@ final class Client {
     /// Renvoie la réponse JSON ; aussi pour 409 (« occupé ») que l'appelant affiche.
     @discardableResult
     func envoyer(_ chemin: String, _ corps: [String: Any] = [:]) async -> [String: Any]? {
-        guard pret else { return nil }
+        let (s, json) = await poster(chemin, corps)
+        guard s != 0, s < 300 || s == 409 else { return nil }
+        return json
+    }
+
+    /// POST qui garde le statut HTTP et le corps JSON, même en erreur (400 « rien de sélectionné »…).
+    /// Statut 0 : moteur injoignable.
+    func poster(_ chemin: String, _ corps: [String: Any] = [:]) async -> (statut: Int, json: [String: Any]?) {
+        guard pret else { return (0, nil) }
         do {
             let (data, r) = try await session.data(for: requete(chemin, methode: "POST", corps: corps))
-            let s = Client.statut(r)
-            guard s < 300 || s == 409 else { return nil }
-            return try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        } catch { return nil }
+            return (Client.statut(r), try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+        } catch { return (0, nil) }
     }
 
     func lire(_ chemin: String) async -> Any? {

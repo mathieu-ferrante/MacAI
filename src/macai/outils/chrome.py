@@ -298,8 +298,7 @@ def telecharger_page(url: str, delai: float = 15) -> str:
 @outil("lire_page_web", "Télécharge et lit le texte d'une page web sans l'ouvrir (articles, documentation…).",
        "web", {"url": ("string", "adresse de la page")}, mac_seulement=False)
 def lire_page_web(ctx, url):
-    if not re.match(r"^https?://", url):
-        url = "https://" + url
+    url = url_publique(url)
     try:
         titre, texte = html_vers_texte(telecharger_page(url))
     except (OSError, ValueError) as e:
@@ -307,9 +306,8 @@ def lire_page_web(ctx, url):
     return Resultat(True, f"{titre}\n{url}\n\n{texte[:12000]}", {"url": url})
 
 
-@outil("recherche_web", "Cherche sur internet (DuckDuckGo) et renvoie les premiers résultats (titre, lien, "
-       "résumé), sans ouvrir le navigateur.", "web", {"requete": ("string", "recherche")}, mac_seulement=False)
-def recherche_web(ctx, requete):
+def resultats_recherche(requete: str, nombre: int = 8) -> list[tuple[str, str, str]]:
+    """(titre, lien, résumé) des premiers résultats DuckDuckGo (version HTML, sans JavaScript)."""
     url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote_plus(requete)
     try:
         page = telecharger_page(url)
@@ -321,9 +319,100 @@ def recherche_web(ctx, requete):
         lien = m.group(1)
         if "uddg=" in lien:
             lien = urllib.parse.unquote(re.search(r"uddg=([^&]+)", lien).group(1))
-        titre = html.unescape(re.sub(r"<.*?>", "", m.group(2)))
-        resume = html.unescape(re.sub(r"<.*?>", "", m.group(3)))
-        resultats.append(f"- {titre}\n  {lien}\n  {resume}")
-        if len(resultats) >= 8:
+        if "duckduckgo.com/y.js" in lien or "ad_provider" in lien:
+            continue  # publicités
+        titre = html.unescape(re.sub(r"<.*?>", "", m.group(2))).strip()
+        resume = html.unescape(re.sub(r"<.*?>", "", m.group(3))).strip()
+        resultats.append((titre, lien, resume))
+        if len(resultats) >= nombre:
             break
-    return "\n".join(resultats) if resultats else "Aucun résultat."
+    return resultats
+
+
+@outil("recherche_web", "Cherche sur internet (DuckDuckGo) et renvoie les premiers résultats (titre, lien, "
+       "résumé), sans ouvrir le navigateur.", "web", {"requete": ("string", "recherche")}, mac_seulement=False)
+def recherche_web(ctx, requete):
+    resultats = resultats_recherche(requete)
+    return "\n".join(f"- {t}\n  {l}\n  {r}" for t, l, r in resultats) if resultats else "Aucun résultat."
+
+
+def url_publique(url: str) -> str:
+    """Refuse les adresses locales ou privées (le moteur d'IA, la box, le réseau local) : une page piégée ne doit
+    pas pouvoir faire interroger le Mac lui-même."""
+    import ipaddress
+    import socket
+    if not re.match(r"^https?://", url):
+        url = "https://" + url
+    hote = urllib.parse.urlparse(url).hostname or ""
+    try:
+        adresses = {i[4][0] for i in socket.getaddrinfo(hote, None)}
+    except OSError as e:
+        raise ErreurOutil(f"Adresse introuvable : {hote}") from e
+    for a in adresses:
+        ip = ipaddress.ip_address(a.split("%")[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ErreurOutil(f"Adresse locale ou privée refusée : {hote}")
+    return url
+
+
+def passages_utiles(texte: str, question: str, nombre: int = 3, taille: int = 380) -> list[str]:
+    """Les passages de la page qui partagent le plus de mots avec la question (sans modèle : instantané)."""
+    from ..agent.routeur import normaliser
+    mots = {m for m in re.findall(r"[a-z0-9]+", normaliser(question)) if len(m) > 3}
+    morceaux, courant = [], ""
+    for phrase in re.split(r"(?<=[.!?])\s+|\n+", texte):
+        if len(courant) + len(phrase) > taille and courant:
+            morceaux.append(courant.strip())
+            courant = ""
+        courant += " " + phrase
+    if courant.strip():
+        morceaux.append(courant.strip())
+    import math
+    jeux = [set(re.findall(r"[a-z0-9]+", normaliser(m))) for m in morceaux]
+    # Mots rares dans la page = plus parlants (« poste », « Toulon » sont partout, « horaires » non).
+    poids = {w: math.log(1 + len(jeux) / (1 + sum(w in j for j in jeux))) for w in mots}
+    chiffres = re.compile(r"\b\d{1,2} ?h ?\d{0,2}\b|\b\d{1,2}:\d{2}\b|\d+[,.]?\d* ?(€|eur|euros?)\b|\b(19|20)\d{2}\b",
+                          re.I)
+    veut_chiffres = bool(re.search(r"horaire|heure|ouvert|ferme|prix|cout|tarif|combien|quand|date|annee",
+                                   normaliser(question)))
+    notes = []
+    for i, (m, jeu) in enumerate(zip(morceaux, jeux)):
+        note = sum(poids[w] for w in mots & jeu)
+        if veut_chiffres and note > 0:
+            note += min(len(chiffres.findall(m)), 4) * 0.6
+        notes.append((note, i, m))
+    notes.sort(key=lambda x: (-x[0], x[1]))
+    gardes = sorted((i, m) for n, i, m in notes[:nombre] if n > 0)
+    return [m for _, m in gardes]
+
+
+@outil("rechercher_et_lire", "Répond à une question d'actualité ou factuelle (horaires, prix, dates, chiffres, "
+       "personnes, définitions…) : cherche sur internet, lit les meilleures pages et renvoie les passages utiles "
+       "avec leurs sources. Réponds ensuite en citant les sources.", "web",
+       {"question": ("string", "la question, ex. « horaires de la poste de Toulon centre »")}, mac_seulement=False,
+       mots_cles=["horaires", "prix", "combien coute", "actualite", "qui est", "c'est quand", "quand est",
+                  "recherche sur internet", "cherche sur internet", "derniere version", "resultat du match"])
+def rechercher_et_lire(ctx, question):
+    from concurrent.futures import ThreadPoolExecutor
+    resultats = resultats_recherche(question, nombre=6)
+    if not resultats:
+        return "Aucun résultat trouvé sur internet pour cette question."
+
+    def lire(r):
+        titre, lien, resume = r
+        try:
+            _, texte = html_vers_texte(telecharger_page(url_publique(lien)))
+        except (ErreurOutil, OSError, ValueError):
+            return titre, lien, [resume] if resume else []
+        return titre, lien, passages_utiles(texte, question) or ([resume] if resume else [])
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        lus = list(pool.map(lire, resultats[:3]))
+    blocs = []
+    for n, (titre, lien, passages) in enumerate(lus, 1):
+        if passages:
+            blocs.append(f"Source {n} : {titre} — {lien}\n" + "\n".join(f"« {p[:420]} »" for p in passages))
+    if not blocs:
+        return "Pages trouvées mais illisibles : " + ", ".join(l for _, l, _ in resultats[:3])
+    return ("\n\n".join(blocs) + "\n\nRéponds à la question avec ces passages uniquement, en citant « Source N ». "
+            "Si l'information n'y est pas, dis-le.")

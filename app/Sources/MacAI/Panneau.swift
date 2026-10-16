@@ -46,6 +46,7 @@ final class Panneau: NSPanel {
 
     override func cancelOperation(_ sender: Any?) {
         orderOut(nil)  // Échap ferme le panneau (la demande en cours continue)
+        etat.attente = nil  // une consigne attendue (texte sélectionné, zone) est abandonnée
     }
 }
 
@@ -101,7 +102,8 @@ struct VuePanneau: View {
             Image(systemName: etat.ecoute ? "waveform" : "sparkle")
                 .font(.title2).foregroundStyle(etat.ecoute ? Color.red : Color.accentColor)
                 .symbolEffect(.pulse, isActive: etat.ecoute || etat.occupe)
-            TextField(etat.ecoute ? "J'écoute…" : "Demande-moi n'importe quoi sur ton Mac…", text: $etat.saisie)
+            TextField(etat.ecoute ? "J'écoute…" : etat.attente?.invite ?? "Demande-moi n'importe quoi sur ton Mac…",
+                      text: $etat.saisie)
                 .textFieldStyle(.plain).font(.title3)
                 .focused($focus)
                 .onSubmit { etat.envoyer() }
@@ -115,7 +117,7 @@ struct VuePanneau: View {
                 } label: {
                     Image(systemName: etat.ecoute ? "mic.fill" : "mic").font(.title2)
                 }
-                .buttonStyle(.plain).help("Parler (ou maintiens la touche Fn)")
+                .buttonStyle(.plain).help("Parler (ou maintiens ⌥⇧Espace)")
             }
         }
     }

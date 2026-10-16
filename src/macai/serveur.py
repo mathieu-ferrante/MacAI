@@ -96,6 +96,8 @@ def creer_gestionnaire(app: Application, jeton: str):
                 b = app.ctx.service("competences")
                 return self._json(200, [{"nom": c.nom, "description": c.description, "parametres": c.parametres,
                                          "utilisations": c.utilisations} for c in (b.competences.values() if b else [])])
+            if self.path == "/taches":
+                return self._json(200, app.taches() if hasattr(app, "taches") else [])
             if self.path == "/journal":
                 return self._json(200, app.journal.derniers(100))
             self._json(404, {"erreur": "inconnu"})
@@ -140,6 +142,27 @@ def creer_gestionnaire(app: Application, jeton: str):
             if self.path == "/indexer":
                 app._lancer_indexation(force=True)
                 return self._json(202, {"ok": True})
+            if self.path in ("/texte", "/image"):
+                from . import texte
+                from .outils.base import ErreurOutil
+                try:
+                    if self.path == "/texte":
+                        r = texte.demande_texte(app, str(d.get("action", "")), str(d.get("consigne", "")),
+                                                str(d.get("sortie", "")))
+                    else:
+                        r = texte.demande_image(app, str(d.get("chemin", "")), str(d.get("action", "")),
+                                                str(d.get("question", "")))
+                except ErreurOutil as e:
+                    return self._json(409 if str(e) == "occupé" else 400, {"erreur": str(e)})
+                return self._json(202, r)
+            if self.path == "/annuler":
+                if app.occupe():
+                    return self._json(409, {"erreur": "occupé"})
+                return self._json(200, app.annuler() if hasattr(app, "annuler") else
+                                  {"ok": False, "texte": "Annulation indisponible."})
+            if self.path == "/taches/supprimer":
+                ok = app.supprimer_tache(str(d.get("id", ""))) if hasattr(app, "supprimer_tache") else False
+                return self._json(200 if ok else 404, {"ok": ok})
             self._json(404, {"erreur": "inconnu"})
 
         def _diagnostic(self, d: dict):

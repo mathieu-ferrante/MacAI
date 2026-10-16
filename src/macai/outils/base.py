@@ -337,7 +337,8 @@ def outil(nom: str, description: str, groupe: str, parametres: dict | None = Non
 
 
 MODULES = ["systeme", "applications", "fichiers", "documents", "recherche_outils", "chrome",
-           "fenetres", "discussions", "organisation", "memoire_outils", "competences_outils", "onshape_outils"]
+           "fenetres", "discussions", "organisation", "memoire_outils", "competences_outils", "onshape_outils",
+           "taches", "texte_outils"]
 
 
 # Outils lents par nature (modèle de vision, OCR, réponse d'une autre IA, gros dossiers) : délai plus long.

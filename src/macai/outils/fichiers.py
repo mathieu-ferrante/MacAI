@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+from .. import annulation
 from ..mac import commun
 from .base import ErreurOutil, Resultat, Risque, outil
 
@@ -165,7 +166,9 @@ def lister_dossier(ctx, chemin, tri="date"):
        {"chemin": ("string", "dossier à créer")}, risque=Risque.CREATION, mac_seulement=False)
 def creer_dossier(ctx, chemin):
     d = resoudre(chemin, ecriture=True)
+    manquants = annulation.dossiers_manquants(d)
     d.mkdir(parents=True, exist_ok=True)
+    annulation.enregistrer(ctx, f"Création du dossier {d.name}", annulation.ops_dossiers(manquants))
     return f"Dossier prêt : {d}"
 
 
@@ -183,12 +186,19 @@ def _risque_ecriture(args):
        risque=_risque_ecriture, mac_seulement=False, annonce=lambda a: f"Écrire {a['chemin']}")
 def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     p = resoudre(chemin, ecriture=True)
+    ops: list[dict] = []
     if p.exists() and not ecraser:
         p = sans_collision(p)
     elif p.exists():
-        mettre_corbeille(p)  # l'ancienne version reste récupérable dans la Corbeille
+        jete = mettre_corbeille(p)  # l'ancienne version reste récupérable dans la Corbeille
+        if isinstance(jete, Path):
+            ops.append({"type": "restaurer", "depuis": str(jete), "vers": str(p)})
+    remplace = bool(ops)
+    ops += annulation.ops_dossiers(annulation.dossiers_manquants(p.parent))
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(contenu, encoding="utf-8")
+    ops.append({"type": "corbeille", "chemin": str(p)})
+    annulation.enregistrer(ctx, f"{'Remplacement' if remplace else 'Création'} de {p.name}", ops)
     return Resultat(True, f"Fichier écrit : {p} ({len(contenu)} caractères)", {"fichier": str(p)})
 
 
@@ -208,12 +218,16 @@ def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
 def deplacer(ctx, source, destination):
     src = resoudre(source, ecriture=True, doit_exister=True)
     dest = resoudre(destination, ecriture=True)
-    if _vers_dossier(src, dest, destination):
+    vers_dossier = _vers_dossier(src, dest, destination)
+    ops = annulation.ops_dossiers(annulation.dossiers_manquants(dest if vers_dossier else dest.parent))
+    if vers_dossier:
         dest.mkdir(parents=True, exist_ok=True)
         dest = dest / src.name
     dest = sans_collision(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src), str(dest))
+    ops.append({"type": "deplacer", "de": str(dest), "vers": str(src)})
+    annulation.enregistrer(ctx, f"Déplacement de {src.name} vers {dest.parent.name}", ops)
     return Resultat(True, f"Déplacé : {src.name} → {dest}", {"fichier": str(dest)})
 
 
@@ -229,6 +243,8 @@ def renommer(ctx, chemin, nouveau_nom):
         nouveau_nom += src.suffix
     dest = sans_collision(src.with_name(nouveau_nom))
     src.rename(dest)
+    annulation.enregistrer(ctx, f"Renommage de {src.name} en {dest.name}",
+                           [{"type": "deplacer", "de": str(dest), "vers": str(src)}])
     return Resultat(True, f"Renommé en {dest.name}", {"fichier": str(dest)})
 
 
@@ -238,12 +254,16 @@ def renommer(ctx, chemin, nouveau_nom):
 def copier(ctx, source, destination):
     src = resoudre(source, doit_exister=True)
     dest = resoudre(destination, ecriture=True)
-    if _vers_dossier(src, dest, destination):
+    vers_dossier = _vers_dossier(src, dest, destination)
+    ops = annulation.ops_dossiers(annulation.dossiers_manquants(dest if vers_dossier else dest.parent))
+    if vers_dossier:
         dest.mkdir(parents=True, exist_ok=True)
         dest = dest / src.name
     dest = sans_collision(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     (shutil.copytree if src.is_dir() else shutil.copy2)(str(src), str(dest))
+    ops.append({"type": "corbeille", "chemin": str(dest)})
+    annulation.enregistrer(ctx, f"Copie de {src.name} vers {dest.parent.name}", ops)
     return Resultat(True, f"Copié vers {dest}", {"fichier": str(dest)})
 
 
@@ -254,17 +274,22 @@ def _cible_corbeille(chemin: str) -> str:
         return str(chemin)
 
 
-def mettre_corbeille(p: Path) -> None:
+def mettre_corbeille(p: Path) -> Path | None:
+    """Met `p` à la Corbeille et renvoie son emplacement dans la Corbeille (pour pouvoir l'en ressortir)."""
     if sys.platform == "darwin":
         from Foundation import NSFileManager, NSURL
-        ok, _, err = NSFileManager.defaultManager().trashItemAtURL_resultingItemURL_error_(
+        ok, resultat, err = NSFileManager.defaultManager().trashItemAtURL_resultingItemURL_error_(
             NSURL.fileURLWithPath_(str(p)), None, None)
         if not ok:
             raise ErreurOutil(f"Impossible de mettre {p.name} à la Corbeille : {err}")
-    else:  # poste de développement : corbeille simulée
-        corbeille = Path.home() / ".macai" / "corbeille"
-        corbeille.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(p), str(sans_collision(corbeille / p.name)))
+        chemin = resultat.path() if resultat is not None else None
+        return Path(str(chemin)) if chemin else None
+    # poste de développement : corbeille simulée
+    corbeille = Path.home() / ".macai" / "corbeille"
+    corbeille.mkdir(parents=True, exist_ok=True)
+    dest = sans_collision(corbeille / p.name)
+    shutil.move(str(p), str(dest))
+    return dest
 
 
 @outil("mettre_a_la_corbeille", "Met un fichier ou dossier à la Corbeille (récupérable).", "fichiers",
@@ -278,7 +303,10 @@ def mettre_a_la_corbeille(ctx, chemin):
     maison = Path.home().resolve()
     if p.resolve() == maison or len(p.parts) <= 3 or p.resolve().parent == maison:
         raise ErreurOutil(f"Refusé : {p} est un dossier principal de ton compte.")
-    mettre_corbeille(p)
+    jete = mettre_corbeille(p)
+    if isinstance(jete, Path):
+        annulation.enregistrer(ctx, f"Mise à la Corbeille de {p.name}",
+                               [{"type": "restaurer", "depuis": str(jete), "vers": str(p)}])
     return f"{p.name} est dans la Corbeille."
 
 
@@ -317,11 +345,20 @@ def ranger_dossier(ctx, chemin):
     d = resoudre(chemin, ecriture=True, doit_exister=True)
     plan = plan_rangement(d)
     deplaces = 0
-    for cat, elements in plan.items():
-        (d / cat).mkdir(exist_ok=True)
-        for e in elements:
-            ctx.verifier_arret()
-            shutil.move(str(e), str(sans_collision(d / cat / e.name)))
-            deplaces += 1
+    ops: list[dict] = []
+    try:
+        for cat, elements in plan.items():
+            if not (d / cat).exists():
+                ops.append({"type": "supprimer_dossier_vide", "chemin": str(d / cat)})
+            (d / cat).mkdir(exist_ok=True)
+            for e in elements:
+                ctx.verifier_arret()
+                dest = sans_collision(d / cat / e.name)
+                shutil.move(str(e), str(dest))
+                ops.append({"type": "deplacer", "de": str(dest), "vers": str(e)})
+                deplaces += 1
+    finally:  # même interrompu, ce qui a déjà bougé reste annulable d'un coup
+        if deplaces:
+            annulation.enregistrer(ctx, f"Rangement de {deplaces} fichiers de {d.name}", ops)
     resume = ", ".join(f"{k} : {len(v)}" for k, v in plan.items())
     return Resultat(True, f"{deplaces} fichiers rangés dans {d}. {resume}", {"plan": {k: len(v) for k, v in plan.items()}})
