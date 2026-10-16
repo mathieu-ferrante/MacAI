@@ -272,6 +272,11 @@ def servir(app: Application, port: int = 0) -> None:
     try:
         serveur.serve_forever(poll_interval=1.0)
     finally:
-        infos.unlink(missing_ok=True)
+        # Seulement si c'est encore notre fichier : un moteur relancé entre-temps a pu écrire le sien.
+        try:
+            if json.loads(infos.read_text(encoding="utf-8")).get("pid") == os.getpid():
+                infos.unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
         app.fermer()
         serveur.server_close()
