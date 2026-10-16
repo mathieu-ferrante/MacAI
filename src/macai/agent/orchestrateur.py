@@ -1,7 +1,13 @@
 """Boucle de l'agent : demande → (commande directe | modèle ⇄ outils) → réponse.
 
 Événements émis via `ctx.emettre(type, **données)` pour l'interface :
-  debut, routage, outil_debut, annonce, confirmation, outil_fin, texte, proposition_competence, fin, erreur
+  debut, routage, plan_propose, outil_debut, annonce, confirmation, outil_fin, texte, proposition_competence,
+  fin, erreur
+
+Mode plan (« montre-moi avant de faire », réglage agent.plan) : pour une demande en plusieurs étapes, le modèle
+propose d'abord un plan numéroté (événement plan_propose) ; l'utilisateur l'accepte, le refuse ou le corrige via
+`ctx.demander_plan(id, etapes) -> (decision, correction)`. Sans ce point d'accroche (CLI, banc, tests), pas de
+plan : on agit directement (le plan serait accepté d'office, inutile de payer un appel au modèle).
 """
 from __future__ import annotations
 
@@ -11,6 +17,7 @@ import re
 import sys
 import threading
 import time
+import uuid
 
 from ..llm.ollama import ErreurOllama
 from ..outils.base import Outil, Resultat, Risque
@@ -45,6 +52,30 @@ SAVOIR = re.compile(r"^(comment (on |faire|faut|puis|je peux|est-ce|ca marche|fo
                     r"quelle est la difference|quel est l'interet)")
 QUESTION = re.compile(r"^(comment|pourquoi|est-ce que|qu'est-ce|quels?|quelles?|quand|ou)\b")
 
+# Mode plan
+PLAN_ETAPES_MAX = 6
+PLAN_ETAPES_MIN = 3     # en dessous, rien à valider : on agit directement
+# Demande qui AGIT (pas une simple lecture ou question) : un verbe d'action quelque part.
+PLAN_ACTION = re.compile(r"\b(envoi|envoy|ouvr|cree|crée|deplac|range|rang|renomm|ecri|ajout|supprim|mets|met |"
+                         r"copi|clique|lance|ferm|telecharg|prepar|repond|planifi|programm|organis|rempli|"
+                         r"enregistr|install|activ|desactiv|regl|change|modifi|effac|vide|archiv|tri|class|partag|"
+                         r"imprim|convert|export|compress|deplace|colle|tape|saisi|inscri|reserv|commande|note )")
+PLAN_MOTS_MAX = 12      # au-delà : demande jugée en plusieurs étapes
+PLAN_LIAISONS = re.compile(r"( et | puis |, |\bensuite\b|\bapres ca\b|\bpour finir\b)")
+PLAN_REFUS = "D'accord, je ne fais rien."
+CONSIGNE_PLAN = ("Tu prépares une tâche sur le Mac de l'utilisateur, sans rien faire pour l'instant. Écris "
+                 "uniquement un plan numéroté de 1 à {n} étapes concrètes et courtes, en français (une action par "
+                 "ligne : « 1. Ouvrir Mail », « 2. … »). Pas d'introduction, pas de conclusion.")
+ETAPE_PLAN = re.compile(r"^\s*(?:\d+\s*[.)\-:]|[-*•])\s*(.+?)\s*$")
+
+# Propositions de compétence : seulement pour ce qui se répète vraiment.
+TRACES_MAX = 30
+TRACES_RECENTES_S = 30 * 24 * 3600
+MOTS_VIDES = {"le", "la", "les", "un", "une", "des", "de", "du", "et", "a", "au", "aux", "en", "mon", "ma", "mes",
+              "pour", "dans", "sur", "avec", "moi", "fais", "fait", "peux", "tu", "je", "me", "m", "l", "d", "ce",
+              "cet", "cette", "ces", "puis", "ensuite", "stp", "merci", "s'il", "te", "plait", "plais", "qui",
+              "que", "est", "son", "sa", "ses", "ton", "ta", "tes", "y", "il", "elle", "par"}
+
 
 class Orchestrateur:
     def __init__(self, ctx: Contexte, rapide=None):
@@ -52,6 +83,7 @@ class Orchestrateur:
         self.rapide = rapide
         self.historique: list[dict] = []
         self.derniere_trace: dict | None = None
+        self.plan_valide = False  # plan accepté pour la demande en cours : plus que les confirmations sensibles
         ctx.services["orchestrateur"] = self
 
     # --- Décisions de sécurité ---------------------------------------------
@@ -60,6 +92,8 @@ class Orchestrateur:
         if o.toujours_confirmer:
             return True
         mode = self.ctx.config.agent.get("autonomie", "equilibre")
+        if self.plan_valide and mode == "prudent":
+            mode = "equilibre"  # l'utilisateur a validé le plan : on ne redemande que ce qui est sensible
         r = _risque(o, args) if risque is None else risque
         if mode == "autonome":
             return False
@@ -115,7 +149,9 @@ class Orchestrateur:
             try:
                 texte = self._commande_directe(demande, trace)
                 if texte is None:
-                    texte = self._boucle(demande, trace)
+                    plan = self._plan(demande)
+                    self.plan_valide = bool(plan)
+                    texte = PLAN_REFUS if plan is False else self._boucle(demande, trace, plan or None)
             except InterruptedError:
                 texte = "Arrêté."
             except ErreurOllama as e:
@@ -133,6 +169,7 @@ class Orchestrateur:
             texte = texte or f"Erreur interne ({type(e).__name__}) : {e}"
             ctx.emettre("erreur", texte=f"Erreur interne ({type(e).__name__}) : {e}")
         finally:
+            self.plan_valide = False
             ctx.emettre("fin", texte=texte, actions=trace)
         # Apprentissage hors du verrou de la demande : l'utilisateur peut enchaîner tout de suite.
         threading.Thread(target=self._apprendre, args=(demande,), daemon=True, name="apprentissage").start()
@@ -173,7 +210,65 @@ class Orchestrateur:
             textes.append(r.texte)
         return plan.reponse.format(*textes) if plan.reponse else (textes[-1] if textes else "C'est fait.")
 
-    def _boucle(self, demande: str, trace: list) -> str:
+    # --- Mode plan ------------------------------------------------------------------
+
+    def plan_voulu(self, demande: str) -> bool:
+        """Faut-il montrer un plan avant d'agir ? Jamais pour une tâche planifiée (personne devant l'écran), ni
+        sans interface pour répondre, ni pour une question."""
+        ctx = self.ctx
+        mode = str(ctx.config.agent.get("plan", "complexe")).lower()
+        if mode == "jamais" or ctx.services.get("tache_planifiee") or getattr(ctx, "demander_plan", None) is None:
+            return False
+        t = routeur.normaliser(demande).strip()
+        if not _imperatif(demande) or SAVOIR.search(t) or not PLAN_ACTION.search(t + " "):
+            return False  # question ou simple lecture : pas de plan
+        return mode == "toujours" or demande_complexe(demande)
+
+    def _plan(self, demande: str) -> list[str] | bool | None:
+        """None : pas de plan (on agit directement). False : refusé. Liste : plan validé à suivre."""
+        if not self.plan_voulu(demande):
+            return None
+        ctx = self.ctx
+        etapes = self._proposer_plan(demande)
+        if len(etapes) < PLAN_ETAPES_MIN:
+            return None  # plan court : rien à valider, on agit
+        for essai in range(2):
+            ctx.verifier_arret()
+            ident = uuid.uuid4().hex[:12]
+            ctx.emettre("plan_propose", id=ident, demande=demande, etapes=etapes)
+            ctx.journal.ecrire("plan_propose", id=ident, etapes=etapes)
+            try:
+                decision, correction = ctx.demander_plan(ident, etapes)
+            except Exception:  # noqa: BLE001 - interface en défaut : on ne fait rien plutôt que d'agir à l'aveugle
+                decision, correction = "refuser", ""
+            decision = str(decision or "").lower()
+            ctx.journal.ecrire("plan_decision", id=ident, decision=decision, correction=str(correction or "")[:300])
+            ctx.verifier_arret()
+            if decision.startswith("accept"):
+                return etapes
+            if decision.startswith("corrig") and str(correction or "").strip():
+                if essai == 0:
+                    nouvelles = self._proposer_plan(demande, etapes, str(correction).strip())
+                    etapes = nouvelles or etapes
+                    continue
+                # Seconde correction : on suit le dernier plan en tenant compte de la remarque.
+                return etapes + [f"(Remarque de l'utilisateur : {str(correction).strip()})"]
+            return False
+        return False
+
+    def _proposer_plan(self, demande: str, precedent: list[str] | None = None, correction: str = "") -> list[str]:
+        ctx = self.ctx
+        contenu = demande
+        if precedent:
+            contenu += ("\n\nPlan précédent :\n" + "\n".join(f"{i}. {e}" for i, e in enumerate(precedent, 1))
+                        + f"\n\nCorrection demandée par l'utilisateur : {correction}\nRefais le plan en en tenant compte.")
+        messages = [{"role": "system", "content": CONSIGNE_PLAN.format(n=PLAN_ETAPES_MAX)},
+                    {"role": "user", "content": contenu}]
+        rep = ctx.ollama.discuter(ctx.config.modeles["agent"], messages, None, reflexion=False,
+                                  options={"num_predict": 300, "temperature": 0})
+        return lire_plan(rep.texte)
+
+    def _boucle(self, demande: str, trace: list, plan: list[str] | None = None) -> str:
         ctx = self.ctx
         cfg = ctx.config
         noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
@@ -187,8 +282,12 @@ class Orchestrateur:
 
         memoire = ctx.service("memoire")
         souvenirs = memoire.pertinents(demande) if memoire else []
+        valide = ""
+        if plan:
+            valide = ("\n\nPlan validé par l'utilisateur :\n" + "\n".join(f"{i}. {e}" for i, e in enumerate(plan, 1))
+                      + "\nSuis-le.")
         messages = [{"role": "system", "content": consignes.construire()}, *self.historique,
-                    {"role": "user", "content": f"{demande}\n\n{consignes.contexte(souvenirs, demande=demande)}"}]
+                    {"role": "user", "content": f"{demande}{valide}\n\n{consignes.contexte(souvenirs, demande=demande)}"}]
         reflexion = any(m in routeur.normaliser(demande) for m in MOTS_REFLEXION) or len(demande.split()) > 40
         imperatif = _imperatif(demande)
         modele = cfg.modeles["agent"]
@@ -311,16 +410,129 @@ class Orchestrateur:
     # --- Compétences ----------------------------------------------------------
 
     def _proposer_competence(self, demande: str, trace: list) -> None:
-        seuil = int(self.ctx.config.agent.get("competence_apres_actions", 3))
+        """Garde la dernière tâche réussie (pour « crée une compétence ») mais ne PROPOSE une compétence que si elle
+        vaut la peine : même genre de tâche réussi au moins deux fois récemment, au moins N actions (hors simples
+        observations), et aucune compétence existante qui fait déjà la même suite d'outils."""
+        ctx = self.ctx
+        seuil = int(ctx.config.agent.get("competence_apres_actions", 3))
         utiles = [t for t in trace if not t.get("direct")]
-        if (len(utiles) >= seuil and all(t["ok"] for t in utiles)
-                and not any(t["outil"].startswith("competence_") for t in utiles)):
+        reussie = (utiles and all(t["ok"] for t in utiles)
+                   and not any(t["outil"].startswith("competence_") or t["outil"] == "creer_competence"
+                               for t in utiles))
+        actions = [t for t in utiles if t["outil"] not in OBSERVATION]
+        if reussie and len(utiles) >= seuil:
             self.derniere_trace = {"demande": demande, "actions": utiles}
-            self.ctx.services["derniere_trace"] = self.derniere_trace
-            self.ctx.emettre("proposition_competence", demande=demande, nb_actions=len(utiles))
+            ctx.services["derniere_trace"] = self.derniere_trace
         elif any(t["outil"] != "creer_competence" for t in trace):
             self.derniere_trace = None
-            self.ctx.services["derniere_trace"] = None
+            ctx.services["derniere_trace"] = None
+        if not reussie or not actions or ctx.services.get("tache_planifiee"):
+            return
+        signature = signature_trace(demande, utiles)
+        fois = 1 + sum(1 for t in self._traces_reussies() if traces_similaires(signature, t))
+        self._retenir_trace(demande, signature)
+        if len(actions) < seuil or fois < 2 or self._competence_similaire(signature["outils"]):
+            return
+        ctx.emettre("proposition_competence", demande=demande, nb_actions=len(utiles),
+                    raison=f"Tu as fait cette tâche {fois} fois")
+
+    def proposer_depuis_demonstration(self, etapes, demande: str = "") -> bool:
+        """Fin d'une démonstration (« regarde comment je fais ») : propose d'en faire une compétence.
+        `etapes` : [{"outil": nom, "arguments": {...}}, …] (comme une trace de l'agent), ou directement la recette
+        de demonstration.recette() ({"etapes": [...], "description": ...}). Les phrases (str) sont ignorées.
+        Renvoie True si proposé."""
+        if isinstance(etapes, dict):
+            demande = demande or str(etapes.get("description") or "")
+            etapes = etapes.get("etapes") or []
+        actions = [{"outil": str(e["outil"]), "arguments": dict(e.get("arguments") or {}), "ok": True,
+                    "cles": list(e.get("cles") or [])}
+                   for e in etapes or [] if isinstance(e, dict) and e.get("outil")]
+        if not actions:
+            return False
+        demande = demande or "tâche montrée par l'utilisateur"
+        self.derniere_trace = {"demande": demande, "actions": actions}
+        self.ctx.services["derniere_trace"] = self.derniere_trace
+        if self._competence_similaire(signature_trace(demande, actions)["outils"]):
+            return False
+        self.ctx.emettre("proposition_competence", demande=demande, nb_actions=len(actions),
+                         raison="Tu viens de me montrer comment faire")
+        return True
+
+    def _fichier_traces(self):
+        return self.ctx.config.chemin("traces_reussies.json")
+
+    def _traces_reussies(self) -> list[dict]:
+        try:
+            d = json.loads(self._fichier_traces().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        limite = time.time() - TRACES_RECENTES_S
+        return [t for t in d if isinstance(t, dict) and t.get("quand", 0) >= limite] if isinstance(d, list) else []
+
+    def _retenir_trace(self, demande: str, signature: dict) -> None:
+        traces = self._traces_reussies() + [{**signature, "demande": _couper(demande, 200), "quand": time.time()}]
+        try:
+            f = self._fichier_traces()
+            f.parent.mkdir(parents=True, exist_ok=True)
+            temp = f.with_name(f.name + ".tmp")
+            temp.write_text(json.dumps(traces[-TRACES_MAX:], ensure_ascii=False), encoding="utf-8")
+            temp.replace(f)
+        except OSError:
+            pass
+
+    def _competence_similaire(self, outils: list[str]) -> bool:
+        biblio = self.ctx.service("competences")
+        for c in (getattr(biblio, "competences", None) or {}).values():
+            etapes = [e.get("outil", "") for e in getattr(c, "etapes", []) if isinstance(e, dict)]
+            if suite_outils(etapes) == outils:
+                return True
+        return False
+
+
+def demande_complexe(demande: str) -> bool:
+    """Plusieurs étapes probables : liaison (« et », « puis », virgule, « ensuite »…) ou plus de 12 mots."""
+    t = " " + routeur.normaliser(demande).strip() + " "
+    return bool(PLAN_LIAISONS.search(t)) or len(demande.split()) > PLAN_MOTS_MAX
+
+
+def lire_plan(texte: str) -> list[str]:
+    """Étapes d'un plan numéroté (au plus 6) ; lignes sans numéro ignorées dès qu'il y a une liste."""
+    texte = re.sub(r"<think>.*?</think>", "", texte or "", flags=re.S)
+    etapes = []
+    for ligne in texte.splitlines():
+        m = ETAPE_PLAN.match(ligne)
+        if m and (e := m.group(1).strip(" *_`")):
+            etapes.append(e[:200])
+    return etapes[:PLAN_ETAPES_MAX]
+
+
+def suite_outils(noms: list[str]) -> list[str]:
+    """Suite des outils qui agissent (observations retirées, répétitions consécutives fusionnées)."""
+    sortie: list[str] = []
+    for n in noms:
+        if n not in OBSERVATION and (not sortie or sortie[-1] != n):
+            sortie.append(n)
+    return sortie
+
+
+def mots_demande(demande: str) -> list[str]:
+    mots = re.findall(r"[a-z0-9']+", routeur.normaliser(demande))
+    return sorted({m for m in mots if m not in MOTS_VIDES and len(m) > 2 and not m.isdigit()})
+
+
+def signature_trace(demande: str, actions: list[dict]) -> dict:
+    return {"outils": suite_outils([a["outil"] for a in actions]), "mots": mots_demande(demande)}
+
+
+def traces_similaires(a: dict, b: dict) -> bool:
+    """Même genre de tâche : même suite d'outils, et des mots de la demande en commun."""
+    if not a.get("outils") or a.get("outils") != b.get("outils"):
+        return False
+    ma, mb = set(a.get("mots") or []), set(b.get("mots") or [])
+    if not ma or not mb:
+        return True
+    commun = ma & mb
+    return len(commun) >= 2 or len(commun) / len(ma | mb) >= 0.25
 
 
 def preparer(o: Outil, args) -> tuple[dict, str]:

@@ -35,8 +35,10 @@ contexte = 8192
 # "equilibre" (recommandé), "prudent" ou "autonome"
 autonomie = "equilibre"
 etapes_max = 10
-# Proposer de créer une compétence après une tâche réussie d'au moins N actions.
+# Proposer une compétence quand une même tâche d'au moins N actions a réussi deux fois (ou après une démonstration).
 competence_apres_actions = 3
+# Montrer le plan avant d'agir : "complexe" (demandes en plusieurs étapes), "toujours" ou "jamais".
+plan = "complexe"
 
 [recherche]
 # Dossiers indexés (~ = dossier personnel).
@@ -56,6 +58,14 @@ application = "Google Chrome"
 [diagnostic]
 # Accès de diagnostic pour les essais (outils en lecture seule via le serveur local). Laisser à false.
 actif = false
+
+[alertes]
+# Alertes discrètes vérifiées chaque minute, sans modèle (au plus une fois par heure chacune).
+batterie = true
+memoire = true
+disque = true
+rendez_vous = true
+telechargements = true
 
 [voix]
 # "ecrit" ou "oral" (modifiable depuis le panneau).
@@ -78,6 +88,7 @@ class Config:
     voix: dict = field(default_factory=dict)
     mcp: list = field(default_factory=list)
     diagnostic: dict = field(default_factory=dict)
+    alertes: dict = field(default_factory=dict)
 
     @property
     def fichier(self) -> Path:
@@ -100,5 +111,5 @@ def charger(dossier: Path | None = None) -> Config:
         print(f"macai.toml invalide ({e}) : valeurs par défaut utilisées.", file=sys.stderr)
         perso = {}
     sections = {k: {**defaut.get(k, {}), **perso.get(k, {})}
-                for k in ("modeles", "agent", "recherche", "chrome", "voix", "diagnostic")}
+                for k in ("modeles", "agent", "recherche", "chrome", "voix", "diagnostic", "alertes")}
     return Config(donnees=dossier, mcp=perso.get("mcp", []), **sections)

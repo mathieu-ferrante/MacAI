@@ -341,3 +341,59 @@ class Planificateur:
             finally:
                 self.verrou.release()
         return lancees
+
+
+# --- Briefing du matin (réglé depuis le panneau : une tâche quotidienne étiquetée « briefing ») -----------
+
+BRIEFING_ETIQUETTE = "briefing"
+BRIEFING_DEMANDE = ("Fais mon briefing du matin : mon agenda d'aujourd'hui, mes mails non lus importants résumés "
+                    "en 3 lignes, et mes rappels du jour.")
+BRIEFING_HEURE = "08:00"
+
+
+def fichier_taches(source) -> Path:
+    """taches.json à partir d'une Config (`.chemin`), d'une Application (`.cfg`) ou d'un chemin de fichier."""
+    if hasattr(source, "cfg"):
+        source = source.cfg
+    if hasattr(source, "chemin"):
+        return Path(source.chemin("taches.json"))
+    return Path(source)
+
+
+def _briefing(taches: list[dict]) -> dict | None:
+    return next((t for t in taches if t.get("etiquette") == BRIEFING_ETIQUETTE), None)
+
+
+def briefing_etat(source) -> dict:
+    """{"actif": bool, "heure": "HH:MM"} (heure par défaut quand aucun briefing n'est programmé)."""
+    t = _briefing(charger(fichier_taches(source)))
+    if t is None:
+        return {"actif": False, "heure": BRIEFING_HEURE}
+    return {"actif": bool(t.get("active", True)), "heure": t.get("heure") or BRIEFING_HEURE}
+
+
+def regler_briefing(source, actif: bool, heure: str = BRIEFING_HEURE, maintenant: datetime | None = None) -> dict:
+    """Active (crée ou met à jour l'heure) ou désactive (supprime) le briefing quotidien. ValueError si l'heure est
+    illisible. Renvoie le nouvel état, comme briefing_etat."""
+    fichier = fichier_taches(source)
+    with _VERROU:
+        taches = charger(fichier)
+        existant = _briefing(taches)
+        if not actif:
+            if existant is not None:
+                sauver(fichier, [t for t in taches if t is not existant])
+            return {"actif": False, "heure": (existant or {}).get("heure") or BRIEFING_HEURE}
+        heure = lire_heure(heure or BRIEFING_HEURE)
+        if existant is None:
+            tache = creer(BRIEFING_DEMANDE, "quotidien", heure, maintenant=maintenant)
+            tache["etiquette"] = BRIEFING_ETIQUETTE
+            taches.append(tache)
+        else:
+            if existant.get("heure") != heure:
+                # Nouvelle heure : on repart de maintenant (pas de rattrapage d'une heure qu'on vient de choisir).
+                existant["derniere_execution"] = (maintenant or datetime.now()).isoformat(timespec="seconds")
+            existant.update(demande=BRIEFING_DEMANDE, frequence="quotidien", heure=heure, jour="", date="",
+                            active=True)
+            existant["description"] = decrire(existant)
+        sauver(fichier, taches)
+    return {"actif": True, "heure": heure}
