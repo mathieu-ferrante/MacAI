@@ -123,3 +123,27 @@ déverrouillé, et accepte « codesign veut utiliser la clé MacAI Local » (mot
 | « tous les matins à 8h, fais-moi un résumé de mes mails et de mon agenda » | tâche visible dans 🧠 > Tâches planifiées ; notification le lendemain à 8 h |
 | « quels sont les horaires de la poste de Toulon ? » | horaires lus sur le site de La Poste, avec la source |
 | `macai banc --scenarios` | 50/50 (dernier passage : 50/50 après corrections) |
+
+## Nouveautés du 16/10 (2e série) à essayer après `./installer.sh`
+
+| Essai | Attendu |
+|---|---|
+| Menu 🧠 > Réponses > Orales, puis ⌥⇧Espace : « quelle heure est-il » | réponse lue à voix haute |
+| Menu 🧠 > Conversation vocale, poser une question à la voix | après la réponse, MacAI réécoute seul ; « merci » termine |
+| « mets ~/Desktop/x.txt à la corbeille » en mode oral | « … Tu confirmes ? » : répondre « oui » à la voix |
+| ⌥⇧T > Écouter sur un article | lecture à voix haute, Échap pour arrêter |
+| « dans TextEdit, ouvre un nouveau document, écris un titre puis exporte en PDF » | carte « Voici ce que je vais faire » (plan), Valider, puis exécution sans autre question |
+| Menu 🧠 > Alertes | notifications batterie < 20 %, mémoire saturée, disque, rendez-vous dans 15 min, téléchargement fini |
+| Menu 🧠 > Briefing du matin (heure au choix) | notification chaque matin avec agenda, mails, rappels |
+| « trie mes mails » | groupes À traiter / À lire / Notifications / Pubs ; rien n'est supprimé |
+| « retrouve le mail où … parlait de … » | le bon mail, ouvrable (après indexation, Mac branché) |
+| « combien j'ai dépensé en essence ce mois-ci ? » | total et lignes trouvées dans les factures indexées |
+| « classe les papiers de mes téléchargements » (ou menu 🧠 > Classer automatiquement) | factures, impôts… renommés et rangés dans Documents/Administratif ; « annule » les remet |
+| « comment on fait pour exporter en PDF dans TextEdit ? » | chemin du menu, et l'endroit surligné à l'écran |
+| Menu 🧠 > Enregistrer une démonstration, faire une tâche, Terminer | étapes affichées ; MacAI propose d'en faire une compétence |
+| Refaire deux fois la même tâche en 3 étapes | la 2e fois seulement, proposition de compétence |
+| « quelles compétences toutes prêtes tu proposes ? » | recettes ArtCraft (conversion JPG/PNG, logo texte, import LightCraft…) |
+| Une tâche dans EffectCraft | plus de confirmation à chaque étape (seulement pour supprimer, envoyer, écraser un fichier) |
+
+Banc : `macai banc --scenarios` → 62 scénarios (dernier passage : 60/62, les 2 échecs corrigés et revérifiés).
+Mémoire mesurée : 32 % de la RAM utilisée au repos, MacAI ≈ 49 Mo (app 18 + moteur 20 + Ollama 11).
