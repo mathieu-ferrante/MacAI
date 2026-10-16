@@ -6,8 +6,11 @@ import SwiftUI
 final class Indicateur: NSPanel {
     private var generation = 0   // un masquage différé ancien ne cache pas un message plus récent
     private let hote = NSHostingView(rootView: VueIndicateur(texte: "", symbole: "mic.fill", couleur: .red))
+    /// 0 : indicateur principal ; 1 : juste en dessous (démonstration en cours, permanent).
+    private let rang: Int
 
-    init() {
+    init(rang: Int = 0) {
+        self.rang = rang
         super.init(contentRect: NSRect(x: 0, y: 0, width: 200, height: 36),
                    styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
         isFloatingPanel = true
@@ -35,7 +38,7 @@ final class Indicateur: NSPanel {
         let souris = NSEvent.mouseLocation
         let ecran = NSScreen.screens.first { NSMouseInRect(souris, $0.frame, false) } ?? NSScreen.main
         if let f = ecran?.visibleFrame {
-            setFrame(NSRect(x: f.midX - largeur / 2, y: f.maxY - taille.height - 10, width: largeur, height: taille.height),
+            setFrame(NSRect(x: f.midX - largeur / 2, y: f.maxY - taille.height - 10 - CGFloat(rang) * 46, width: largeur, height: taille.height),
                      display: true)
         }
         orderFrontRegardless()  // sans activer MacAI

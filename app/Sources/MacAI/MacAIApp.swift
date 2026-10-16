@@ -25,6 +25,7 @@ final class Delegue: NSObject, NSApplicationDelegate {
     lazy var indicateur = Indicateur()
     lazy var actions = Actions(etat: etat, panneau: panneau, indicateur: indicateur)
     let notifications = Notifications()
+    let surlignage = Surlignage()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Delegue.partage = self
@@ -40,6 +41,8 @@ final class Delegue: NSObject, NSApplicationDelegate {
         raccourcis.surFinParole = { [weak self] in self?.etat.finirEcoute() }
         raccourcis.surDebutTouche = { [weak self] in self?.actions.debutToucheMaintenue() }
         raccourcis.surFinTouche = { [weak self] in self?.actions.finToucheMaintenue() }
+        raccourcis.surAppuiTouche = { [weak self] in self?.etat.voix.taire() }
+        raccourcis.surEchap = { [weak self] in self?.etat.echap() }
         raccourcis.surTexte = { [weak self] in self?.actions.menuTexte() }
         raccourcis.surZone = { [weak self] in self?.actions.regarderZone() }
         raccourcis.installer()
@@ -51,12 +54,25 @@ final class Delegue: NSObject, NSApplicationDelegate {
         etat.surTacheTerminee = { [weak self] description, texte, ok in
             self?.notifications.publier(description: description, texte: texte, ok: ok)
         }
+        // Alertes du moteur (batterie, mémoire, disque, rendez-vous, téléchargements) : notification macOS.
+        etat.surAlerte = { [weak self] titre, texte, _ in
+            self?.notifications.publier(description: titre, texte: texte, ok: true)
+        }
+        etat.surSurligner = { [weak self] zone, texte in self?.surlignage.montrer(zone, texte: texte) }
+        // Plan à valider : le panneau doit être visible (sans lever une fermeture par Échap).
+        etat.surPlan = { [weak self] in
+            guard let self, !self.panneau.isVisible else { return }
+            self.panneau.montrer(auto: true)
+        }
+        etat.panneauVisible = { [weak self] in self?.panneau.isVisible ?? false }
+        _ = actions  // branche les retours de l'état (lecture, écoute automatique, démonstration) dès le lancement
         // Liste des tâches planifiées rafraîchie à l'ouverture d'un menu (dont le menu 🧠).
         NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil,
                                                queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.etat.connecte else { return }
                 Task { await self.etat.rafraichirTaches() }
+                Task { await self.etat.chargerReglages() }
             }
         }
         // Démarrage automatique à l'ouverture de session.
@@ -122,7 +138,14 @@ struct MenuMacAI: View {
         if roleFn != "parler" { Text("Dicter : \(nomTouche) maintenue") }
         Text("Texte sélectionné : ⌥⇧T")
         Text("Zone de l'écran : ⌥⇧S")
-        Toggle("Réponses à l'oral", isOn: $etat.modeOral)
+        Menu("Réponses") {
+            ForEach(ModeReponses.allCases, id: \.self) { m in
+                Toggle(m.titre, isOn: Binding(get: { etat.modeReponses == m }, set: { if $0 { etat.modeReponses = m } }))
+            }
+            Divider()
+            Toggle("Conversation vocale", isOn: $etat.conversationVocale)
+                .disabled(!etat.modeReponses.oral)
+        }
         Menu("Touche \(nomTouche) maintenue") {
             Toggle("Dicter dans l'application", isOn: Binding(get: { roleFn != "parler" },
                                                                set: { if $0 { roleFn = "dicter" } }))
@@ -132,6 +155,12 @@ struct MenuMacAI: View {
             Toggle("Utiliser Option droite au lieu de Fn", isOn: Binding(get: { touche == "option_droite" },
                                                                           set: { touche = $0 ? "option_droite" : "fn" }))
         }
+        Divider()
+        reglagesMoteur
+        Button(etat.demonstrationEnCours ? "Terminer la démonstration…" : "Enregistrer une démonstration") {
+            Delegue.partage?.actions.basculerDemonstration()
+        }
+        .disabled(!etat.connecte)
         Divider()
         Button("Indexer mes fichiers maintenant") { Task { await etat.client.envoyer("/indexer") } }
         Button("Ouvrir les réglages (macai.toml)") {
@@ -146,4 +175,34 @@ struct MenuMacAI: View {
     }
 
     private var nomTouche: String { touche == "option_droite" ? "Option droite" : "Fn" }
+
+    /// Réglages du moteur (relus à l'ouverture du menu) ; grisés tant qu'ils ne sont pas connus.
+    @ViewBuilder private var reglagesMoteur: some View {
+        let connus = etat.connecte && etat.reglages != nil
+        Menu("Montrer le plan avant d'agir") {
+            ForEach([("complexe", "Pour les tâches en plusieurs étapes"), ("toujours", "Toujours"), ("jamais", "Jamais")],
+                    id: \.0) { valeur, titre in
+                Toggle(titre, isOn: Binding(get: { (etat.reglages?.plan ?? "complexe") == valeur },
+                                            set: { if $0 { etat.changerPlan(valeur) } }))
+            }
+        }
+        .disabled(!connus)
+        Menu("Alertes") {
+            ForEach(Reglages.alertes, id: \.0) { cle, titre in
+                Toggle(titre, isOn: Binding(get: { etat.reglages?.alertes[cle] ?? false },
+                                            set: { etat.changerAlerte(cle, $0) }))
+            }
+        }
+        .disabled(!connus)
+        Toggle("Briefing du matin", isOn: Binding(get: { etat.reglages?.briefingActif ?? false },
+                                                  set: { etat.changerBriefing(actif: $0) }))
+            .disabled(!connus)
+        Button("Heure du briefing… (\(etat.reglages?.briefingHeure ?? "--:--"))") {
+            Delegue.partage?.actions.demanderHeureBriefing()
+        }
+        .disabled(!connus)
+        Toggle("Classer automatiquement les téléchargements",
+               isOn: Binding(get: { etat.reglages?.classement ?? false }, set: { etat.changerClassement($0) }))
+            .disabled(!connus)
+    }
 }

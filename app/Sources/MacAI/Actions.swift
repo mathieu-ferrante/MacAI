@@ -13,6 +13,10 @@ final class Actions {
     private var roleEnCours: String?       // rôle de la touche maintenue au moment de l'appui
     private var appPrecedente: NSRunningApplication?
     private var cibleMenu: CibleMenu?      // NSMenuItem.target est faible : on la garde
+    private var indicateurEcoute = false   // l'indicateur montre l'écoute automatique
+    private var indicateurLecture = false  // l'indicateur montre « Lecture… »
+    /// Indicateur permanent sous le principal : « Démonstration en cours ».
+    private lazy var indicateurDemonstration = Indicateur(rang: 1)
 
     init(etat: Etat, panneau: Panneau, indicateur: Indicateur) {
         self.etat = etat
@@ -21,6 +25,50 @@ final class Actions {
         etat.surConsigne = { [weak self] attente, consigne in self?.consigneRecue(attente, consigne) }
         etat.surFinDiscrete = { [weak self] ok, message in
             if ok { self?.indicateur.reussite(message) } else { self?.indicateur.erreur(message) }
+        }
+        etat.surMessage = { [weak self] ok, message in
+            if ok { self?.indicateur.reussite(message) } else { self?.indicateur.erreur(message) }
+        }
+        etat.surLecture = { [weak self] texte in self?.lire(texte) }
+        etat.surSuivi = { [weak self] texte in self?.montrerEcoute(texte) }
+        etat.surDemonstration = { [weak self] enCours in self?.montrerDemonstration(enCours) }
+    }
+
+    // MARK: - Voix : indicateurs
+
+    /// Écoute automatique (conversation, oui / non) : « Je t'écoute… » puis ce qui est entendu.
+    private func montrerEcoute(_ texte: String?) {
+        if let texte {
+            indicateurEcoute = true
+            indicateurLecture = false
+            indicateur.montrer(texte, symbole: "mic.fill", couleur: .red)
+        } else if indicateurEcoute {
+            indicateurEcoute = false
+            indicateur.masquer()
+        }
+    }
+
+    /// « Écouter » (⌥⇧T) : le texte sélectionné est lu ; Échap ou la touche pour parler l'arrêtent.
+    private func lire(_ texte: String) {
+        guard !texte.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            indicateur.erreur("Rien à lire.")
+            return
+        }
+        indicateurLecture = true
+        indicateurEcoute = false
+        indicateur.montrer("Lecture…  (Échap pour arrêter)", symbole: "speaker.wave.2.fill")
+        etat.voix.parler(texte, limite: 20_000) { [weak self] _ in
+            guard let self, self.indicateurLecture else { return }
+            self.indicateurLecture = false
+            self.indicateur.masquer()
+        }
+    }
+
+    private func montrerDemonstration(_ enCours: Bool) {
+        if enCours {
+            indicateurDemonstration.montrer("Démonstration en cours", symbole: "record.circle", couleur: .red)
+        } else {
+            indicateurDemonstration.masquer()
         }
     }
 
@@ -95,6 +143,7 @@ final class Actions {
         }
         elements.insert(.separateur, at: 3)
         elements.append(.separateur)
+        elements.append(.choix("Écouter") { [weak self] in self?.lancerLecture() })
         elements.append(.choix("Autre consigne…") { [weak self] in self?.demanderConsigneTexte() })
         _ = ouvrirMenu("Texte sélectionné", elements)
     }
@@ -115,6 +164,20 @@ final class Actions {
             } else {
                 panneau.montrer()
             }
+        }
+    }
+
+    /// « Écouter » : le moteur renvoie la sélection telle quelle (sans modèle), l'app la lit à voix haute.
+    /// Pas de panneau : l'application de l'utilisateur reste devant.
+    private func lancerLecture() {
+        Task {
+            if let erreur = await etat.lancer("/texte", ["action": "lire", "sortie": "afficher"],
+                                              libelle: "Écouter le texte sélectionné", discret: "", lire: true) {
+                indicateur.erreur(erreur)
+                return
+            }
+            // La fin a pu arriver pendant la requête (la lecture a alors déjà commencé).
+            if etat.occupe { indicateur.montrer("Lecture…", symbole: "speaker.wave.2.fill", duree: 15) }
         }
     }
 
@@ -252,6 +315,84 @@ final class Actions {
             } else {
                 indicateur.reussite("Tâche supprimée")
             }
+        }
+    }
+
+    /// Heure du briefing du matin (HH:MM).
+    func demanderHeureBriefing() {
+        guard let r = etat.reglages else {
+            indicateur.erreur("MacAI n'est pas encore prêt.")
+            return
+        }
+        NSApp.activate()
+        let alerte = NSAlert()
+        alerte.messageText = "Heure du briefing du matin"
+        alerte.informativeText = "Format HH:MM, par exemple 08:30."
+        let champ = NSTextField(string: r.briefingHeure)
+        champ.frame = NSRect(x: 0, y: 0, width: 120, height: 24)
+        alerte.accessoryView = champ
+        alerte.window.initialFirstResponder = champ
+        alerte.addButton(withTitle: "Enregistrer")
+        alerte.addButton(withTitle: "Annuler")
+        guard alerte.runModal() == .alertFirstButtonReturn else { return }
+        let saisie = champ.stringValue.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "h", with: ":")
+        let parties = saisie.split(separator: ":", omittingEmptySubsequences: false)
+        guard parties.count <= 2, let h = Int(parties[0]), (0...23).contains(h),
+              let m = parties.count == 2 ? (parties[1].isEmpty ? 0 : Int(parties[1])) : 0, (0...59).contains(m) else {
+            indicateur.erreur("Heure invalide : « \(champ.stringValue) » (format HH:MM).")
+            return
+        }
+        let heure = String(format: "%02d:%02d", h, m)
+        etat.changerBriefing(heure: heure)
+        indicateur.reussite("Briefing à \(heure)")
+    }
+
+    /// Démonstration : début, ou fin avec le nom de la compétence ; le résultat s'affiche dans le panneau.
+    func basculerDemonstration() {
+        guard etat.connecte else {
+            indicateur.erreur("MacAI n'est pas encore prêt.")
+            return
+        }
+        guard etat.demonstrationEnCours else {
+            Task {
+                let (ok, texte) = await etat.debuterDemonstration()
+                if ok {
+                    indicateur.montrer(texte, symbole: "record.circle", couleur: .red, duree: 5)
+                } else {
+                    indicateur.erreur(texte)
+                }
+            }
+            return
+        }
+        NSApp.activate()
+        let alerte = NSAlert()
+        alerte.messageText = "Terminer la démonstration"
+        alerte.informativeText = "Quel nom donner à cette démonstration ? (ex. : exporter le devis en PDF)"
+        let champ = NSTextField(string: "")
+        champ.placeholderString = "Nom"
+        champ.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+        alerte.accessoryView = champ
+        alerte.window.initialFirstResponder = champ
+        alerte.addButton(withTitle: "Enregistrer")
+        alerte.addButton(withTitle: "Continuer la démonstration")
+        guard alerte.runModal() == .alertFirstButtonReturn else { return }
+        let nom = champ.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !nom.isEmpty else {
+            indicateur.erreur("Donne un nom à la démonstration (elle continue).")
+            return
+        }
+        Task {
+            let (ok, texte, etapes) = await etat.finirDemonstration(nom)
+            guard ok || !texte.isEmpty else {
+                indicateur.erreur("La démonstration n'a pas pu être enregistrée.")
+                return
+            }
+            var resultat = texte
+            if !etapes.isEmpty {
+                resultat += (resultat.isEmpty ? "" : "\n\n")
+                    + etapes.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+            }
+            afficherResultatTache("Démonstration « \(nom) »", resultat)
         }
     }
 

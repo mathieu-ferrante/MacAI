@@ -27,6 +27,10 @@ final class Raccourcis {
     /// Touche maintenue (Fn ou Option droite) : son rôle (dicter ou parler) est choisi par l'appelant.
     var surDebutTouche: (@MainActor () -> Void)?
     var surFinTouche: (@MainActor () -> Void)?
+    /// Appui (même bref) sur la touche pour parler : la voix de MacAI se tait tout de suite.
+    var surAppuiTouche: (@MainActor () -> Void)?
+    /// Échap, dans n'importe quelle application : coupe la voix ou l'écoute automatique.
+    var surEchap: (@MainActor () -> Void)?
     var surTexte: (@MainActor () -> Void)?
     var surZone: (@MainActor () -> Void)?
 
@@ -81,6 +85,7 @@ final class Raccourcis {
             // La répétition automatique du clavier renvoie des « appuis » : on n'écoute qu'une fois.
             guard !paroleRaccourciEnCours else { return }
             paroleRaccourciEnCours = true
+            surAppuiTouche?()
             surDebutParole?()
         case (Raccourcis.idParole, false):
             guard paroleRaccourciEnCours else { return }
@@ -103,10 +108,14 @@ final class Raccourcis {
             MainActor.assumeIsolated { self?.changementModificateurs(e) }
         }
         // Une vraie touche frappée pendant l'appui (Fn + flèche, Fn + Effacer, Option droite pour { } [ ]
-        // sur clavier français) : ce n'est pas une prise de parole. Seul le fait qu'une touche soit frappée
-        // compte, rien n'est lu ni gardé.
-        let touche: (NSEvent) -> Void = { [weak self] _ in
-            MainActor.assumeIsolated { self?.toucheFrappee() }
+        // sur clavier français) : ce n'est pas une prise de parole. Seuls comptent le fait qu'une touche soit
+        // frappée et s'il s'agit d'Échap (qui coupe la voix) ; rien n'est lu ni gardé.
+        let touche: (NSEvent) -> Void = { [weak self] e in
+            let echap = e.keyCode == UInt16(kVK_Escape)
+            MainActor.assumeIsolated {
+                if echap { self?.surEchap?() }
+                self?.toucheFrappee()
+            }
         }
         // Surveillance globale : nécessite l'autorisation Accessibilité (demandée au premier lancement).
         installerMoniteursGlobaux(traiter, touche)
@@ -160,6 +169,7 @@ final class Raccourcis {
             return
         }
         if enfoncee {
+            surAppuiTouche?()
             minuterie?.invalidate()
             appuiDepuis = Date()
             // Appui maintenu 0,3 s : on commence à écouter (un appui bref garde son rôle habituel).

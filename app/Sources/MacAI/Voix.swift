@@ -3,7 +3,8 @@ import Foundation
 import Speech
 
 /// Voix 100 % locale : transcription Apple SpeechAnalyzer (macOS 26+) et synthèse AVSpeechSynthesizer.
-/// Le micro n'est ouvert que pendant l'appui sur la touche ; rien ne reste chargé ensuite.
+/// Le micro n'est ouvert que pendant l'appui sur la touche, ou quelques secondes après une réponse dite
+/// (conversation vocale, confirmation à voix haute) ; rien ne reste chargé ensuite.
 @MainActor
 final class Voix: NSObject {
     private let synthese = AVSpeechSynthesizer()
@@ -166,23 +167,104 @@ final class Voix: NSObject {
 
     // MARK: - Synthèse
 
-    private lazy var voixFrancaise: AVSpeechSynthesisVoice? = {
-        let voix = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("fr") }
-        // Préférence : voix premium, puis améliorée, puis la voix par défaut.
-        return voix.first { $0.quality == .premium } ?? voix.first { $0.quality == .enhanced }
-            ?? AVSpeechSynthesisVoice(language: "fr-FR")
-    }()
+    private var finParole: (@MainActor (Bool) -> Void)?
+    private var derniereReplique: ObjectIdentifier?
 
-    func parler(_ texte: String) {
-        let propre = texte.replacingOccurrences(of: "*", with: "").replacingOccurrences(of: "#", with: "")
-        let phrase = AVSpeechUtterance(string: String(propre.prefix(600)))
-        phrase.voice = voixFrancaise
-        phrase.rate = 0.52
-        synthese.stopSpeaking(at: .immediate)
-        synthese.speak(phrase)
+    override init() {
+        super.init()
+        synthese.delegate = self
     }
 
+    /// Une lecture est en cours (ou en file d'attente).
+    var parle: Bool { finParole != nil || synthese.isSpeaking }
+
+    private lazy var voixFrancaise: AVSpeechSynthesisVoice? = {
+        let voix = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("fr") }
+        // Préférence : voix premium, puis améliorée, puis la voix par défaut ; français de France d'abord.
+        func meilleure(_ q: AVSpeechSynthesisVoiceQuality) -> AVSpeechSynthesisVoice? {
+            voix.first { $0.quality == q && $0.language == "fr-FR" } ?? voix.first { $0.quality == q }
+        }
+        return meilleure(.premium) ?? meilleure(.enhanced) ?? AVSpeechSynthesisVoice(language: "fr-FR")
+    }()
+
+    /// Lit `texte` phrase par phrase (Markdown et adresses retirés, `limite` caractères au plus).
+    /// `fin(true)` : lecture allée jusqu'au bout ; `fin(false)` : interrompue (taire(), nouvelle lecture).
+    func parler(_ texte: String, limite: Int = 1500, fin: (@MainActor (Bool) -> Void)? = nil) {
+        taire()
+        let phrases = Voix.phrasesAParler(texte, limite: limite)
+        guard !phrases.isEmpty else {
+            fin?(true)
+            return
+        }
+        finParole = fin
+        for p in phrases {
+            let replique = AVSpeechUtterance(string: p)
+            replique.voice = voixFrancaise
+            replique.rate = 0.52
+            derniereReplique = ObjectIdentifier(replique)
+            synthese.speak(replique)
+        }
+    }
+
+    /// Coupe la voix tout de suite (Échap, touche pour parler, nouvelle demande).
     func taire() {
+        let fin = finParole
+        finParole = nil
+        derniereReplique = nil
         synthese.stopSpeaking(at: .immediate)
+        fin?(false)
+    }
+
+    private func repliqueFinie(_ id: ObjectIdentifier) {
+        guard id == derniereReplique else { return }
+        derniereReplique = nil
+        let fin = finParole
+        finParole = nil
+        fin?(true)
+    }
+
+    /// Texte prêt à être dit : sans Markdown, adresses remplacées par « lien », coupé en phrases,
+    /// limité à `limite` caractères (coupé à la fin d'une phrase).
+    nonisolated static func phrasesAParler(_ texte: String, limite: Int) -> [String] {
+        var t = texte
+        func remplacer(_ motif: String, _ par: String) {
+            t = t.replacingOccurrences(of: motif, with: par, options: .regularExpression)
+        }
+        remplacer("(?s)```.*?```", " (bloc de code) ")
+        remplacer("!?\\[([^\\]]*)\\]\\([^)]*\\)", "$1")        // [texte](adresse) → texte
+        // Adresses (sans la ponctuation qui les suit) : « lien ».
+        remplacer("(https?|ftp|file)://[^\\s)>\\]]*[^\\s)>\\].,;:!?]", "lien")
+        remplacer("\\bwww\\.[^\\s)>\\]]*[^\\s)>\\].,;:!?]", "lien")
+        remplacer("(?m)^\\s*([-*+•]|>)+\\s+", "")                 // puces, citations
+        remplacer("(?m)^\\s*\\|?[-:| ]{3,}\\|?\\s*$", "")           // séparateurs de tableau
+        remplacer("[*#`~|>]", " ")
+        remplacer("(?<=\\w)_(?=\\w)", " ")
+        remplacer("_", "")
+        remplacer("([^.!?:;,\\s])[ \\t]*\\n+", "$1. ")             // une ligne sans ponctuation = une phrase
+        remplacer("\\s+", " ")
+        t = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        var phrases: [String] = []
+        var total = 0
+        var tronque = false
+        t.enumerateSubstrings(in: t.startIndex..., options: .bySentences) { sous, _, _, arret in
+            guard let p = sous?.trimmingCharacters(in: .whitespaces), !p.isEmpty else { return }
+            if total + p.count > limite {
+                if phrases.isEmpty { phrases.append(String(p.prefix(limite)) + "…") }
+                tronque = true
+                arret = true
+                return
+            }
+            phrases.append(p)
+            total += p.count
+        }
+        if tronque { phrases.append("La suite est dans le panneau.") }
+        return phrases
+    }
+}
+
+extension Voix: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.repliqueFinie(id) }
     }
 }
