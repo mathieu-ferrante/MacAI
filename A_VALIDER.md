@@ -102,3 +102,24 @@ Si quelque chose ne marche pas : menu 🧠 > Ouvrir le journal, et renvoie-moi l
 `./installer.sh` (ou `app/construire.sh`) signe l'app avec le certificat « MacAI Local ». La première fois, macOS
 peut demander « codesign veut utiliser la clé MacAI Local » : saisis ton mot de passe de session et choisis
 **Toujours autoriser**. Si l'écran a été verrouillé, déverrouille-le avant de lancer la mise à jour.
+
+## Nouveautés du 16/10 à essayer
+
+Le moteur est à jour. **L'app doit être réinstallée** pour avoir les nouveaux raccourcis : lance `./installer.sh`, écran
+déverrouillé, et accepte « codesign veut utiliser la clé MacAI Local » (mot de passe, **Toujours autoriser**).
+
+| Essai | Attendu |
+|---|---|
+| Sélectionne un texte avec des fautes dans Notes, ⌥⇧T > Corriger | le texte est remplacé, corrigé |
+| Sélectionne un mail en anglais, ⌥⇧T > Traduire / Résumer / Répondre | traduction en place / résumé / brouillon de réponse dans le panneau |
+| ⌥⇧S, sélectionne une zone avec un message d'erreur > Expliquer | explication dans le panneau |
+| ⌥⇧S sur un tableau (PDF, page web) > Extraire le tableau | fichier Excel sur le Bureau |
+| Maintiens Fn dans n'importe quel champ et parle | le texte s'écrit à la place du curseur (le panneau ne s'ouvre pas) |
+| « qu'est-ce que j'ai demain ? » | journée complète : rendez-vous (y compris récurrents) et rappels |
+| « résume mes mails non lus » | résumé des mails |
+| « réponds au dernier mail de Paul que je serai là » | brouillon de réponse ouvert dans Mail, non envoyé |
+| « envoie un SMS à Maman : j'arrive » | confirmation affichée avec le texte complet, puis envoi |
+| « range mes téléchargements » puis « annule » | tout revient à sa place |
+| « tous les matins à 8h, fais-moi un résumé de mes mails et de mon agenda » | tâche visible dans 🧠 > Tâches planifiées ; notification le lendemain à 8 h |
+| « quels sont les horaires de la poste de Toulon ? » | horaires lus sur le site de La Poste, avec la source |
+| `macai banc --scenarios` | 50/50 (dernier passage : 50/50 après corrections) |
