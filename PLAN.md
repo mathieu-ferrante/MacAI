@@ -50,6 +50,13 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D30 | Interdiction absolue (dans le code) d'acheter, payer, demander des crédits ou une utilisation supplémentaire, et de mémoriser des secrets | Exigence de Mathieu. |
 | D31 | Chaque outil tourne dans un fil surveillé avec délai maximal | Vu en essai : une fenêtre d'autorisation macOS sans réponse bloquait le moteur indéfiniment. |
 | D32 | Question explicative (« comment… », « pourquoi… ») : outils de lecture seulement | Vu en essai : « comment envoyer un mail ? » préparait des brouillons et lisait les mails. |
+| D33 | Texte sélectionné (⌥⇧T) et zone de l'écran (⌥⇧S) traités sans boucle d'agent : une consigne fixe par action | Un petit modèle corrige, traduit, résume très bien en un appel ; la sélection est lue pendant que l'appli de l'utilisateur est encore devant. |
+| D34 | Fn maintenue = dictée dans l'application au premier plan (réglable) ; ⌥⇧Espace maintenus = parler à MacAI | Dictée locale (SpeechAnalyzer), aucun modèle chargé, usage quotidien. |
+| D35 | Agenda et rappels lus par EventKit (récurrences comprises), repli AppleScript ; création encore par AppleScript | Les réunions récurrentes manquaient ; création EventKit prête dans mac/agenda.py. |
+| D36 | Annuler : pile des opérations inverses (50 dernières) pour déplacer, renommer, copier, écrire, ranger, Corbeille | Confiance : toute action sur les fichiers est réversible. |
+| D37 | Tâches planifiées exécutées sans personne : confirmations refusées d'office, autonomie au plus « équilibre », envoi/suppression/achat refusés à la création | Rien de sensible ne peut se faire en l'absence de l'utilisateur. |
+| D38 | Questions factuelles : rechercher_et_lire (3 pages lues, passages choisis sans modèle, sources citées) ; adresses locales/privées refusées | Vu en essai : horaires inventés ; et une page piégée ne doit pas interroger le Mac ou le réseau local. |
+| D39 | `macai banc --scenarios` : 50 demandes réelles dans le vrai moteur, outils simulés, comparaison avec le passage précédent | Mesurer chaque changement et repérer les régressions. |
 
 ## Lots
 

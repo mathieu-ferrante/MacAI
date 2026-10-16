@@ -272,3 +272,11 @@ def test_autorisation_manquante_arrete_la_demande(ctx):
     ctx.ollama = FauxOllama([appel("lire_fenetre"), appel("lire_fenetre"), Reponse(texte="je vais dans Réglages")])
     texte = Orchestrateur(ctx, CommandesRapides()).traiter("lis la fenêtre du Finder")
     assert texte.startswith("Je ne peux pas le faire pour l'instant") and len(ctx.ollama.recus) == 1
+
+
+def test_commandes_directes_reglages_et_claude():
+    r = CommandesRapides()
+    assert r.reconnaitre("ouvre les réglages Bluetooth").actions == [("ouvrir_reglage", {"rubrique": "bluetooth"})]
+    assert r.reconnaitre("demande à Claude quels sont les meilleurs claviers").actions == [
+        ("demander_a_claude", {"question": "Quels sont les meilleurs claviers"})]
+    assert r.reconnaitre("demande à Paul s'il vient") is None

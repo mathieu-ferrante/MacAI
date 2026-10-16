@@ -60,6 +60,14 @@ class CommandesRapides:
         demande = r"(?:peux-tu |tu peux |stp |s'il te plait )?"
         self.motifs = [
             (P(ANNULER), lambda m, t: Plan([("annuler_derniere_action", {})])),
+            # Réglages Système sur une rubrique : « ouvre les réglages Bluetooth », « va dans les réglages du son ».
+            (P(rf"^{demande}(?:ouvre|va dans|affiche|montre)(?: moi)? (?:les |le )?(?:reglages|parametres|preferences)"
+               r"(?: systeme)?(?: de la| du| des| de l'| d'| sur la| sur le| sur| rubrique| section| :)? (?P<r>[a-z0-9' -]{2,30})$"),
+             lambda m, t: Plan([("ouvrir_reglage", {"rubrique": m.group("r").strip()})])),
+            # Question à Claude : un seul outil déterministe (le modèle se perdait dans l'interface).
+            (P(rf"^{demande}(?:ouvre claude(?: en mode chat)?(?:,| et)? )?(?:demande|pose|ecris|dis)(?:-lui|-le)?"
+               r"(?: a claude| a l'app claude)?(?: la question)?(?: de| si| :|,)? (?P<q>.{4,})$"),
+             self._claude),
             (P(rf"^{demande}(?:fais|fait|prepare|donne)[- ]moi (?:un|le) (?:resume|point|briefing)"
                r"(?: de (?:ma|la) journee| du jour| du matin)? (?:chaque matin|tous les matins)"
                r"(?: (?:a|vers) (?P<h>\d{1,2}) ?(?:h|:|heures?)? ?(?P<mn>\d{2})?)?$"), self._resume_matin),
@@ -123,6 +131,13 @@ class CommandesRapides:
     def _chercher_sur(self, m, original):
         q = _nettoyer(self._extrait(m, original, "q"))
         return Plan([("chrome_rechercher", {"requete": q, "site": m.group("site")})])
+
+    def _claude(self, m, original):
+        if "claude" not in m.group(0):
+            return None
+        q = self._extrait(m, original, "q").strip(" :,")
+        q = re.sub(r"^(a|à) claude\s*(de|si|:)?\s*", "", q, flags=re.I).strip()
+        return Plan([("demander_a_claude", {"question": q[:1].upper() + q[1:]})]) if len(q) > 3 else None
 
     def _ouvrir(self, m, original):
         if NE_PAS_INTERCEPTER.search(m.group(0)) or not _nom_simple(m.group("nom")):
