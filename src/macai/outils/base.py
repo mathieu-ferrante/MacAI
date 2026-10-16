@@ -96,8 +96,10 @@ APPS_EXECUTION = {"terminal", "iterm", "iterm2", "warp", "ghostty", "alacritty",
                   "visual studio code", "code", "cursor", "xcode"}
 APPS_MESSAGERIE = {"mail", "messages", "whatsapp", "slack", "discord", "telegram", "signal", "microsoft teams",
                    "teams", "outlook", "messenger", "spark", "thunderbird", "facetime", "skype", "zoom"}
-ENVOI = re.compile(r"envoy|send|publi|post|partag|share|soumett|submit|r[ée]pond|reply|transf[ée]r|forward|"
-                   r"supprim|delete|effac|vider|empty|erase|d[ée]sinstall|uninstall", re.I)
+# Clics qui demandent confirmation (envoyer, publier, supprimer…). « Répondre » ou « Transférer » ouvrent seulement
+# une fenêtre : pas de confirmation (Mathieu veut que MacAI agisse librement, sauf pour l'important).
+ENVOI = re.compile(r"envoy|\bsend\b|publi|\bposter\b|\bpost\b|partag|\bshare\b|soumett|submit|supprim|delete|"
+                   r"effac|\bvider\b|\bempty\b|erase|d[ée]sinstall|uninstall", re.I)
 
 
 def nom_appli(nom: str) -> str:
@@ -338,7 +340,7 @@ def outil(nom: str, description: str, groupe: str, parametres: dict | None = Non
 
 MODULES = ["systeme", "applications", "fichiers", "documents", "recherche_outils", "chrome",
            "fenetres", "discussions", "organisation", "memoire_outils", "competences_outils", "onshape_outils",
-           "taches", "texte_outils"]
+           "taches", "texte_outils", "guide"]
 
 
 # Outils lents par nature (modèle de vision, OCR, réponse d'une autre IA, gros dossiers) : délai plus long.

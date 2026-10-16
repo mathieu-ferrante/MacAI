@@ -154,10 +154,17 @@ def test_indexeur_ignore_les_fichiers_icloud_non_telecharges(tmp_path, monkeypat
 
 def test_risque_mcp_par_nom_et_annotations():
     from macai.mcp.client import risque_mcp
-    assert risque_mcp({"name": "infos"}) == Risque.SENSIBLE                             # rien d'annoncé
+    # Règle de Mathieu : confirmation seulement pour supprimer, envoyer, code système, écraser un fichier.
+    assert risque_mcp({"name": "infos"}) == Risque.MODIFICATION
+    assert risque_mcp({"name": "add_keyframe", "annotations": {"destructiveHint": True}}) == Risque.MODIFICATION
     assert risque_mcp({"name": "infos", "annotations": {"readOnlyHint": True}}) == Risque.LECTURE
-    assert risque_mcp({"name": "run_script", "annotations": {"readOnlyHint": True}}) == Risque.SENSIBLE
+    assert risque_mcp({"name": "run_script", "description": "Run JavaScript in the app"}) == Risque.MODIFICATION
+    assert risque_mcp({"name": "run_command", "description": "Run a shell command"}) == Risque.SENSIBLE
     assert risque_mcp({"name": "upload_file", "annotations": {"destructiveHint": False}}) == Risque.SENSIBLE
+    assert risque_mcp({"name": "effacer_tout"}) == Risque.SENSIBLE
+    export = risque_mcp({"name": "doc_export"})
+    assert export({"path": "/tmp/nouveau-fichier-qui-n-existe-pas.png"}) == Risque.MODIFICATION
+    assert export({"path": __file__}) == Risque.SENSIBLE                                  # écraserait un fichier
     assert risque_mcp({"name": "x"}, "lecture") == Risque.LECTURE                       # choix explicite
 
 

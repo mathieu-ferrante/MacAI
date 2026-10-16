@@ -94,3 +94,17 @@ def test_banc_scenarios_registre_simule_et_verdicts(cfg):
     r = b.jouer(b.Scenario("exécute la commande rm -rf ~/x", ("executer_commande",), confirmation=True), ollama, cfg,
                 charger_tous())
     assert not r["ok"] and "attendu executer_commande" in r["problemes"][0]
+
+
+def test_action_lire_sans_modele(cfg, monkeypatch):
+    from macai.application import Application
+    ollama = FauxOllama([])
+    app = Application(cfg, ollama=ollama, avec_fond=False)
+    evts = []
+    app.emettre = lambda t, **d: evts.append((t, d))
+    monkeypatch.setattr(tx, "lire_selection", lambda: tx.Selection("Texte à lire.", 1, "Safari", "sélection"))
+    tx.demande_texte(app, "lire")
+    fin = time.monotonic() + 5
+    while not any(t == "fin" for t, _ in evts) and time.monotonic() < fin:
+        time.sleep(0.02)
+    assert [d["texte"] for t, d in evts if t == "fin"] == ["Texte à lire."] and ollama.recus == []

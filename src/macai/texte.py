@@ -127,6 +127,8 @@ def recoller(selection: Selection, resultat: str) -> None:
 
 def consigne_pour(action: str, consigne: str = "") -> tuple[str, str]:
     """(consigne au modèle, sortie par défaut)."""
+    if action == "lire":  # « Écouter » : le texte tel quel, l'app le lit à voix haute (pas de modèle)
+        return ("", "afficher")
     if action == "libre":
         if not consigne.strip():
             raise ErreurOutil("Dis ce qu'il faut faire du texte (consigne).")
@@ -253,6 +255,11 @@ def demande_texte(app, action: str, consigne: str = "", sortie: str = "") -> dic
     if sortie not in ("remplacer", "copier", "afficher"):
         raise ErreurOutil("Sortie inconnue (remplacer, copier ou afficher).")
     selection = lire_selection()
+    if action == "lire":
+        texte_lu = selection.texte[:20000]
+        if not lancer(app, lambda: texte_lu, f"Lecture du texte de {selection.application}"):
+            raise ErreurOutil("occupé")
+        return {"ok": True, "longueur": len(selection.texte), "source": selection.source}
     messages_pour(action, selection.texte, consigne)  # vérifie la longueur avant de partir en arrière-plan
 
     def travail() -> str:

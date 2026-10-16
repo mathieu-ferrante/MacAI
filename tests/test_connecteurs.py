@@ -50,7 +50,7 @@ def test_mcp_serveur_absent(tmp_path):
 
 def test_risque_mcp_force():
     assert risque_mcp({}, "lecture") == Risque.LECTURE
-    assert risque_mcp({}) == Risque.SENSIBLE  # outil tiers non annoté : confirmation
+    assert risque_mcp({}) == Risque.MODIFICATION  # créer/modifier dans un logiciel : sans confirmation
 
 
 # --- Mémoire ----------------------------------------------------------------------------

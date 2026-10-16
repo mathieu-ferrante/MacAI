@@ -23,7 +23,18 @@ INACTIVITE_S = 300
 # Variables transmises aux serveurs (plus celles de leur configuration) : jamais tout l'environnement de MacAI.
 ENV_TRANSMIS = ("PATH", "HOME", "LANG", "USER", "TMPDIR")
 # Noms d'outils qui exécutent, effacent ou envoient : confirmation, quoi que le serveur annonce.
-NOM_SENSIBLE = re.compile(r"run|exec|command|script|shell|delete|remove|erase|send|publish|upload", re.I)
+# Outils de logiciels tiers qui demandent confirmation : supprimer, envoyer/publier, exécuter du code système.
+# Les logiciels (ArtCraft…) marquent presque tout « destructif », même dessiner ou ajouter un calque : on ne s'y
+# fie plus, sinon chaque étape demandait une confirmation (retour de Mathieu).
+NOM_SENSIBLE = re.compile(r"delete|remove|erase|trash|purge|wipe|clear_?all|uninstall|send|publish|upload|share|"
+                          r"e?mail|shell|terminal|bash|zsh|subprocess|effac|supprim|vider|corbeille|envoy|publi|"
+                          r"partag|desinstall|d[ée]sinstall", re.I)
+# « run_script », « execute_command » : sans risque quand ils pilotent le logiciel lui-même (ArtCraft : commandes
+# du moteur, annulables) ; confirmation seulement si la description parle de commandes du système.
+NOM_EXECUTION = re.compile(r"exec|script|command|run", re.I)
+DESCRIPTION_SYSTEME = re.compile(r"shell|terminal|bash|zsh|subprocess|system command|os command|commande syst|"
+                                 r"arbitrary (code|program)|any program", re.I)
+NOM_ECRITURE = re.compile(r"save|export|write|render|output|enregistr", re.I)
 
 
 class ErreurMCP(RuntimeError):
@@ -253,16 +264,39 @@ def nom_outil(serveur: str, outil: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_]", "_", f"{serveur}__{outil}")[:64]
 
 
-def risque_mcp(definition: dict, force: str | None = None) -> Risque:
+def risque_mcp(definition: dict, force: str | None = None):
+    """Risque d'un outil MCP : lecture si annoncé ; confirmation pour supprimer, envoyer, exécuter du code, ou
+    écrire PAR-DESSUS un fichier qui existe ; tout le reste (créer, dessiner, modifier, exporter vers un nouveau
+    fichier) se fait sans confirmation en mode équilibré."""
     if force:
         return {"lecture": Risque.LECTURE, "creation": Risque.CREATION, "modification": Risque.MODIFICATION,
                 "sensible": Risque.SENSIBLE}.get(force, Risque.MODIFICATION)
+    nom = str(definition.get("name", ""))
     ann = definition.get("annotations") or {}
-    if ann.get("destructiveHint") is True or NOM_SENSIBLE.search(str(definition.get("name", ""))):
+    if NOM_SENSIBLE.search(nom):
+        return Risque.SENSIBLE
+    if NOM_EXECUTION.search(nom) and DESCRIPTION_SYSTEME.search(str(definition.get("description", ""))):
         return Risque.SENSIBLE
     if ann.get("readOnlyHint") is True:
         return Risque.LECTURE
-    return Risque.SENSIBLE  # rien d'annoncé : on ne sait pas ce que fait l'outil, confirmation
+    if not NOM_ECRITURE.search(nom):
+        return Risque.MODIFICATION
+
+    def selon_arguments(args: dict) -> Risque:
+        return Risque.SENSIBLE if any(_ecrase_un_fichier(v) for v in (args or {}).values()) else Risque.MODIFICATION
+    return selon_arguments
+
+
+def _ecrase_un_fichier(valeur) -> bool:
+    """Chemin d'un fichier existant (hors dossier temporaire) : l'écrire le remplacerait."""
+    import tempfile
+    if not isinstance(valeur, str) or not valeur.startswith(("/", "~/")) or len(valeur) > 1024:
+        return False
+    try:
+        p = Path(os.path.expanduser(valeur)).resolve()
+        return p.is_file() and not p.is_relative_to(Path(tempfile.gettempdir()).resolve())
+    except OSError:
+        return False
 
 
 class GestionnaireMCP:
