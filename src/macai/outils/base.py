@@ -96,6 +96,9 @@ APPS_EXECUTION = {"terminal", "iterm", "iterm2", "warp", "ghostty", "alacritty",
                   "visual studio code", "code", "cursor", "xcode"}
 APPS_MESSAGERIE = {"mail", "messages", "whatsapp", "slack", "discord", "telegram", "signal", "microsoft teams",
                    "teams", "outlook", "messenger", "spark", "thunderbird", "facetime", "skype", "zoom"}
+# Applis d'IA : y envoyer une question n'engage personne. Ailleurs (Messages, WhatsApp, Slack…) c'est un
+# message envoyé à quelqu'un : confirmation obligatoire.
+DISCUSSIONS_IA = {"claude", "chatgpt", "le chat", "mistral", "perplexity", "gemini", "copilot"}
 # Clics qui demandent confirmation (envoyer, publier, supprimer…). « Répondre » ou « Transférer » ouvrent seulement
 # une fenêtre : pas de confirmation (Mathieu veut que MacAI agisse librement, sauf pour l'important).
 ENVOI = re.compile(r"envoy|\bsend\b|publi|\bposter\b|\bpost\b|partag|\bshare\b|soumett|submit|supprim|delete|"

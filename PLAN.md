@@ -57,6 +57,7 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D37 | Tâches planifiées exécutées sans personne : confirmations refusées d'office, autonomie au plus « équilibre », envoi/suppression/achat refusés à la création | Rien de sensible ne peut se faire en l'absence de l'utilisateur. |
 | D38 | Questions factuelles : rechercher_et_lire (3 pages lues, passages choisis sans modèle, sources citées) ; adresses locales/privées refusées | Vu en essai : horaires inventés ; et une page piégée ne doit pas interroger le Mac ou le réseau local. |
 | D39 | `macai banc --scenarios` : 50 demandes réelles dans le vrai moteur, outils simulés, comparaison avec le passage précédent | Mesurer chaque changement et repérer les régressions. |
+| D40 | Plan à valider seulement si la demande touche à l'important (envoyer à quelqu'un, supprimer, ranger, installer, acheter…) ; ouvrir une appli, y taper, cliquer, interroger Claude/ChatGPT : on agit directement. « Envoyer » une question à une IA n'est plus sensible (supprimer y reste sensible) | Mathieu : accepter chaque étape pour « ouvre Claude et demande-lui… » faisait perdre l'intérêt de MacAI. Les étapes sensibles gardent leur confirmation. |
 
 ## Lots
 

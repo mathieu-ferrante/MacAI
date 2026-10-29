@@ -11,8 +11,8 @@ from pathlib import Path
 
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import (APPS_EXECUTION, APPS_MESSAGERIE, ENVOI, ErreurOutil, Resultat, Risque, interdire_achat,
-                   interdire_donnees_bancaires, nom_appli, outil)
+from .base import (APPS_EXECUTION, APPS_MESSAGERIE, DISCUSSIONS_IA, ENVOI, ErreurOutil, Resultat, Risque,
+                   interdire_achat, interdire_donnees_bancaires, nom_appli, outil)
 
 
 def _pas_dans_claude_code(ctx, application: str = "") -> None:
@@ -47,10 +47,13 @@ def _appli_devant() -> str:
 
 def _risque_selon(app: str, envoi: bool, libelle: str = "") -> Risque:
     """Taper ou valider dans un Terminal = exécuter du code ; valider dans une messagerie = écrire à quelqu'un ;
-    cliquer sur Envoyer / Supprimer / Publier : confirmation dans tous ces cas."""
+    cliquer sur Envoyer / Supprimer / Publier : confirmation dans tous ces cas. Sauf « Envoyer » une question
+    à une IA (Claude, ChatGPT…) : personne n'est engagé."""
     a = nom_appli(app)
     if a in APPS_EXECUTION:
         return Risque.SENSIBLE
+    if a in DISCUSSIONS_IA:
+        libelle = re.sub(r"(?i)envoy\w*|\bsend\b", "", libelle)
     if envoi and a in APPS_MESSAGERIE:
         return Risque.SENSIBLE
     if libelle and ENVOI.search(libelle):

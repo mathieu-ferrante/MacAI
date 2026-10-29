@@ -180,7 +180,7 @@ struct MenuMacAI: View {
     @ViewBuilder private var reglagesMoteur: some View {
         let connus = etat.connecte && etat.reglages != nil
         Menu("Montrer le plan avant d'agir") {
-            ForEach([("complexe", "Pour les tâches en plusieurs étapes"), ("toujours", "Toujours"), ("jamais", "Jamais")],
+            ForEach([("complexe", "Pour les tâches importantes (envoyer, supprimer, ranger…)"), ("toujours", "Toujours"), ("jamais", "Jamais")],
                     id: \.0) { valeur, titre in
                 Toggle(titre, isOn: Binding(get: { (etat.reglages?.plan ?? "complexe") == valeur },
                                             set: { if $0 { etat.changerPlan(valeur) } }))

@@ -10,13 +10,10 @@ import time
 
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import ErreurOutil, Resultat, Risque, outil
+from .base import DISCUSSIONS_IA, ErreurOutil, Resultat, Risque, outil
 
 ATTENTE_REPONSE_MAX_S = 120
 STABLE_S = 4.0  # la réponse est finie quand plus rien ne change pendant ce temps
-# Applis d'IA : y envoyer une question n'engage personne. Ailleurs (Messages, WhatsApp, Slack…) c'est un
-# message envoyé à quelqu'un : confirmation obligatoire.
-DISCUSSIONS_IA = {"claude", "chatgpt", "le chat", "mistral", "perplexity", "gemini", "copilot"}
 
 
 def _parcourir(pid: int, noeuds_max: int = 5000):

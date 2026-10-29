@@ -62,6 +62,12 @@ PLAN_ACTION = re.compile(r"\b(envoi|envoy|ouvr|cree|crée|deplac|range|rang|reno
                          r"copi|clique|lance|ferm|telecharg|prepar|repond|planifi|programm|organis|rempli|"
                          r"enregistr|install|activ|desactiv|regl|change|modifi|effac|vide|archiv|tri|class|partag|"
                          r"imprim|convert|export|compress|deplace|colle|tape|saisi|inscri|reserv|commande|note )")
+# Plan montré seulement si la demande touche à quelque chose d'important (envoyer à quelqu'un, supprimer, déplacer
+# ou ranger des fichiers, installer, acheter…). Ouvrir une appli, y taper, cliquer, poser une question à Claude :
+# on agit directement (Mathieu : valider chaque étape fait perdre l'intérêt de MacAI).
+PLAN_IMPORTANT = re.compile(r"\b(envoi|envoy|supprim|effac|vide|corbeille|deplac|renomm|range|rang|class|tri|"
+                            r"install|desinstall|achet|pai|commande|reserv|desactiv|modifi|ecras|partag|publi|"
+                            r"inscri|rempli|archiv|virement|transf)")
 PLAN_MOTS_MAX = 12      # au-delà : demande jugée en plusieurs étapes
 PLAN_LIAISONS = re.compile(r"( et | puis |, |\bensuite\b|\bapres ca\b|\bpour finir\b)")
 PLAN_REFUS = "D'accord, je ne fais rien."
@@ -224,7 +230,9 @@ class Orchestrateur:
         t = routeur.normaliser(demande).strip()
         if not _imperatif(demande) or SAVOIR.search(t) or not PLAN_ACTION.search(t + " "):
             return False  # question ou simple lecture : pas de plan
-        return mode == "toujours" or demande_complexe(demande)
+        if mode == "toujours":
+            return True
+        return demande_complexe(demande) and bool(PLAN_IMPORTANT.search(t)) and not _vers_une_ia(t)
 
     def _plan(self, demande: str) -> list[str] | bool | None:
         """None : pas de plan (on agit directement). False : refusé. Liste : plan validé à suivre."""
@@ -567,6 +575,14 @@ def _risque(o: Outil, args: dict) -> Risque:
         return o.risque_pour(args)
     except Exception:  # noqa: BLE001 - risque incalculable : on le traite comme sensible
         return Risque.SENSIBLE
+
+
+def _vers_une_ia(t: str) -> bool:
+    """Demande adressée à une appli d'IA (« demande à Claude de… ») : « envoie », « compare »… vont à l'IA,
+    pas à quelqu'un. Les étapes réellement sensibles demandent quand même leur confirmation."""
+    from ..outils.base import DISCUSSIONS_IA
+    return bool(re.search(r"\b(demande|pose|dis|ecris)(-lui|-leur)?\b", t)) and any(
+        re.search(rf"\b{re.escape(ia)}\b", t) for ia in DISCUSSIONS_IA)
 
 
 def _imperatif(demande: str) -> bool:

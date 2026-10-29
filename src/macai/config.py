@@ -37,7 +37,7 @@ autonomie = "equilibre"
 etapes_max = 10
 # Proposer une compétence quand une même tâche d'au moins N actions a réussi deux fois (ou après une démonstration).
 competence_apres_actions = 3
-# Montrer le plan avant d'agir : "complexe" (demandes en plusieurs étapes), "toujours" ou "jamais".
+# Montrer le plan avant d'agir : "complexe" (plusieurs étapes ET quelque chose d'important : envoyer, supprimer, ranger…), "toujours" ou "jamais".
 plan = "complexe"
 
 [recherche]

@@ -315,3 +315,23 @@ def test_proposition_depuis_demonstration(ctx):
     assert ctx.services["derniere_trace"]["actions"][0]["outil"] == "ouvrir_application"
     assert not o.proposer_depuis_demonstration([])
     assert o.proposer_depuis_demonstration({"description": "trier", "etapes": etapes})
+
+
+def test_pas_de_plan_pour_piloter_une_appli(ctx):
+    """Ouvrir une appli et y faire quelque chose sans enjeu : on agit, pas de plan à accepter."""
+    o, faits, vus = _orch_plan(ctx, [], [])
+    for demande in ("ouvre claude va en mode chat et demande lui si une RX 9070 GRE vaut une RX 9070 XT",
+                    "lance Safari, va sur le site de la météo et clique sur Paris",
+                    "ouvre ChatGPT et demande-lui de comparer deux cartes graphiques puis envoie"):
+        assert not o.plan_voulu(demande), demande
+    assert o.plan_voulu(DEMANDE_LONGUE)                       # déplacer des fichiers : plan montré
+    assert o.plan_voulu("ouvre Mail et envoie le devis à Paul")  # écrire à quelqu'un : plan montré
+
+
+def test_envoyer_une_question_a_une_ia_sans_confirmation():
+    from macai.outils.base import Risque
+    from macai.outils.fenetres import _risque_selon
+    assert _risque_selon("Claude", True, "Envoyer le message") == Risque.MODIFICATION
+    assert _risque_selon("ChatGPT", True, "Supprimer la conversation") == Risque.SENSIBLE
+    assert _risque_selon("Messages", True, "") == Risque.SENSIBLE
+    assert _risque_selon("Safari", False, "Envoyer") == Risque.SENSIBLE
