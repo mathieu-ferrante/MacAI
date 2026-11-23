@@ -16,11 +16,14 @@ final class Client {
 
     var pret: Bool { port != 0 }
 
-    /// Lit serveur.json écrit par le moteur au démarrage.
-    func chargerInfos() -> Bool {
+    /// Lit serveur.json écrit par le moteur au démarrage. Seulement s'il vient du moteur que l'app a lancé : après
+    /// un arrêt brutal, un ancien fichier pointerait vers un port qu'un autre programme pourrait avoir repris.
+    func chargerInfos(pidAttendu: Int32?) -> Bool {
         let f = Moteur.dossier.appendingPathComponent("serveur.json")
-        guard let data = try? Data(contentsOf: f),
+        guard let pidAttendu,
+              let data = try? Data(contentsOf: f),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let pid = json["pid"] as? Int, Int32(pid) == pidAttendu,
               let p = json["port"] as? Int, let j = json["jeton"] as? String else { return false }
         port = p
         jeton = j

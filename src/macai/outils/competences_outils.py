@@ -14,7 +14,12 @@ def _biblio(ctx):
 @outil("creer_competence", "Crée une compétence réutilisable : à partir de la dernière tâche réussie, ou d'une "
        "description (ex. « mode travail : ouvre VS Code et Slack, volume à 20 »).", "competences",
        {"description": ("string", "description de la compétence, facultatif si on part de la dernière tâche"),
-        "nom": ("string", "nom souhaité, facultatif")}, requis=[], risque=Risque.CREATION, mac_seulement=False)
+        "nom": ("string", "nom souhaité, facultatif")}, requis=[], mac_seulement=False,
+       # Une compétence se rejoue plus tard : créée à la demande de l'agent, elle est confirmée (le bouton
+       # « Créer la compétence » de l'app, lui, est déjà l'accord de l'utilisateur : Application.creer_competence).
+       risque=Risque.SENSIBLE,
+       annonce=lambda a: "Créer une compétence réutilisable" + (f" : {a['description']}" if a.get("description")
+                                                                else " à partir de la dernière tâche"))
 def creer_competence(ctx, description="", nom=""):
     from ..competences.competences import generer
     biblio = _biblio(ctx)
@@ -28,6 +33,7 @@ def creer_competence(ctx, description="", nom=""):
                         description + (f"\n(Correction demandée : {derniere_erreur})" if derniere_erreur else ""))
             if nom:
                 c.nom = nom
+            c.nom = biblio.nom_libre(c.nom)
             c = biblio.ajouter(c)
             break
         except ValueError as e:

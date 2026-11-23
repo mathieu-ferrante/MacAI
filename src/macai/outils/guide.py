@@ -299,7 +299,7 @@ def montrer_menu(ctx, application, chemin):
 
 def _risque_cliquer_libelle(args: dict) -> Risque:
     from .fenetres import _risque_selon
-    return _risque_selon(str(args.get("application", "")), True, str(args.get("libelle", "")))
+    return _risque_selon(str(args.get("application", "")), False, str(args.get("libelle", "")), clic=True)
 
 
 def trouver_par_libelle(elements: list, libelle: str):
@@ -333,6 +333,15 @@ def cliquer_libelle(ctx, application, libelle):
     if e is None:
         raise ErreurOutil(f"Pas de bouton « {libelle} » dans {titre}. Relis la fenêtre avec lire_fenetre.")
     interdire_achat(e.libelle, e.valeur, bouton=True)
+    # Le bouton trouvé peut différer du libellé demandé (« nvoyer » trouve « Envoyer ») : risque recalculé sur le
+    # vrai libellé, et confirmation tardive si besoin (relecture de sécurité).
+    from .. import securite
+    from .base import Risque
+    from .fenetres import _risque_selon
+    reel = f"{e.libelle} {e.valeur}".strip()
+    if _risque_selon(application, False, reel, clic=True) >= Risque.SENSIBLE:
+        securite.confirmer_pendant(ctx, f"Cliquer sur « {reel or libelle} » dans {application}", "cliquer_libelle",
+                                   {"application": application, "libelle": reel or libelle})
     ax.appuyer(e.ref)
     time.sleep(0.4)
     return f"Clic sur « {e.libelle or e.valeur} » dans {titre.split(' — ', 1)[0]}."

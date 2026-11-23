@@ -28,7 +28,9 @@ ENV_TRANSMIS = ("PATH", "HOME", "LANG", "USER", "TMPDIR")
 # fie plus, sinon chaque étape demandait une confirmation (retour de Mathieu).
 NOM_SENSIBLE = re.compile(r"delete|remove|erase|trash|purge|wipe|clear_?all|uninstall|send|publish|upload|share|"
                           r"e?mail|shell|terminal|bash|zsh|subprocess|effac|supprim|vider|corbeille|envoy|publi|"
-                          r"partag|desinstall|d[ée]sinstall", re.I)
+                          r"partag|desinstall|d[ée]sinstall|post_?message|message|reply|comment|tweet|push|"
+                          r"merge_?pull|pull_?request|transfer|payment|\bpay|charge|invoice|invite|forward|"
+                          r"start_?process|spawn|kill|drop_?table|\bdrop\b|commit|deploy|refund", re.I)
 # « run_script », « execute_command » : sans risque quand ils pilotent le logiciel lui-même (ArtCraft : commandes
 # du moteur, annulables) ; confirmation seulement si la description parle de commandes du système.
 NOM_EXECUTION = re.compile(r"exec|script|command|run", re.I)
@@ -275,6 +277,8 @@ def risque_mcp(definition: dict, force: str | None = None):
     ann = definition.get("annotations") or {}
     if NOM_SENSIBLE.search(nom):
         return Risque.SENSIBLE
+    if ann.get("openWorldHint") is True and ann.get("readOnlyHint") is not True:
+        return Risque.SENSIBLE  # écrit vers l'extérieur (service en ligne) : comme envoyer
     if NOM_EXECUTION.search(nom) and DESCRIPTION_SYSTEME.search(str(definition.get("description", ""))):
         return Risque.SENSIBLE
     if ann.get("readOnlyHint") is True:

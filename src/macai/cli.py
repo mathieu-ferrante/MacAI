@@ -128,6 +128,24 @@ def cmd_mcp(args) -> int:
     return 0
 
 
+def cmd_modeles(args) -> int:
+    """Empreintes des modèles Ollama : les afficher, ou accepter celles d'aujourd'hui (après une mise à jour)."""
+    from . import config
+    from .llm.ollama import Ollama, enregistrer_empreintes
+    cfg = config.charger()
+    voulus = {cfg.modeles.get(k) for k in ("agent", "vision", "embeddings")} - {None, ""}
+    actuelles = {n: d for n, d in Ollama().empreintes_installees().items() if n in voulus}
+    if args.accepter:
+        enregistrer_empreintes(cfg.chemin("modeles_empreintes.json"), actuelles)
+        print("Empreintes enregistrées :")
+    for n, d in sorted(actuelles.items()):
+        print(f"- {n} : {d[:12]}")
+    manquants = voulus - set(actuelles)
+    if manquants:
+        print("Non installés : " + ", ".join(sorted(manquants)))
+    return 0
+
+
 def cmd_verifier(args) -> int:
     from .verification import verifier
     return verifier(json_sortie=args.json)
@@ -167,6 +185,10 @@ def main(argv=None) -> int:
     s = sub.add_parser("mcp", help="connecteurs MCP : tester ou détecter")
     s.add_argument("action", choices=["tester", "detecter"])
     s.set_defaults(func=cmd_mcp)
+
+    s = sub.add_parser("modeles", help="empreintes des modèles Ollama (--accepter après une mise à jour)")
+    s.add_argument("--accepter", action="store_true")
+    s.set_defaults(func=cmd_modeles)
 
     s = sub.add_parser("verifier", help="contrôle l'installation et produit un rapport")
     s.add_argument("--json", action="store_true")

@@ -11,7 +11,9 @@ from .base import ErreurOutil, Resultat, Risque, interdire_donnees_bancaires, ou
 DEMANDE_DE_RETENIR = re.compile(
     r"\b(retiens|retenir|souviens|souvenir|rappelle[- ]toi|memorise|memoriser|note (?:que|bien)|n'oublie pas|"
     r"garde en (?:tete|memoire)|je suis|je m'appelle|appelle[- ]moi|j'aime|je n'aime pas|je deteste|je prefere|"
-    r"j'habite|je vis|je travaille|mon|ma|mes)\b")
+    r"j'habite|je vis|je travaille)\b")
+# (« mon », « ma », « mes » retirés : « résume mes mails » suffisait à faire retenir sans accord un fait dicté par
+# un mail piégé, relu ensuite dans chaque demande.)
 
 
 def _memoire(ctx):

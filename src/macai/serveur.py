@@ -43,17 +43,24 @@ def creer_gestionnaire(app: Application, jeton: str):
 
         # --- utilitaires -----------------------------------------------------------
         def _autorise(self) -> bool:
-            recu = self.headers.get("X-MacAI-Jeton", "")
-            if hmac.compare_digest(recu, jeton):
+            """Jeton exact (comparé en octets, en temps constant), et rien qui vienne d'un navigateur : une page web
+            envoie toujours un en-tête Origin, et un « DNS rebinding » se trahit par un Host étranger."""
+            recu = self.headers.get("X-MacAI-Jeton", "").encode("utf-8", "surrogateescape")
+            hote = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
+            if hmac.compare_digest(recu, jeton.encode()) and hote in ("127.0.0.1", "localhost", "::1") \
+                    and self.headers.get("Origin") is None:
                 return True
-            self._json(401, {"erreur": "jeton invalide"})
+            self.close_connection = True  # corps non lu : la connexion ne resert pas
+            self._json(401, {"erreur": "accès refusé"}, fermer=True)
             return False
 
-        def _json(self, code: int, donnees) -> None:
+        def _json(self, code: int, donnees, fermer: bool = False) -> None:
             corps = json.dumps(donnees, ensure_ascii=False, default=str).encode()
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(corps)))
+            if fermer:
+                self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(corps)
 
@@ -233,7 +240,8 @@ def creer_gestionnaire(app: Application, jeton: str):
 def ecrire_infos(fichier: Path, port: int, jeton: str) -> None:
     fichier.parent.mkdir(parents=True, exist_ok=True)
     tmp = fichier.with_suffix(".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    tmp.unlink(missing_ok=True)  # O_EXCL + O_NOFOLLOW : jamais écrire à travers un lien posé là
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "w") as f:
         json.dump({"port": port, "jeton": jeton, "pid": os.getpid()}, f)
     os.replace(tmp, fichier)

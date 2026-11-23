@@ -86,11 +86,21 @@ def attendre_chargement(ctx, delai: float = 12) -> None:
         time.sleep(0.4)
 
 
+def _risque_ouvrir_url(args: dict) -> Risque:
+    """Une adresse du réseau local (box, imprimante, le Mac lui-même) ouverte avec les cookies de Chrome peut
+    déclencher une action (requête GET) : confirmation. Les données qui sortiraient dans l'adresse sont
+    contrôlées par l'orchestrateur (securite.sortie_a_confirmer)."""
+    from .. import securite
+    return Risque.SENSIBLE if securite.adresse_locale(str(args.get("url", ""))) else Risque.CREATION
+
+
 @outil("ouvrir_url", "Ouvre une adresse web dans Chrome (nouvel onglet).", "web",
-       {"url": ("string", "adresse complète, ex. https://cad.onshape.com")}, risque=Risque.CREATION,
+       {"url": ("string", "adresse complète, ex. https://cad.onshape.com")}, risque=_risque_ouvrir_url,
        annonce=lambda a: f"Ouvrir {a['url']}")
 def ouvrir_url(ctx, url):
-    if not re.match(r"^https?://", url):
+    if not re.match(r"^https?://", url, re.I):
+        if re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I) and not re.match(r"^[\w.-]+:\d", url):
+            raise ErreurOutil("Seules les adresses web (http ou https) s'ouvrent ici.")  # file:, javascript:…
         url = "https://" + url.lstrip("/")
     ouvrir_onglet(ctx, url)
     return f"{url} ouvert dans Chrome."
@@ -155,7 +165,39 @@ def lire_page(ctx):
         raise ErreurOutil("Impossible de lire la page (aucune fenêtre Chrome ?).") from None
     texte = (f"Page : {d['titre']}\nAdresse : {d['url']}\n\nÉléments :\n" + "\n".join(d["elements"]) +
              f"\n\nTexte :\n{d['texte']}")
+    # Libellés gardés pour le calcul du risque de cliquer_page (qui ne voit que le numéro).
+    _PAGE.update(url=str(d.get("url", "")), libelles={})
+    for ligne in d.get("elements", []):
+        m = re.match(r"(\d+) \[[^\]]*\] ?(.*?)(?:  → .*)?$", str(ligne))
+        if m:
+            _PAGE["libelles"][int(m.group(1))] = m.group(2)
     return Resultat(True, texte, {"url": d["url"], "titre": d["titre"]})
+
+
+_PAGE: dict = {"url": "", "libelles": {}}
+ABSENT = "§absent§"
+# Page de paiement ou de commande : tout clic y est confirmé.
+PAGE_PAIEMENT = re.compile(r"checkout|payment|paiement|\bpay\b|/cart|panier|/order|commande|billing|facturation|"
+                           r"virement|transfer|subscribe|abonnement|upgrade", re.I)
+
+
+def _risque_cliquer_page(args: dict) -> Risque:
+    from .fenetres import _risque_selon
+    try:
+        libelle = _PAGE["libelles"].get(int(args.get("numero", 0)), "")
+    except (TypeError, ValueError):
+        libelle = ""
+    if PAGE_PAIEMENT.search(_PAGE.get("url", "")):
+        return Risque.SENSIBLE
+    return _risque_selon("Google Chrome", False, libelle, clic=True)
+
+
+def _annonce_cliquer_page(a: dict) -> str:
+    try:
+        libelle = _PAGE["libelles"].get(int(a.get("numero", 0)), "")
+    except (TypeError, ValueError):
+        libelle = ""
+    return f"Cliquer sur « {libelle} » dans la page" if libelle else f"Cliquer sur l'élément {a['numero']} de la page"
 
 
 def _element(n) -> str:
@@ -163,12 +205,21 @@ def _element(n) -> str:
 
 
 @outil("cliquer_page", "Clique sur un élément de la page Chrome, par son numéro donné par lire_page.", "web",
-       {"numero": ("integer", "numéro de l'élément")}, risque=Risque.MODIFICATION,
-       annonce=lambda a: f"Cliquer sur l'élément {a['numero']} de la page")
+       {"numero": ("integer", "numéro de l'élément")}, risque=_risque_cliquer_page, annonce=_annonce_cliquer_page)
 def cliquer_page(ctx, numero):
-    texte = chrome_js(ctx, f"(() => {{ const e = {_element(numero)}; if (!e) return ''; return ((e.innerText || '') "
-                           f"+ ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.value || '')).slice(0, 300); }})()")
-    interdire_achat(texte)
+    texte = chrome_js(ctx, f"(() => {{ const e = {_element(numero)}; if (!e) return '{ABSENT}'; return ((e.innerText || '') "
+                           f"+ ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '') "
+                           f"+ ' ' + (e.value || '')).slice(0, 300); }})()")
+    if texte == ABSENT:
+        raise ErreurOutil(f"Élément {numero} introuvable : relis la page avec lire_page (elle a pu changer).")
+    adresse = chrome_js(ctx, "location.href")
+    interdire_achat(texte, bouton=True)
+    # La page a pu changer depuis lire_page : risque recalculé sur le vrai bouton et la vraie adresse.
+    from .. import securite
+    from .fenetres import _risque_selon
+    if PAGE_PAIEMENT.search(str(adresse)) or _risque_selon("Google Chrome", False, texte, clic=True) >= Risque.SENSIBLE:
+        securite.confirmer_pendant(ctx, f"Cliquer sur « {texte.strip() or 'un élément sans nom'} » dans la page "
+                                        f"{str(adresse)[:120]}", "cliquer_page", {"numero": numero})
     r = chrome_js(ctx, f"(() => {{ const e = {_element(numero)}; if (!e) return 'absent'; "
                        f"e.scrollIntoView({{block: 'center'}}); e.click(); return 'ok'; }})()")
     if r == "absent":
@@ -182,7 +233,10 @@ def cliquer_page(ctx, numero):
        "et valide avec Entrée si demandé.", "web",
        {"numero": ("integer", "numéro du champ"), "texte": ("string", "texte à écrire"),
         "valider": ("boolean", "appuyer sur Entrée ensuite")}, requis=["numero", "texte"],
-       risque=Risque.MODIFICATION, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}")
+       # Valider un formulaire web = l'envoyer (Gmail, réseau social, banque) : confirmation.
+       risque=lambda a: Risque.SENSIBLE if a.get("valider") else Risque.MODIFICATION,
+       annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']} de la page"
+                         + (" et VALIDER le formulaire" if a.get("valider") else ""))
 def remplir_page(ctx, numero, texte, valider=False):
     interdire_donnees_bancaires(texte)
     interdire_achat(texte)
@@ -285,11 +339,23 @@ def html_vers_texte(page: str) -> tuple[str, str]:
     return p.titre.strip(), re.sub(r"\n\s*\n+", "\n\n", texte).strip()
 
 
+class _RedirectionVerifiee(urllib.request.HTTPRedirectHandler):
+    """Chaque redirection est revérifiée : une page publique ne doit pas renvoyer vers 127.0.0.1 ou la box."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        url_publique(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OUVREUR = urllib.request.build_opener(_RedirectionVerifiee)
+
+
 def telecharger_page(url: str, delai: float = 15) -> str:
+    url_publique(url)
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                                                              "AppleWebKit/605.1.15 (KHTML, like Gecko) Safari/605.1.15",
                                                "Accept-Language": "fr-FR,fr;q=0.9"})
-    with urllib.request.urlopen(req, timeout=delai) as r:
+    with _OUVREUR.open(req, timeout=delai) as r:
         if "html" not in r.headers.get("Content-Type", "html"):
             raise ErreurOutil("Ce lien n'est pas une page web.")
         return r.read(3_000_000).decode(r.headers.get_content_charset() or "utf-8", errors="replace")

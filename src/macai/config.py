@@ -105,6 +105,12 @@ class Config:
 def charger(dossier: Path | None = None) -> Config:
     dossier = Path(dossier or dossier_donnees())
     dossier.mkdir(parents=True, exist_ok=True)
+    try:
+        # Index (extraits de documents et de mails), journal, mémoire : lisibles par l'utilisateur seul, même si
+        # MACAI_HOME pointe hors de ~/Library (déjà fermé en 0700 par macOS).
+        os.chmod(dossier, 0o700)
+    except OSError:
+        pass
     fichier = dossier / "macai.toml"
     if not fichier.exists():
         fichier.write_text(CONFIG_PAR_DEFAUT, encoding="utf-8")

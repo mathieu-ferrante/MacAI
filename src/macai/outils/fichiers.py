@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -9,20 +10,27 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from .. import annulation
+from .. import annulation, securite
 from ..mac import commun
 from .base import ErreurOutil, Resultat, Risque, outil
 
-# Jamais lus ni modifiés par l'agent : clés, mots de passe, cookies, messageries, historiques, navigateurs.
-# Comparaison sans casse (APFS ne distingue pas ~/.SSH de ~/.ssh) sur le chemin réel (liens résolus).
-INTERDITS = [".ssh", ".gnupg", ".aws", ".netrc", ".config", ".docker", ".kube", ".npmrc", ".pypirc", ".env",
-             ".zsh_history", ".bash_history", ".python_history", ".lesshst", ".git-credentials",
-             "library/keychains", "library/cookies", "library/messages", "library/mail", "library/safari",
+# Jamais lus ni modifiés par l'agent : clés, mots de passe, cookies, messageries, historiques, navigateurs, carnet
+# d'adresses, notes. Tout fichier ou dossier caché du dossier personnel est aussi interdit en lecture (~/.zshrc,
+# ~/.zsh_sessions, ~/.claude.json… contiennent souvent des clés). Comparaison par securite.cle_chemin : liens
+# résolus, sans casse ni forme Unicode, firmlink /System/Volumes/Data retiré (relecture de sécurité : les trois
+# permettaient de contourner cette liste).
+INTERDITS = ["library/keychains", "library/cookies", "library/messages", "library/mail", "library/safari",
              "library/accounts", "library/application support/google/chrome",
              "library/application support/bravesoftware", "library/application support/microsoft edge",
              "library/application support/arc", "library/application support/firefox",
              "library/application support/1password", "library/application support/bitwarden",
-             "library/group containers/2bua8c4s2c.com.1password"]
+             "library/group containers/2bua8c4s2c.com.1password", "library/application support/addressbook",
+             "library/group containers/group.com.apple.notes", "library/containers/com.apple.notes",
+             "library/containers/com.apple.mail", "library/group containers/group.com.apple.messages",
+             "library/application support/claude", "library/application support/com.apple.tcc",
+             "library/launchagents", "library/preferences", "library/identityservices",
+             "library/application support/knowledge", "library/biome", "library/suggestions",
+             "library/application support/callhistorydb", "library/application support/com.apple.sharedfilelist"]
 MOTS_INTERDITS = ("login data", "cookies", "web data", "keychain", "id_rsa", "id_ed25519", ".pem", ".p12")
 
 
@@ -35,20 +43,28 @@ def _depot_macai() -> Path:
     return Path(__file__).resolve().parents[3]  # …/MacAI (src/macai/outils/fichiers.py)
 
 
+def _relatif_maison(cle: str) -> str | None:
+    maison = securite.cle_chemin(Path.home())
+    if cle == maison:
+        return ""
+    return cle[len(maison) + 1:] if securite.sous(cle, maison) else None
+
+
 def chemin_interdit(chemin) -> bool:
     """Vrai si le chemin touche des secrets ou les fichiers de MacAI lui-même (jeton, journal, index, réglages)."""
     try:
-        r = Path(os.path.realpath(Path(str(chemin)).expanduser()))
+        cle = securite.cle_chemin(Path(str(chemin)).expanduser())
     except (OSError, ValueError):
         return True
-    texte = r.as_posix().casefold()
-    maison = Path.home().resolve().as_posix().casefold()
-    relatif = texte[len(maison) + 1:] if texte.startswith(maison + "/") else ""
-    if relatif and any(relatif == i or relatif.startswith(i + "/") for i in INTERDITS):
+    relatif = _relatif_maison(cle)
+    if relatif:
+        if any(x.startswith(".") for x in relatif.split("/")):
+            return True  # fichiers cachés du dossier personnel : configuration, historiques, clés
+        if any(relatif == i or relatif.startswith(i + "/") for i in INTERDITS):
+            return True
+    if any(m in cle for m in MOTS_INTERDITS):
         return True
-    if any(m in texte for m in MOTS_INTERDITS):
-        return True
-    return r.is_relative_to(_donnees_macai())
+    return securite.sous(cle, securite.cle_chemin(_donnees_macai()))
 
 
 CATEGORIES = {
@@ -68,20 +84,25 @@ CATEGORIES = {
 
 def _ecriture_permise(p: Path) -> bool:
     """Dossier personnel (hors fichiers cachés et Bibliothèque), disques externes et dossier temporaire ; jamais
-    le système, ni ce qui ferait exécuter du code plus tard (~/.zshenv, LaunchAgents, réglages et code de MacAI)."""
-    r = Path(os.path.realpath(p))
-    temporaire = Path(tempfile.gettempdir()).resolve()
-    if r.is_relative_to(temporaire) or str(r).startswith("/Volumes/"):
-        return True
-    maison = Path.home().resolve()
-    if not r.is_relative_to(maison):
+    le système, ni ce qui ferait exécuter du code plus tard (~/.zshenv, LaunchAgents, réglages et code de MacAI).
+    Comparaison canonique : « ~/library/LaunchAgents » est refusé comme « ~/Library/LaunchAgents »."""
+    cle = securite.cle_chemin(p)
+    if securite.sous(cle, securite.cle_chemin(_donnees_macai())) or \
+            securite.sous(cle, securite.cle_chemin(_depot_macai())):
         return False
-    parties = r.relative_to(maison).parts
+    if securite.sous(cle, securite.cle_chemin(tempfile.gettempdir())) or \
+            (cle.startswith("/volumes/") and cle.count("/") >= 3):
+        return True  # dossier temporaire, disque externe (pas la racine d'un volume)
+    relatif = _relatif_maison(cle)
+    if not relatif:
+        return False  # hors du dossier personnel, ou le dossier personnel lui-même
+    parties = relatif.split("/")
     if any(x.startswith(".") for x in parties):
         return False
-    if parties and parties[0] == "Library" and "Mobile Documents" not in parties:
-        return False  # seul iCloud Drive (Library/Mobile Documents) reste modifiable
-    return not (r.is_relative_to(_donnees_macai()) or r.is_relative_to(_depot_macai()))
+    if parties[0] == "library":
+        # Seul iCloud Drive (Library/Mobile Documents, puis un dossier d'appli) reste modifiable.
+        return len(parties) >= 3 and parties[1] == "mobile documents"
+    return True
 
 
 def verifier_chemin(p: Path, ecriture: bool = False) -> Path:
@@ -202,6 +223,30 @@ def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     return Resultat(True, f"Fichier écrit : {p} ({len(contenu)} caractères)", {"fichier": str(p)})
 
 
+DOSSIERS_DU_COMPTE = {"desktop", "documents", "downloads", "pictures", "movies", "music", "library", "applications",
+                      "public", "sites"}
+
+
+def _dossier_principal(p: Path) -> bool:
+    """Le dossier personnel, un dossier standard du compte (Documents, Bureau…), ou une racine système : ne se
+    déplace pas et ne se renomme pas (des applis et macOS en dépendent)."""
+    maison = Path.home().resolve()
+    r = p.resolve()
+    return r == maison or len(r.parts) <= 3 or (r.parent == maison and r.name.casefold() in DOSSIERS_DU_COMPTE)
+
+
+def _risque_destination(base: Risque):
+    """Déplacer ou copier hors du dossier personnel (clé USB, volume réseau monté, dossier temporaire purgé par
+    macOS) : les fichiers quittent le Mac ou risquent de disparaître → confirmation."""
+    def risque(args: dict) -> Risque:
+        try:
+            cle = securite.cle_chemin(commun.chemin(str(args.get("destination", ""))))
+        except (OSError, ValueError):
+            return Risque.SENSIBLE
+        return base if _relatif_maison(cle) else Risque.SENSIBLE
+    return risque
+
+
 def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
     """La destination désigne-t-elle un dossier ? Oui s'il existe, finit par « / », ou s'il n'existe pas et n'a
     pas d'extension alors que la source en a une (« déplace a.pdf vers Factures » = dans le dossier Factures)."""
@@ -213,10 +258,12 @@ def _vers_dossier(src: Path, dest: Path, texte: str) -> bool:
 @outil("deplacer", "Déplace un fichier ou dossier. Si la destination est un dossier, l'élément y est placé. "
        "N'écrase jamais : ajoute (2) au nom si besoin.", "fichiers",
        {"source": ("string", "chemin à déplacer"), "destination": ("string", "dossier ou nouveau chemin")},
-       risque=Risque.MODIFICATION, mac_seulement=False,
+       risque=_risque_destination(Risque.MODIFICATION), mac_seulement=False,
        annonce=lambda a: f"Déplacer {a['source']} vers {a['destination']}")
 def deplacer(ctx, source, destination):
     src = resoudre(source, ecriture=True, doit_exister=True)
+    if _dossier_principal(src):
+        raise ErreurOutil(f"Refusé : {src} est un dossier principal de ton compte, il reste à sa place.")
     dest = resoudre(destination, ecriture=True)
     vers_dossier = _vers_dossier(src, dest, destination)
     ops = annulation.ops_dossiers(annulation.dossiers_manquants(dest if vers_dossier else dest.parent))
@@ -237,11 +284,17 @@ def deplacer(ctx, source, destination):
        annonce=lambda a: f"Renommer {Path(a['chemin']).name} en {a['nouveau_nom']}")
 def renommer(ctx, chemin, nouveau_nom):
     src = resoudre(chemin, ecriture=True, doit_exister=True)
-    if "/" in nouveau_nom:
+    if _dossier_principal(src):
+        raise ErreurOutil(f"Refusé : {src} est un dossier principal de ton compte, il garde son nom.")
+    nouveau_nom = securite.texte_normal(nouveau_nom).strip()
+    if "/" in nouveau_nom or ":" in nouveau_nom or "\\" in nouveau_nom:
         raise ErreurOutil("Le nouveau nom ne doit pas contenir de « / » (utilise deplacer).")
+    if not nouveau_nom or nouveau_nom.startswith(".") or re.search(r"[\x00-\x1f\x7f]", nouveau_nom):
+        # « .zshenv » : un fichier caché du dossier personnel s'exécute à chaque ouverture de Terminal.
+        raise ErreurOutil("Nom refusé : pas de nom caché (commençant par un point) ni de caractère de contrôle.")
     if not Path(nouveau_nom).suffix and src.suffix:
         nouveau_nom += src.suffix
-    dest = sans_collision(src.with_name(nouveau_nom))
+    dest = sans_collision(verifier_chemin(src.with_name(nouveau_nom), ecriture=True))
     src.rename(dest)
     annulation.enregistrer(ctx, f"Renommage de {src.name} en {dest.name}",
                            [{"type": "deplacer", "de": str(dest), "vers": str(src)}])
@@ -250,7 +303,7 @@ def renommer(ctx, chemin, nouveau_nom):
 
 @outil("copier", "Copie un fichier ou dossier.", "fichiers",
        {"source": ("string", "chemin à copier"), "destination": ("string", "dossier ou nouveau chemin")},
-       risque=Risque.CREATION, mac_seulement=False)
+       risque=_risque_destination(Risque.CREATION), mac_seulement=False)
 def copier(ctx, source, destination):
     src = resoudre(source, doit_exister=True)
     dest = resoudre(destination, ecriture=True)
@@ -261,7 +314,12 @@ def copier(ctx, source, destination):
         dest = dest / src.name
     dest = sans_collision(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    (shutil.copytree if src.is_dir() else shutil.copy2)(str(src), str(dest))
+    if src.is_dir():
+        # Liens symboliques recopiés comme liens : sinon un lien « notes.txt → ~/.ssh/config » glissé dans un
+        # dossier devenait une copie lisible du secret (relecture de sécurité).
+        shutil.copytree(str(src), str(dest), symlinks=True)
+    else:
+        shutil.copy2(str(src), str(dest))
     ops.append({"type": "corbeille", "chemin": str(dest)})
     annulation.enregistrer(ctx, f"Copie de {src.name} vers {dest.parent.name}", ops)
     return Resultat(True, f"Copié vers {dest}", {"fichier": str(dest)})

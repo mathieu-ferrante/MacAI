@@ -49,6 +49,14 @@ SF_DATALESS = 0x40000000
 PRIORITAIRES = ["Desktop", "Documents", "Downloads", "Library/Mobile Documents/com~apple~CloudDocs"]
 
 
+def _interdit(p: Path) -> bool:
+    from ..outils.fichiers import chemin_interdit
+    try:
+        return chemin_interdit(p)
+    except Exception:  # noqa: BLE001 - doute : on n'indexe pas
+        return True
+
+
 def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: bool = True) -> Iterator[tuple[Path, os.stat_result]]:
     ignores = set(ignorer)
     pile: list[tuple[Path, bool]] = []
@@ -93,6 +101,8 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
                 continue
             if projet and genre_de(p) in ("code", "autre"):
                 continue
+            if _interdit(p):
+                continue  # même règle que lire_document : un « cookies.txt » ou une clé ne devient pas cherchable
             yield p, st
 
 
@@ -160,7 +170,8 @@ class Indexeur:
                 nouveaux.append((p, st))
         nouveaux.sort(key=lambda x: -x[1].st_mtime)
         # Les mails et notes (« mail://… », « note://… ») ont leur propre suivi : jamais pris pour des fichiers disparus.
-        disparus = [c for c in connus if c not in vus and "://" not in c and not os.path.lexists(c)]
+        disparus = [c for c in connus if c not in vus and "://" not in c
+                    and (not os.path.lexists(c) or _interdit(Path(c)))]  # indexés avant les règles actuelles
         return nouveaux, disparus
 
     def traiter(self, p: Path, st: os.stat_result) -> None:
@@ -442,7 +453,8 @@ class SourcesApple:
 
 def lancer_en_arriere_plan(force: bool = False) -> subprocess.Popen | None:
     """Démarre `python -m macai indexer` en priorité basse (cœurs E sur Apple Silicon)."""
-    cmd = [sys.executable, "-m", "macai", "indexer"] + (["--force"] if force else [])
+    # -P : le dossier courant n'est pas ajouté aux chemins d'import (un « macai.py » posé là ne serait pas chargé).
+    cmd = [sys.executable, "-P", "-m", "macai", "indexer"] + (["--force"] if force else [])
     if sys.platform == "darwin":
         cmd = ["/usr/sbin/taskpolicy", "-b"] + cmd
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

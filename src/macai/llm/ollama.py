@@ -30,6 +30,18 @@ class ErreurOllama(RuntimeError):
     pass
 
 
+def enregistrer_empreintes(fichier, empreintes: dict) -> None:
+    from pathlib import Path
+    f = Path(fichier)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_name(f.name + ".tmp")
+    tmp.unlink(missing_ok=True)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as sortie:
+        json.dump(empreintes, sortie, indent=1)
+    os.replace(tmp, f)
+
+
 @dataclass
 class AppelOutil:
     nom: str
@@ -109,6 +121,41 @@ class Ollama:
         self.hote = hote.rstrip("/")
         self.garder = garder
         self.contexte = contexte
+        # Empreintes des modèles (fichier JSON {nom: digest}) : None = pas de vérification (tests, banc).
+        self.fichier_empreintes = None
+        self._verifies: dict[str, float] = {}
+
+    # --- Intégrité des modèles ------------------------------------------------
+
+    def empreintes_installees(self) -> dict[str, str]:
+        return {m["name"]: m.get("digest", "") for m in self._json("/api/tags", delai=5).get("models", [])}
+
+    def verifier_modele(self, modele: str) -> None:
+        """Le modèle est-il celui qu'on a installé ? Ollama n'a pas d'authentification : tout programme du Mac
+        (même une appli bac à sable) peut remplacer « qwen3.5:4b-q4_K_M » par un modèle dont le gabarit glisse des
+        consignes, et MacAI les suivrait avec ses autorisations (relecture de sécurité). L'empreinte est retenue
+        au premier usage ; un écart arrête tout jusqu'à `macai modeles --accepter`."""
+        if self.fichier_empreintes is None or time.monotonic() - self._verifies.get(modele, -1e9) < 60:
+            return
+        from pathlib import Path
+        f = Path(self.fichier_empreintes)
+        try:
+            connues = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            connues = {}
+        actuelles = self.empreintes_installees()
+        nom = modele if modele in actuelles else next((n for n in actuelles if n.split(":")[0] == modele), modele)
+        actuelle = actuelles.get(nom, "")
+        if not actuelle:
+            return  # pas installé : Ollama le dira lui-même
+        if nom not in connues:
+            connues[nom] = actuelle
+            enregistrer_empreintes(f, connues)
+        elif connues[nom] != actuelle:
+            raise ErreurOllama(f"le modèle {nom} a changé depuis son installation (empreinte {actuelle[:12]} au lieu "
+                               f"de {connues[nom][:12]}). Par sécurité je ne l'utilise pas. Si c'est toi qui l'as "
+                               "mis à jour, lance dans le Terminal : macai modeles --accepter")
+        self._verifies[modele] = time.monotonic()
 
     # --- HTTP ---------------------------------------------------------------
 
@@ -141,6 +188,7 @@ class Ollama:
         `arret` : événement « Stop » de l'utilisateur. Dès qu'il est levé, la connexion est coupée (Ollama
         abandonne aussitôt le calcul) et InterruptedError est levée, même pendant le chargement du modèle ou la
         lecture du prompt."""
+        self.verifier_modele(modele)
         corps = {
             "model": modele,
             "messages": messages,
@@ -237,6 +285,7 @@ class Ollama:
     def vecteurs(self, modele: str, textes: list[str], dimensions: int | None = None) -> list[list[float]]:
         # Contexte 512 : les extraits font ~250 jetons ; avec le contexte par défaut (4 096), le modèle
         # d'embeddings occupe 2,2 Go au lieu de 1 Go et sature la mémoire graphique à côté de l'agent (mesuré).
+        self.verifier_modele(modele)
         corps = {"model": modele, "input": textes, "keep_alive": self.garder, "truncate": True,
                  "options": {"num_ctx": CONTEXTE_EMBEDDINGS}}
         if dimensions:

@@ -79,9 +79,9 @@ def test_lire_page_et_cliquer(ctx, scripts, monkeypatch):
                                        "texte": "Bienvenue"})]
     r = chrome.lire_page(ctx)
     assert "1 [button] Créer" in r.texte and r.donnees["titre"] == "Onshape"
-    scripts["reponses"] = ["Créer", "ok", "complete"]
+    scripts["reponses"] = ["Créer", "https://cad.onshape.com/documents", "ok", "complete"]
     assert "Clic" in chrome.cliquer_page(ctx, 1)
-    scripts["reponses"] = ["", "absent"]
+    scripts["reponses"] = [chrome.ABSENT]
     with pytest.raises(ErreurOutil, match="relis la page"):
         chrome.cliquer_page(ctx, 99)
     scripts["reponses"] = ["Acheter plus de crédits d'utilisation", "ok"]

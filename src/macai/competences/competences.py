@@ -126,6 +126,15 @@ class Bibliotheque:
         self.registre.retirer(c.nom_outil)
         return True
 
+    def nom_libre(self, nom: str) -> str:
+        """Jamais d'écrasement silencieux d'une compétence existante : « mode_travail » devient « mode_travail_2 »."""
+        if nom not in self.competences and not (self.dossier / f"{nom}.json").exists():
+            return nom
+        i = 2
+        while f"{nom}_{i}" in self.competences or (self.dossier / f"{nom}_{i}.json").exists():
+            i += 1
+        return f"{nom}_{i}"
+
     def _sauver(self, c: Competence) -> None:
         (self.dossier / f"{c.nom}.json").write_text(json.dumps(asdict(c), ensure_ascii=False, indent=2), encoding="utf-8")
 

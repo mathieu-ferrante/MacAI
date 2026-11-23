@@ -120,10 +120,21 @@ def _fait(fait: str, limite: int = 200) -> str:
     return re.sub(r"\s+", " ", t).strip(" ;.")[:limite]
 
 
+def _sans_deguisement(texte) -> str:
+    """Le texte tel quel, sauf ce qui sert à déguiser une balise : caractères invisibles retirés, accents composés
+    (NFC), formes pleine largeur ramenées à l'ASCII. Le reste du contenu n'est pas modifié."""
+    import unicodedata
+    t = unicodedata.normalize("NFC", str(texte or ""))
+    return "".join("" if unicodedata.category(c) == "Cf" else
+                   unicodedata.normalize("NFKC", c) if 0xFF00 <= ord(c) <= 0xFFEF or c in "\ufe64\ufe65" else c
+                   for c in t)
+
+
 def donnees(texte: str, limite: int = 4000) -> str:
     """Encadre un résultat d'outil comme donnée et le tronque (sans possibilité d'en sortir)."""
-    # Toute variante de la balise (casse, espaces) est retirée : le cadre ne peut pas être refermé de l'intérieur.
-    texte = re.sub(r"<\s*/?\s*donn[eé]es\s*>", "[balise retirée]", str(texte or ""), flags=re.I)
+    # Toute variante de la balise est retirée : casse, espaces, attributs, accent décomposé, caractères invisibles,
+    # chevrons pleine largeur (« ＜/donnees＞ ») : le cadre ne peut pas être refermé de l'intérieur.
+    texte = re.sub(r"<\s*/?\s*d\s*o\s*n\s*n\w*[^>]{0,40}>", "[balise retirée]", _sans_deguisement(texte), flags=re.I)
     if len(texte) > limite:
         texte = texte[:limite] + f"\n[… {len(texte) - limite} caractères tronqués]"
     return f"<donnees>\n{texte}\n</donnees>"

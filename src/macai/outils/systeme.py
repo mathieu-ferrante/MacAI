@@ -74,6 +74,11 @@ def lire_presse_papiers(ctx):
 @outil("copier_presse_papiers", "Copie un texte dans le presse-papiers.", "systeme",
        {"texte": ("string", "texte à copier")}, risque=Risque.CREATION)
 def copier_presse_papiers(ctx, texte):
+    # Mêmes interdits que pour taper (coller ensuite avec cmd+v est contrôlé dans raccourci_clavier) : le
+    # presse-papiers ne doit pas servir à contourner les filtres de saisie (relecture de sécurité).
+    from .base import interdire_achat, interdire_donnees_bancaires
+    interdire_donnees_bancaires(texte)
+    interdire_achat(texte)
     commun.executer(["pbcopy"], entree=texte)
     return f"Copié ({len(texte)} caractères)."
 
@@ -144,11 +149,27 @@ SHELL = re.compile(r"[\n\r;&|`$<>(){}*?!\\]")
 # Sous-commandes autorisées en lecture seule, ou options interdites.
 SOUS_COMMANDES = {"diskutil": {"list", "info"}, "defaults": {"read"}, "pmset": {"-g"}}
 OPTIONS_INTERDITES = {"find": ("-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"),
-                      "sysctl": ("-w",), "top": ()}
+                      "sysctl": ("-w",), "top": (), "file": ("-C",)}
+# Lettres d'options (groupées ou non : « -rn ») qui lisent trop ou bloquent : grep récursif (descend dans ~/.ssh),
+# ps e/E (affiche l'environnement des processus, donc les clés d'API exportées), tail -f (ne finit jamais).
+LETTRES_INTERDITES = {"grep": "rR", "ps": "eE", "tail": "fF"}
 
 
-def analyser_commande(cmd: str) -> list[str] | None:
-    """Mots de la commande si elle est sûre à exécuter sans shell ni confirmation, sinon None."""
+def _option_interdite(nom: str, mot: str) -> bool:
+    if mot in OPTIONS_INTERDITES.get(nom, ()) or ("=" in mot and nom == "sysctl"):
+        return True
+    lettres = LETTRES_INTERDITES.get(nom, "")
+    if not lettres:
+        return False
+    if mot.startswith("--"):
+        return nom == "grep" and ("recurs" in mot or mot.startswith("--directories"))
+    groupe = mot[1:] if mot.startswith("-") else (mot if nom == "ps" else "")  # ps accepte « aux » sans tiret
+    return bool(groupe) and groupe.isalpha() and any(c in lettres for c in groupe)
+
+
+def analyser_commande(cmd: str, dossier: str = "~") -> list[str] | None:
+    """Mots de la commande si elle est sûre à exécuter sans shell ni confirmation, sinon None. Chaque argument
+    est résolu par rapport au dossier de travail (relecture de sécurité : « cat id_ed25519 » dans ~/.ssh passait)."""
     if not cmd or SHELL.search(cmd) or len(cmd) > 500:
         return None
     try:
@@ -160,21 +181,34 @@ def analyser_commande(cmd: str) -> list[str] | None:
     nom, reste = mots[0], mots[1:]
     if nom in SOUS_COMMANDES and (not reste or reste[0] not in SOUS_COMMANDES[nom]):
         return None
-    if any(m in OPTIONS_INTERDITES.get(nom, ()) or "=" in m and nom == "sysctl" for m in reste):
+    if nom == "grep" and any(m == "-d" for m in reste):
+        return None  # grep -d recurse
+    if any(_option_interdite(nom, m) for m in reste):
         return None
     mots = [str(Path(m).expanduser()) if m.startswith("~") else m for m in mots]  # pas de shell : on développe ~
     reste = mots[1:]
     if nom == "top":  # sans -l, top tourne indéfiniment
         mots = ["top", "-l", "1", "-n", "15"]
-    # Les fichiers lus passent par les mêmes interdits que lire_document (clés, mots de passe, cookies…).
+    # Les fichiers lus passent par les mêmes interdits que lire_document (clés, mots de passe, cookies, fichiers
+    # cachés…) : le dossier de travail lui-même, puis chaque argument (et la valeur des « --option=valeur »),
+    # résolu par rapport à ce dossier.
     from .fichiers import chemin_interdit
-    if any(chemin_interdit(m) for m in reste if "/" in m or m.startswith(".")):
+    try:
+        base = commun.chemin(dossier or "~")
+    except (OSError, ValueError):
         return None
+    if chemin_interdit(base):
+        return None
+    for m in reste:
+        valeur = m.split("=", 1)[1] if m.startswith("-") and "=" in m else ("" if m.startswith("-") else m)
+        if valeur and chemin_interdit(base / Path(valeur).expanduser()):
+            return None
     return mots
 
 
 def risque_commande(args: dict) -> Risque:
-    return Risque.LECTURE if analyser_commande(str(args.get("commande", ""))) else Risque.SENSIBLE
+    return Risque.LECTURE if analyser_commande(str(args.get("commande", "")), str(args.get("dossier") or "~")) \
+        else Risque.SENSIBLE
 
 
 @outil("executer_commande", "Exécute une commande dans le Terminal (zsh) et renvoie sa sortie. "
@@ -182,10 +216,14 @@ def risque_commande(args: dict) -> Risque:
        {"commande": ("string", "commande shell complète"),
         "dossier": ("string", "dossier de travail, facultatif")}, requis=["commande"],
        risque=risque_commande, toujours_confirmer=False,
-       annonce=lambda a: f"Exécuter dans le Terminal : {a['commande']}")
+       annonce=lambda a: f"Exécuter dans le Terminal : {a['commande']}"
+                         + (f" (dans {a['dossier']})" if str(a.get("dossier") or "~").strip() not in ("~", "") else ""))
 def executer_commande(ctx, commande, dossier="~"):
     import subprocess
-    mots = analyser_commande(commande)
+
+    from .fichiers import verifier_chemin
+    dossier_reel = verifier_chemin(commun.chemin(dossier or "~"))
+    mots = analyser_commande(commande, dossier or "~")
     # Lecture seule : exécutée directement, sans shell. Sinon (confirmée par l'utilisateur) : zsh sans fichiers
     # de démarrage (-f), pour qu'un ~/.zshenv modifié ne s'exécute pas à chaque commande.
     cmd = mots if mots else ["/bin/zsh", "-fc", commande]
@@ -193,7 +231,7 @@ def executer_commande(ctx, commande, dossier="~"):
            "LANG": "fr_FR.UTF-8", "USER": getpass.getuser()}
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env,
-                           cwd=str(commun.chemin(dossier or "~")))
+                           cwd=str(dossier_reel))
     except subprocess.TimeoutExpired:
         raise ErreurOutil("Commande arrêtée après 120 s.") from None
     except FileNotFoundError:

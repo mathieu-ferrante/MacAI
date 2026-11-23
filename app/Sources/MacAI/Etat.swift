@@ -201,7 +201,7 @@ final class Etat: ObservableObject {
     /// Attend que le moteur publie son port, écoute ses événements, recommence s'il redémarre.
     private func boucleConnexion() async {
         while true {
-            if client.chargerInfos() {
+            if client.chargerInfos(pidAttendu: moteur.pid) {
                 if let infos = await client.lire("/etat") as? [String: Any] {
                     connecte = true
                     statutMoteur = "Prêt"
@@ -682,12 +682,14 @@ final class Etat: ObservableObject {
             } else {
                 envoyer(texte)
             }
+        // À la voix, on peut REFUSER mais jamais accepter : un « oui » entendu peut venir d'une vidéo, d'une page lue
+        // à voix haute ou de quelqu'un d'autre dans la pièce (relecture de sécurité). Accepter = un clic.
         case .confirmation(let id):
-            guard confirmation?.id == id, let oui = Etat.ouiOuNon(texte) else { return }  // ambigu : on attend un clic
-            repondre(oui)
+            guard confirmation?.id == id, Etat.ouiOuNon(texte) == false else { return }
+            repondre(false)
         case .plan(let id):
-            guard plan?.id == id, let oui = Etat.ouiOuNon(texte) else { return }
-            repondrePlan(oui)
+            guard plan?.id == id, Etat.ouiOuNon(texte) == false else { return }
+            repondrePlan(false)
         }
     }
 
@@ -742,7 +744,8 @@ final class Etat: ObservableObject {
         guard n > 0 else { return "Je propose un plan. Je le fais ?" }
         let premieres = p.etapes.prefix(5).map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " .")) }
         let reste = n > 5 ? " ; et \(n - 5) autres" : ""
-        return "Je propose \(n) étape\(n > 1 ? "s" : "") : " + premieres.joined(separator: " ; ") + reste + ". Je le fais ?"
+        return "Je propose \(n) étape\(n > 1 ? "s" : "") : " + premieres.joined(separator: " ; ") + reste
+            + ". Clique sur Valider pour lancer, ou dis non."
     }
 
     func traiter(_ evt: [String: Any]) {
@@ -768,7 +771,7 @@ final class Etat: ObservableObject {
             let phrase = evt["phrase"] as? String ?? "Action sensible"
             let id = evt["id"] as? String ?? ""
             confirmation = DemandeConfirmation(id: id, phrase: phrase)
-            demanderAVoixHaute("\(phrase). Tu confirmes ?", .confirmation(id))
+            demanderAVoixHaute("\(phrase). Clique sur Confirmer pour l'accepter, ou dis non.", .confirmation(id))
         case "plan_propose":
             let p = PropositionPlan(id: evt["id"] as? String ?? "", demande: evt["demande"] as? String ?? "",
                                     etapes: evt["etapes"] as? [String] ?? [])

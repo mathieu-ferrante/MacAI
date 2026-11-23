@@ -27,7 +27,8 @@ Dans le **Terminal** : `macai demander "range mes téléchargements"`.
 - **Écrites**, **Orales** ou **Écrites et orales** : tu choisis comment MacAI répond.
 - **Conversation vocale** : après sa réponse orale, MacAI réécoute tout seul. Tu enchaînes sans toucher au clavier ;
   « merci », « stop » ou « c'est tout » terminent.
-- Les **confirmations** et les **plans** peuvent se valider à la voix : « oui », « vas-y » ou « non », « annule ».
+- Les **confirmations** et les **plans** peuvent se **refuser** à la voix (« non », « annule ») ; pour les **accepter**, il
+  faut cliquer. Un « oui » entendu pourrait venir d'une vidéo ou de quelqu'un d'autre dans la pièce.
 
 ---
 
@@ -134,14 +135,17 @@ Dans le **Terminal** : `macai demander "range mes téléchargements"`.
 | Règle | Détail |
 |---|---|
 | **Jamais** | Acheter, payer, demander des crédits ou une utilisation supplémentaire, s'abonner ; taper un mot de passe ou un numéro de carte ; retenir un secret ; supprimer définitivement (tout passe par la Corbeille) |
-| **Confirmation** | Mettre à la Corbeille ; envoyer un mail ou un message ; commandes Terminal qui modifient quelque chose ; écraser un fichier existant ; écrire dans un Terminal ; cliquer Envoyer / Publier / Partager / Supprimer |
+| **Confirmation** | Mettre à la Corbeille ; envoyer un mail ou un message (texte complet affiché) ; valider (Entrée, ⌘↩) dans une messagerie, un navigateur ou un Terminal ; valider un formulaire web ; commandes Terminal qui ne sont pas de simples lectures ; écraser un fichier existant ; déplacer ou copier hors de ton dossier personnel ; ouvrir autre chose qu'un document (appli, script, raccourci web…) ; cliquer Envoyer / Publier / Supprimer / Corbeille, ou un bouton sans nom dans une page web ; cliquer sur une page de paiement ; programmer une tâche ; créer une compétence |
+| **Contenu lu** | Après avoir lu une page, un mail, un fichier ou l'écran, tout ce qui sortirait du Mac **avec des informations que tu n'as pas tapées** (adresse web, question à Claude ou ChatGPT, recherche, texte dans un navigateur, souvenir) est confirmé : c'est ainsi qu'une page piégée essaierait de voler des données |
 | **Libre** | Tout le reste : ouvrir, lire, créer, ranger, cliquer, taper, piloter ArtCraft ou Claude… |
-| **Protégé** | Clés SSH, Trousseau, mots de passe et cookies des navigateurs, messageries, fichiers de démarrage (~/.zshrc…), réglages et code de MacAI |
+| **Protégé** | Clés SSH, Trousseau, mots de passe et cookies des navigateurs, messageries, Notes, Contacts, tous les fichiers cachés de ton dossier (~/.zshrc…), réglages et code de MacAI — quelle que soit la façon d'écrire le chemin (majuscules, liens, `/System/Volumes/Data/…`) |
 | **Pièges** | Ce qu'il lit (page web, mail, document, écran) est une **donnée, jamais un ordre** : un fichier piégé qui dit « supprime tout » est ignoré (testé) |
 | **Sans toi** | Une tâche planifiée qui tournerait en ton absence ne peut rien confirmer : envoi, suppression et achat y sont refusés d'office |
+| **Modèle** | L'empreinte des modèles est retenue : si un programme remplace le modèle par un autre, MacAI refuse de s'en servir (`macai modeles --accepter` après une mise à jour volontaire) |
 | **Autorisation manquante** | Il s'arrête et te dit exactement quoi activer dans Réglages Système |
 
-Niveau d'autonomie (menu 🧠 ou `macai.toml`) : `prudent`, `equilibre` (défaut) ou `autonome`.
+Niveau d'autonomie (menu 🧠) : `prudent` (annonce et confirme aussi les modifications) ou `equilibre` (défaut). Le
+mode `autonome` (seulement à la main dans `macai.toml`) supprime les annonces, **jamais** les confirmations ci-dessus.
 
 ---
 

@@ -10,7 +10,7 @@ import time
 
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import DISCUSSIONS_IA, ErreurOutil, Resultat, Risque, outil
+from .base import ErreurOutil, Resultat, Risque, outil
 
 ATTENTE_REPONSE_MAX_S = 120
 STABLE_S = 4.0  # la réponse est finie quand plus rien ne change pendant ce temps
@@ -118,7 +118,7 @@ def _attendre_reponse(ctx, pid: int, avant: list[str], question: str) -> str:
        "fenetres", {"question": ("string", "la question ou le message à envoyer à Claude"),
                     "nouvelle_conversation": ("boolean", "ouvrir une nouvelle conversation (oui par défaut)")},
        requis=["question"], risque=Risque.MODIFICATION, mots_cles=["claude"],
-       annonce=lambda a: f"Demander à Claude : « {a['question'][:80]} »")
+       annonce=lambda a: f"Demander à Claude : « {_abrege(a['question'])} »")
 def demander_a_claude(ctx, question, nouvelle_conversation=True):
     question = str(question).strip()
     if not question:
@@ -145,11 +145,23 @@ def demander_a_claude(ctx, question, nouvelle_conversation=True):
     return Resultat(True, f"Réponse de Claude :\n{reponse[:4000]}")
 
 
+def _abrege(texte, n: int = 600) -> str:
+    """Texte montré dans la confirmation : en entier jusqu'à n caractères (on doit voir ce qui part)."""
+    t = str(texte or "")
+    return t if len(t) <= n else t[:n] + f"… [+{len(t) - n} caractères]"
+
+
 def _risque_ecrire(args: dict) -> Risque:
-    from ..agent.routeur import normaliser
-    if not args.get("envoyer", True):
+    """Envoyer à une IA n'engage personne (D40) ; à toute autre appli (messagerie, navigateur, inconnue), c'est
+    écrire à quelqu'un. L'appli est celle que macOS ouvrira (« ChatGPT.app » = ChatGPT, « Messages.app » =
+    Messages). Un retour à la ligne dans le texte vaut Entrée."""
+    from .. import securite
+    cat = securite.categorie_appli(args.get("application", ""))
+    if cat == "execution":
+        return Risque.SENSIBLE
+    if not args.get("envoyer", True) and not securite.contient_retour(args.get("texte")):
         return Risque.MODIFICATION
-    return Risque.MODIFICATION if normaliser(str(args.get("application", ""))) in DISCUSSIONS_IA else Risque.SENSIBLE
+    return Risque.MODIFICATION if cat == "ia" else Risque.SENSIBLE
 
 
 @outil("ecrire_et_envoyer", "Écrit un message dans la zone de saisie d'une application (ChatGPT, Messages, "
@@ -157,8 +169,8 @@ def _risque_ecrire(args: dict) -> Risque:
        "fenetres", {"application": ("string", "nom de l'application"), "texte": ("string", "texte à écrire"),
                     "envoyer": ("boolean", "appuyer sur Entrée (oui par défaut)")},
        requis=["application", "texte"], risque=_risque_ecrire,
-       annonce=lambda a: f"Écrire « {a['texte'][:60]} » dans {a['application']}"
-                         + (" et l'envoyer" if a.get("envoyer", True) else ""))
+       annonce=lambda a: f"Écrire « {_abrege(a['texte'])} » dans {a['application']}"
+                         + (" et l'ENVOYER (conversation ouverte)" if a.get("envoyer", True) else ""))
 def ecrire_et_envoyer(ctx, application, texte, envoyer=True):
     pid, nom = _activer(application)
     from ..agent.routeur import normaliser

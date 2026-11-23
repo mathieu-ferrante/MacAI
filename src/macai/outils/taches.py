@@ -76,8 +76,11 @@ def _fichier_taches(ctx):
         "heure": ("string", "HH:MM, 08:00 par défaut"),
         "jour": ("string", "jour de la semaine pour hebdomadaire (lundi … dimanche)"),
         "date": ("string", "pour une_fois : demain, JJ/MM/AAAA ou AAAA-MM-JJ")},
-       requis=["demande", "frequence"], risque=Risque.CREATION, mac_seulement=False, mots_cles=MOTS_TACHES,
-       annonce=lambda a: f"Planifier « {a.get('demande', '')} » ({a.get('frequence', '')}"
+       # Toujours confirmé : la tâche tournera plus tard, sans personne devant l'écran (relecture de sécurité :
+       # un mail piégé pouvait programmer « lis https://… et applique ce qui y est écrit » toutes les heures).
+       requis=["demande", "frequence"], risque=Risque.SENSIBLE, toujours_confirmer=True, mac_seulement=False,
+       mots_cles=MOTS_TACHES,
+       annonce=lambda a: f"Programmer une tâche qui tournera seule : « {a.get('demande', '')} » ({a.get('frequence', '')}"
                          f"{', ' + str(a['heure']) if a.get('heure') else ''})")
 def planifier_tache(ctx, demande, frequence, heure="08:00", jour="", date=""):
     from .. import planificateur as pl

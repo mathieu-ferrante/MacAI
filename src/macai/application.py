@@ -34,6 +34,8 @@ class Application:
         self.cfg = cfg or config_mod.charger()
         m = self.cfg.modeles
         self.ollama = ollama or Ollama(garder=m["garder_en_memoire"], contexte=int(m["contexte"]))
+        if ollama is None:
+            self.ollama.fichier_empreintes = self.cfg.chemin("modeles_empreintes.json")
         self.registre = charger_tous()
         self.journal = Journal(self.cfg.chemin("journal.jsonl"))
         self._abonnes: list[queue.Queue] = []
@@ -159,7 +161,7 @@ class Application:
             self.cfg.alertes.update({k: bool(v) for k, v in r["alertes"].items() if k in self.cfg.alertes})
         if r.get("plan") in ("complexe", "toujours", "jamais"):
             self.cfg.agent["plan"] = r["plan"]
-        if r.get("autonomie") in ("prudent", "equilibre", "autonome"):
+        if r.get("autonomie") in ("prudent", "equilibre"):
             self.cfg.agent["autonomie"] = r["autonomie"]
         self.classement_actif = bool(r.get("classement", False))
 
@@ -176,7 +178,9 @@ class Application:
             self.cfg.alertes.update({k: bool(v) for k, v in d["alertes"].items() if k in self.cfg.alertes})
         if d.get("plan") in ("complexe", "toujours", "jamais"):
             self.cfg.agent["plan"] = d["plan"]
-        if d.get("autonomie") in ("prudent", "equilibre", "autonome"):
+        if d.get("autonomie") in ("prudent", "equilibre"):
+            # « autonome » seulement à la main dans macai.toml : par l'API, n'importe quel programme qui lirait le
+            # jeton pourrait couper les confirmations (relecture de sécurité).
             self.cfg.agent["autonomie"] = d["autonomie"]
         if "classement" in d:
             self.classement_actif = bool(d["classement"])
@@ -245,8 +249,20 @@ class Application:
             attente["evenement"].set()
 
     def creer_competence(self) -> str:
+        """Bouton « Créer la compétence » de l'app : le clic est l'accord de l'utilisateur (pas de seconde
+        confirmation), mais tout le reste passe par le chemin habituel."""
         with self._occupe:
-            r = self.orchestrateur.executer_outil("creer_competence", {})
+            self.ctx.services["outil_confirme"] = True
+            o = self.registre.get("creer_competence")
+            try:
+                r = o.executer(self.ctx, {}) if o is not None else None
+            finally:
+                self.ctx.services.pop("outil_confirme", None)
+            if r is None:
+                from .outils.base import Resultat
+                r = Resultat.echec("Compétences indisponibles.")
+            self.journal.ecrire("outil", outil="creer_competence", arguments={}, ok=r.ok, texte=r.texte[:500],
+                                duree=0)
             self.emettre("fin", texte=r.texte, actions=[])
             return r.texte
 

@@ -24,6 +24,9 @@ final class Moteur {
         return py
     }
 
+    /// Pid du moteur lancé par l'app (nil s'il ne tourne pas).
+    var pid: Int32? { processus?.isRunning == true ? processus?.processIdentifier : nil }
+
     func demarrer() {
         guard processus?.isRunning != true else { return }  // jamais deux moteurs
         relanceEnAttente?.cancel()
@@ -45,10 +48,19 @@ final class Moteur {
         try? FileManager.default.removeItem(at: infos)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: py)
-        p.arguments = ["-m", "macai", "serveur"]
-        var env = ProcessInfo.processInfo.environment
-        env["PYTHONUNBUFFERED"] = "1"
-        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        // -I : Python isolé (ni PYTHONPATH, ni site utilisateur, ni dossier courant dans les imports). Environnement
+        // minimal : rien d'hérité (DYLD_*, PYTHON*, variables posées par « launchctl setenv ») ne peut changer le code
+        // qui tourne avec les autorisations de MacAI (relecture de sécurité).
+        p.arguments = ["-I", "-m", "macai", "serveur"]
+        let herite = ProcessInfo.processInfo.environment
+        var env: [String: String] = [
+            "PYTHONUNBUFFERED": "1",
+            "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        ]
+        for cle in ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "SHELL", "MACAI_HOME",
+                    "__CFBundleIdentifier", "XPC_SERVICE_NAME"] {
+            if let v = herite[cle] { env[cle] = v }
+        }
         p.environment = env
         let journal = Moteur.dossier.appendingPathComponent("moteur.log")
         tournerJournal(journal)

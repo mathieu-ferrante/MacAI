@@ -112,6 +112,7 @@ cat > "$DONNEES/lancement.json" <<JSON
 JSON
 ln -sf "$VENV/bin/macai" "$(brew --prefix)/bin/macai"
 "$VENV/bin/macai" outils >/dev/null   # crée macai.toml au premier lancement
+"$VENV/bin/macai" modeles --accepter >/dev/null  # empreintes des modèles tout juste téléchargés (sécurité)
 ok "Moteur installé — commande \`macai\` disponible dans le Terminal"
 
 # --- 5. Application ----------------------------------------------------------------------------

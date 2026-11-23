@@ -122,6 +122,18 @@ def _verifier(p: Path) -> None:
     verifier_chemin(p, ecriture=True)
 
 
+def _verifier_origine(de: Path, genre: str) -> None:
+    """L'élément à remettre en place ne doit pas être un secret ou un fichier de MacAI (annulations.json modifié
+    à la main ou par un autre programme) ; seule exception : la Corbeille, d'où l'on restaure."""
+    from . import securite
+    from .outils.base import ErreurOutil
+    from .outils.fichiers import chemin_interdit
+    if genre == "restaurer" and securite.sous(securite.cle_chemin(de), securite.cle_chemin(Path.home() / ".Trash")):
+        return
+    if chemin_interdit(de):
+        raise ErreurOutil(f"Annulation refusée : {de} est un emplacement protégé.")
+
+
 def _appliquer(op: dict) -> tuple[bool, str]:
     from .outils import fichiers
     genre = op.get("type")
@@ -134,6 +146,7 @@ def _appliquer(op: dict) -> tuple[bool, str]:
             ou = "dans la Corbeille" if genre == "restaurer" else "à " + str(de)
             return False, f"{de.name} introuvable {ou} (déplacé ou supprimé depuis ?)"
         _verifier(vers)
+        _verifier_origine(de, genre)
         dest, remarque = _libre(vers)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(de), str(dest))

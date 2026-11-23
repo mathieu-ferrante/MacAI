@@ -9,10 +9,11 @@ import tempfile
 import time
 from pathlib import Path
 
+from .. import securite
 from ..mac import accessibilite as ax
 from ..mac import commun
-from .base import (APPS_EXECUTION, APPS_MESSAGERIE, DISCUSSIONS_IA, ENVOI, ErreurOutil, Resultat, Risque,
-                   interdire_achat, interdire_donnees_bancaires, nom_appli, outil)
+from .base import (ENVOI, ErreurOutil, Resultat, Risque, interdire_achat, interdire_donnees_bancaires, nom_appli,
+                   outil)
 
 
 def _pas_dans_claude_code(ctx, application: str = "") -> None:
@@ -35,7 +36,6 @@ def _pas_dans_claude_code(ctx, application: str = "") -> None:
 
 # Dernière fenêtre lue (pour les niveaux de risque, qui ne voient que les arguments).
 _DERNIERE = {"app": "", "pid": 0, "elements": []}
-TOUCHES_ENVOI = {"entree", "return", "enter", "cmd+entree", "cmd+return", "cmd+enter", "cmd+maj+d", "cmd+shift+d"}
 
 
 def _appli_devant() -> str:
@@ -45,47 +45,74 @@ def _appli_devant() -> str:
         return ""
 
 
-def _risque_selon(app: str, envoi: bool, libelle: str = "") -> Risque:
+def _risque_selon(app: str, envoi: bool, libelle: str = "", clic: bool = False) -> Risque:
     """Taper ou valider dans un Terminal = exécuter du code ; valider dans une messagerie = écrire à quelqu'un ;
-    cliquer sur Envoyer / Supprimer / Publier : confirmation dans tous ces cas. Sauf « Envoyer » une question
-    à une IA (Claude, ChatGPT…) : personne n'est engagé."""
-    a = nom_appli(app)
-    if a in APPS_EXECUTION:
+    valider dans un navigateur = soumettre un formulaire web (Gmail, banque, réseau social) ; cliquer sur Envoyer
+    / Supprimer / Publier / Corbeille : confirmation dans tous ces cas. Sauf « Envoyer » une question à une IA
+    (Claude, ChatGPT…) : personne n'est engagé. L'appli est celle que macOS ouvrira (« Messages.app », « Microsoft
+    Outlook » compris), le libellé est normalisé (Unicode, accents) : relecture de sécurité."""
+    cat = securite.categorie_appli(app)
+    if cat == "execution":
         return Risque.SENSIBLE
-    if a in DISCUSSIONS_IA:
-        libelle = re.sub(r"(?i)envoy\w*|\bsend\b", "", libelle)
-    if envoi and a in APPS_MESSAGERIE:
+    lib = securite.texte_normal(libelle)
+    if cat == "ia":
+        lib = re.sub(r"(?i)envoy\w*|\bsend\b", "", lib)
+    if envoi and cat in ("messagerie", "navigateur"):
         return Risque.SENSIBLE
-    if libelle and ENVOI.search(libelle):
+    if clic and (cat == "messagerie" or (cat == "navigateur" and not lib.strip())):
+        return Risque.SENSIBLE  # messagerie : tout clic peut envoyer (flèche sans libellé) ; page : icône inconnue
+    if lib and (ENVOI.search(lib) or ENVOI.search(securite.simple(lib))):
         return Risque.SENSIBLE
     return Risque.MODIFICATION
 
 
-def _risque_cliquer(args: dict) -> Risque:
+def _element_memorise(numero):
     try:
-        n = int(args.get("numero", 0))
-        e = _DERNIERE["elements"][n - 1] if n >= 1 else None
-        libelle = f"{e.libelle} {e.valeur}" if e else ""
+        n = int(numero)
+        return _DERNIERE["elements"][n - 1] if n >= 1 else None
     except (IndexError, ValueError, TypeError):
-        libelle = ""
-    return _risque_selon(_DERNIERE["app"], True, libelle)
+        return None
+
+
+def _risque_cliquer(args: dict) -> Risque:
+    e = _element_memorise(args.get("numero", 0))
+    return _risque_selon(_DERNIERE["app"], False, f"{e.libelle} {e.valeur}" if e else "", clic=True)
+
+
+def _annonce_cliquer(a: dict) -> str:
+    e = _element_memorise(a.get("numero", 0))
+    cible = f"« {(e.libelle or e.valeur or ax.ROLES.get(e.role, e.role)).strip()} »" if e else f"l'élément {a['numero']}"
+    return f"Cliquer sur {cible}" + (f" dans {_DERNIERE['app']}" if _DERNIERE.get("app") else "")
 
 
 def _risque_saisir(args: dict) -> Risque:
-    return _risque_selon(_DERNIERE["app"], bool(args.get("valider")))
+    return _risque_selon(_DERNIERE["app"], bool(args.get("valider")) or securite.contient_retour(args.get("texte")))
 
 
 def _risque_taper(args: dict) -> Risque:
-    return _risque_selon(str(args.get("application") or _appli_devant()), bool(args.get("valider")))
+    return _risque_selon(str(args.get("application") or _appli_devant()),
+                         bool(args.get("valider")) or securite.contient_retour(args.get("texte")))
 
 
 def _risque_raccourci(args: dict) -> Risque:
-    touches = str(args.get("touches", "")).lower().replace(" ", "")
-    return _risque_selon(_appli_devant(), touches in TOUCHES_ENVOI)
+    mods, touche = securite.touches_normalisees(args.get("touches", ""))
+    app = _appli_devant()
+    if securite.categorie_appli(app) == "execution" and touche not in ("c", "f", "a", "echap"):
+        return Risque.SENSIBLE
+    return Risque.SENSIBLE if securite.raccourci_sensible(mods, touche, securite.categorie_appli(app)) \
+        else Risque.MODIFICATION
 
 
 def _risque_menu(args: dict) -> Risque:
     return _risque_selon(str(args.get("application", "")), False, str(args.get("chemin", "")))
+
+
+def _risque_cliquer_ecran(args: dict) -> Risque:
+    """Clic par la vision : la cible réelle n'est pas connue avant le clic. Confirmation dans une messagerie, un
+    navigateur ou une appli d'exécution, ou si la description parle d'envoyer, supprimer, payer…"""
+    if securite.categorie_appli(_appli_devant()) in ("execution", "messagerie", "navigateur"):
+        return Risque.SENSIBLE
+    return _risque_selon("", False, str(args.get("description", "")))
 
 
 def _mettre_devant(ctx, pid: int, nom: str) -> None:
@@ -145,8 +172,7 @@ def lire_fenetre(ctx, application=""):
 
 
 @outil("cliquer_element", "Clique sur un élément de fenêtre par son numéro (donné par lire_fenetre).", "fenetres",
-       {"numero": ("integer", "numéro de l'élément")}, risque=_risque_cliquer,
-       annonce=lambda a: f"Cliquer sur l'élément {a['numero']}")
+       {"numero": ("integer", "numéro de l'élément")}, risque=_risque_cliquer, annonce=_annonce_cliquer)
 def cliquer_element(ctx, numero):
     e = _element(ctx, numero)
     interdire_achat(e.libelle, bouton=True)
@@ -165,6 +191,7 @@ def cliquer_element(ctx, numero):
                     "remplacer": ("boolean", "effacer le texte déjà présent (seulement si l'utilisateur le demande)")},
        requis=["numero", "texte"],
        risque=_risque_saisir, annonce=lambda a: f"Écrire « {a['texte']} » dans le champ {a['numero']}"
+                                                + (f" de {_DERNIERE['app']}" if _DERNIERE.get("app") else "")
                                                 + (" puis valider (Entrée)" if a.get("valider") else ""))
 def saisir_element(ctx, numero, texte, valider=False, remplacer=False):
     e = _element(ctx, numero)
@@ -232,16 +259,17 @@ def lister_menus(ctx, application, menu=""):
        {"touches": ("string", "raccourci, ex. cmd+c")}, risque=_risque_raccourci,
        annonce=lambda a: f"Raccourci {a['touches']} dans {_appli_devant() or 'l’application au premier plan'}")
 def raccourci_clavier(ctx, touches):
-    parties = [p.strip() for p in touches.lower().replace(" ", "").split("+") if p.strip()]
-    if not parties:
+    # Même lecture des touches que pour le calcul du risque : ce qui a été confirmé est ce qui est envoyé.
+    mods, touche = securite.touches_normalisees(touches)
+    if not touche:
         raise ErreurOutil("Raccourci vide.")
-    if parties[-1] == "q" and any(m in parties[:-1] for m in ("cmd", "command", "commande")):
+    if touche == "q" and "cmd" in mods:
         raise ErreurOutil("Pour quitter une application, utilise quitter_application.")
     if nom_appli(_appli_devant()) in ("macai", "loginwindow", ""):
         raise ErreurOutil("Aucune application cible au premier plan (le panneau MacAI l'est) : ouvre d'abord "
                           "l'application avec ouvrir_application, puis refais le raccourci.")
-    ax.raccourci(parties[:-1], parties[-1])
-    return f"Raccourci {touches} envoyé."
+    ax.raccourci(mods, touche)
+    return f"Raccourci {'+'.join([*mods, touche])} envoyé."
 
 
 @outil("taper_texte", "Tape un texte au clavier à l'endroit du curseur, dans l'application indiquée. Préfère "
@@ -339,11 +367,11 @@ def extraire_coordonnees(texte: str) -> tuple[float, float]:
 @outil("cliquer_ecran", "Trouve à l'écran l'élément décrit (vision) et clique dessus. Dernier recours, moins "
        "fiable que cliquer_element.", "fenetres",
        {"description": ("string", "ce sur quoi cliquer, ex. « le bouton bleu Partager en haut à droite »"),
-        "double": ("boolean", "double-clic")}, requis=["description"], risque=Risque.MODIFICATION,
+        "double": ("boolean", "double-clic")}, requis=["description"], risque=_risque_cliquer_ecran,
        annonce=lambda a: f"Cliquer à l'écran sur : {a['description']}")
 def cliquer_ecran(ctx, description, double=False):
     from .documents import demander_vision
-    interdire_achat(description)
+    interdire_achat(description, bouton=True)
     rep = demander_vision(ctx, capture_reduite(),
                           f"Trouve sur cette capture d'écran : {description}. Réponds UNIQUEMENT en JSON "
                           '{"x": <0-1000>, "y": <0-1000>} : position du centre de l\'élément, en millièmes de la '

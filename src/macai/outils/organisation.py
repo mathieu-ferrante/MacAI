@@ -228,6 +228,12 @@ def _agenda():
 
 # --- Rappels -----------------------------------------------------------------------------------------------
 
+
+def _abrege(texte, n: int = 600) -> str:
+    """Texte montré dans une confirmation d'envoi : en entier jusqu'à n caractères."""
+    t = str(texte or "")
+    return t if len(t) <= n else t[:n] + f"… [+{len(t) - n} caractères]"
+
 @outil("creer_rappel", "Crée un rappel dans l'app Rappels, avec une échéance (notification à l'heure dite).",
        "organisation", {"titre": ("string", "texte du rappel"),
                         "echeance": ("string", "date et heure AAAA-MM-JJ HH:MM, facultatif"),
@@ -586,7 +592,8 @@ end tell''')
 @outil("envoyer_mail", "Envoie un mail immédiatement depuis l'app Mail.", "organisation",
        {"destinataire": ("string", "adresse e-mail"), "sujet": ("string", "sujet"), "corps": ("string", "texte")},
        risque=Risque.SENSIBLE, toujours_confirmer=True,
-       annonce=lambda a: f"ENVOYER un mail à {a['destinataire']} — sujet : {a['sujet']}")
+       annonce=lambda a: f"ENVOYER un mail à {a['destinataire']} — sujet : {a['sujet']} — texte : "
+                         f"« {_abrege(a.get('corps', ''))} »")
 def envoyer_mail(ctx, destinataire, sujet, corps):
     interdire_donnees_bancaires(f"{sujet}\n{corps}")
     commun.osascript(f'''tell application "Mail"

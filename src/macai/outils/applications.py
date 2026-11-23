@@ -168,18 +168,46 @@ def applications_ouvertes(ctx):
     return Resultat(True, texte, {"applications": noms})
 
 
-# Ouvrir ces fichiers revient à exécuter du code (Terminal, Automator, AppleScript, installeurs, raccourcis web).
+# Ouvrir un fichier peut revenir à exécuter du code (.command, .terminal, .app, .pkg, .webloc, alias Finder…).
+# Liste BLANCHE (relecture de sécurité : la liste noire se contournait avec « x.terminal␠ », un lien
+# symbolique « doc.pdf → x.command », ou une extension oubliée) : documents, images, sons, vidéos, archives.
+# Tout le reste (y compris un dossier-paquet) demande confirmation.
+OUVRABLES = {".pdf", ".txt", ".md", ".rtf", ".rtfd", ".doc", ".docx", ".odt", ".pages", ".epub", ".xls", ".xlsx",
+             ".csv", ".numbers", ".ods", ".ppt", ".pptx", ".key", ".odp", ".jpg", ".jpeg", ".png", ".gif", ".heic",
+             ".heif", ".webp", ".tiff", ".tif", ".bmp", ".svg", ".raw", ".cr2", ".nef", ".dng", ".psd", ".mp4",
+             ".mov", ".avi", ".mkv", ".webm", ".m4v", ".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg", ".aiff",
+             ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".stl", ".step", ".stp", ".obj", ".3mf",
+             ".f3d", ".blend", ".json", ".xml", ".log", ".yaml", ".yml", ".ics", ".srt"}
 EXECUTABLES = {".command", ".terminal", ".sh", ".zsh", ".bash", ".tool", ".app", ".pkg", ".mpkg", ".dmg",
                ".workflow", ".scpt", ".scptd", ".applescript", ".webloc", ".fileloc", ".inetloc", ".jar", ".py",
-               ".pl", ".rb", ".shortcut", ".prefpane", ".mobileconfig", ".kext", ".plist"}
+               ".pl", ".rb", ".shortcut", ".prefpane", ".mobileconfig", ".kext", ".plist"}  # pour mémoire (tests)
+ALIAS_FINDER = b"book\x00\x00\x00\x00mark"
 
 
 def _risque_ouvrir(args: dict) -> Risque:
-    from .base import APPS_EXECUTION, nom_appli
-    if Path(str(args.get("chemin", ""))).suffix.lower() in EXECUTABLES:
+    from .. import securite
+    chemin = str(args.get("chemin", ""))
+    if chemin.startswith(("mail://", "note://")):
+        return Risque.CREATION
+    application = str(args.get("application", "") or "")
+    if application and securite.categorie_appli(application) == "execution":
         return Risque.SENSIBLE
-    if nom_appli(str(args.get("application", ""))) in APPS_EXECUTION:
+    try:
+        p = commun.chemin(chemin)  # même résolution que l'outil : guillemets, espaces, liens symboliques
+    except (OSError, ValueError):
         return Risque.SENSIBLE
+    if p.is_dir():
+        # Un dossier ordinaire s'ouvre dans le Finder ; un dossier-paquet (.app, .saver, .workflow…) s'exécute.
+        return Risque.CREATION if p.suffix.lower() in OUVRABLES | {"", ".rtfd"} or not re.fullmatch(
+            r"\.[a-z0-9]{2,12}", p.suffix.lower()) else Risque.SENSIBLE
+    if p.suffix.lower() not in OUVRABLES:
+        return Risque.SENSIBLE
+    try:
+        with open(p, "rb") as f:
+            if f.read(16).startswith(ALIAS_FINDER):
+                return Risque.SENSIBLE  # alias Finder déguisé en document
+    except OSError:
+        pass
     return Risque.CREATION
 
 

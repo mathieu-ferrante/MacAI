@@ -19,6 +19,7 @@ import threading
 import time
 import uuid
 
+from .. import securite
 from ..llm.ollama import ErreurOllama
 from ..outils.base import Outil, Resultat, Risque
 from . import consignes, routeur
@@ -106,15 +107,15 @@ class Orchestrateur:
     def faut_confirmer(self, o: Outil, args: dict, risque: Risque | None = None) -> bool:
         if o.toujours_confirmer:
             return True
+        r = _risque(o, args) if risque is None else risque
+        if r >= Risque.SENSIBLE:
+            # Envoyer, supprimer, exécuter, payer : confirmé dans TOUS les modes, « autonome » compris (relecture
+            # de sécurité : en autonome, Entrée dans Messages ou un clic sur « Supprimer » partaient sans accord).
+            return True
         mode = self.ctx.config.agent.get("autonomie", "equilibre")
         if self.plan_valide and mode == "prudent":
             mode = "equilibre"  # l'utilisateur a validé le plan : on ne redemande que ce qui est sensible
-        r = _risque(o, args) if risque is None else risque
-        if mode == "autonome":
-            return False
-        if mode == "prudent":
-            return r >= Risque.MODIFICATION
-        return r >= Risque.SENSIBLE
+        return mode == "prudent" and r >= Risque.MODIFICATION
 
     def executer_outil(self, nom: str, args: dict) -> Resultat:
         ctx = self.ctx
@@ -133,6 +134,12 @@ class Orchestrateur:
             ctx.emettre("outil_fin", outil=nom, ok=False, texte=r.texte)
             return r
         risque = _risque(o, args)
+        # Contexte de la demande (contenu extérieur déjà lu) : données qui sortiraient du Mac sans venir de
+        # l'utilisateur → confirmation, avec la raison dans la phrase.
+        raison = securite_contexte(ctx, nom, args)
+        if raison:
+            risque = Risque.SENSIBLE
+            phrase = f"{phrase} — {raison}"
         if self.faut_confirmer(o, args, risque):
             ctx.emettre("confirmation", outil=nom, arguments=args, phrase=phrase)
             if not ctx.demander_confirmation(phrase, nom, args):
@@ -140,10 +147,15 @@ class Orchestrateur:
                 r = Resultat.echec(REFUS)
                 ctx.emettre("outil_fin", outil=nom, ok=False, texte=r.texte)
                 return r
+            ctx.services["outil_confirme"] = True  # un contrôle tardif dans l'outil ne redemandera pas
         elif risque >= Risque.MODIFICATION:
             ctx.emettre("annonce", outil=nom, phrase=phrase)
         debut = time.monotonic()
-        r = o.executer(ctx, args)
+        try:
+            r = o.executer(ctx, args)
+        finally:
+            ctx.services.pop("outil_confirme", None)
+        securite.marquer_lu(ctx, nom, r.texte)
         ctx.journal.ecrire("outil", outil=nom, arguments=_abreger(args), ok=r.ok, texte=r.texte[:500],
                            duree=round(time.monotonic() - debut, 2))
         ctx.emettre("outil_fin", outil=nom, ok=r.ok, texte=r.texte[:500], donnees=_serialisable(r.donnees))
@@ -158,6 +170,7 @@ class Orchestrateur:
         try:  # quoi qu'il arrive, « fin » est émis : l'interface ne reste jamais « occupée »
             ctx.arret.clear()
             ctx.services["demande"] = demande  # certains garde-fous dépendent de ce que l'utilisateur a demandé
+            securite.debut_demande(ctx)  # rien d'extérieur n'a encore été lu pour cette demande
             self._oublier_fenetre()
             ctx.emettre("debut", demande=demande)
             ctx.journal.ecrire("demande", texte=demande)
@@ -598,6 +611,28 @@ def preparer(o: Outil, args) -> tuple[dict, str]:
         pass
     propres, invalides = o._corriger(args)
     return propres, ("Valeur invalide : " + " ; ".join(invalides)) if invalides else ""
+
+
+def securite_contexte(ctx, nom: str, args: dict) -> str:
+    """Raison de confirmer qui dépend de la demande en cours (et pas seulement des arguments), ou ""."""
+    try:
+        categorie = ""
+        if nom == "taper_texte":
+            categorie = securite.categorie_appli(args.get("application", ""))
+        elif nom in ("saisir_element", "raccourci_clavier"):
+            fen = sys.modules.get("macai.outils.fenetres")
+            app = (getattr(fen, "_DERNIERE", {}).get("app", "") if nom == "saisir_element"
+                   else (fen._appli_devant() if fen else ""))
+            categorie = securite.categorie_appli(app)
+        if nom == "raccourci_clavier":
+            mods, touche = securite.touches_normalisees(args.get("touches", ""))
+            if securite.contenu_lu(ctx) and securite.raccourci_sensible(mods, touche, categorie, True) \
+                    and not securite.raccourci_sensible(mods, touche, categorie, False):
+                return "un contenu extérieur a été lu : je vérifie avec toi avant de valider dans cette application"
+            return ""
+        return securite.sortie_a_confirmer(ctx, nom, args, categorie)
+    except Exception:  # noqa: BLE001 - doute : on demande plutôt que d'agir
+        return "vérification de sécurité impossible"
 
 
 def _risque(o: Outil, args: dict) -> Risque:

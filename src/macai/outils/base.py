@@ -44,32 +44,48 @@ class ErreurOutil(Exception):
 
 # Jamais cliqué, choisi ni rempli par l'agent, quelle que soit l'application : rien qui dépense de l'argent
 # ou demande des crédits / une utilisation supplémentaire (règle de Mathieu, même si une limite est atteinte).
+# Comparé au texte SIMPLIFIÉ (securite.simple : Unicode normalisé, caractères invisibles retirés, minuscules sans
+# accents) : « Ach​eter », « ＢＵＹ », « Précommander » sont reconnus (relecture de sécurité).
 ACHAT = re.compile(
-    r"\bachet|\bachat|\bpayer\b|\bpaiement|\bpay now\b|\bcr[ée]dits? (d.utilisation|suppl|additionnel)|"
-    r"\bbuy\b|\bpurchase|\bcheckout\b|\bpasser (à|au) (pro|max|plus|team|premium|l.offre)|\bupgrade (plan|to)\b|"
-    r"\b(s.)?abonner\b|\bsouscri|\bsubscribe\b|\bforfait\b|\bfacturation\b|\bbilling\b|"
-    r"(passer|valider|confirmer|finaliser) (la |ma |votre )?commande|\bplace (your |the )?order|\border now\b|"
-    r"\bcommander\b|\bessai gratuit|\bfree trial|\b1[- ]?cli(c|ck)\b|\btop[- ]?up\b|"
-    r"recharger (mon|le|votre|ma) (compte|solde|cr[ée]dit|carte)|\badd funds|ajouter des fonds|"
-    r"(utilisation|usage) suppl[ée]mentaire|\bextra usage|\bmore usage|\bplus d.utilisation|"
+    r"\bachet|\bachat|\bpayer\b|\bpaiement|\bpay now\b|confirm and pay|\bpay with|"
+    r"\bcredits? (d.utilisation|suppl|additionnel)|\bbuy\b|\bpurchase|\bcheckout\b|"
+    r"\bpasser (a|au) (pro|max|plus|team|premium|l.offre|claude|chatgpt)|"
+    r"\b(s.)?abonner\b|\bsouscri|\bsubscribe\b|\bforfait\b|\bfacturation\b|"
+    r"\bbilling\b|(passer|valider|confirmer|finaliser) (la |ma |votre )?commande|je confirme (ma|la) commande|"
+    r"\bplace (your |the )?order|\border now\b|\bcommander\b|\bessai gratuit|"
+    r"\bfree trial|\b1[- ]?cli(c|ck)\b|\btop[- ]?up\b|"
+    r"recharger (mon|le|votre|ma) (compte|solde|credit|carte)|\badd funds|ajouter des fonds|"
+    r"(utilisation|usage) supplementaire|\bextra usage|\bmore usage|\bplus d.utilisation|"
     r"augmenter (la|ma|votre) limite|\bincrease (your )?limit|\bajouter au panier|\badd to (cart|bag|basket)\b|"
-    r"\bpanier\b|\bcart\b", re.I)
-AUTORISES = re.compile(r"d[ée]sabonn|unsubscribe|r[ée]silier|cancel subscription", re.I)
-PRIX = re.compile(r"\d\s?(€|eur\b)|[€$£]\s?\d", re.I)
+    r"\bpanier\b|\bcart\b|\bsend money\b|\benvoyer de l.argent")
+# Mots courts ou ambigus, refusés seulement sur un BOUTON ou un lien (dans un message tapé, « je vais réserver »
+# ou « le virement est arrivé » restent permis).
+ACHAT_BOUTON = re.compile(
+    r"\bpay\b|\bpayez\b|\bpaye maintenant|\bcomprar|\bkaufen|\bacquista|\bcompra\b|\bupgrade\b|"
+    r"\bmettre a niveau|\bget (plus|pro|max|premium)\b|\bcommandez\b|\bpre-?command|\bpre-?order|"
+    r"\breserver\b|\breservez\b|\bbook now\b|\bessayer gratuitement|\btry (it )?free|\bfaire un don\b|"
+    r"\bdonate\b|\bdonation\b|\bvirement\b|\bwire transfer|\bpourboire\b|\btip\b|\bvalider (le|la|mon) (paiement|"
+    r"virement|achat|commande)")
+AUTORISES = re.compile(r"desabonn|unsubscribe|resilier|cancel subscription")
+PRIX = re.compile(r"\d\s?(€|eur\b|usd\b|\$)|[€$£]\s?\d")
 
 
 def interdire_achat(*textes, bouton: bool = False) -> None:
     """Lève ErreurOutil si l'action vise un achat, des crédits ou une utilisation payante. `bouton` : le libellé
     est celui d'un bouton ou d'un lien (un prix y signale un achat ; dans un simple texte, non)."""
+    from ..securite import simple
     for t in textes:
-        if not t or AUTORISES.search(str(t)):
+        if not t:
             continue
-        if ACHAT.search(str(t)) or (bouton and PRIX.search(str(t))):
+        s = simple(t)
+        if AUTORISES.search(s):
+            continue
+        if ACHAT.search(s) or (bouton and (PRIX.search(s) or ACHAT_BOUTON.search(s))):
             raise ErreurOutil(f"Refusé : « {str(t)[:80]} » ressemble à un achat, des crédits ou une utilisation "
                               "payante. MacAI ne fait jamais ce genre d'action ; c'est à toi de décider.")
 
 
-IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[ .-]?[A-Z0-9]{4}){2,7}(?:[ .-]?[A-Z0-9]{1,3})?\b")
+IBAN = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b")
 
 
 def _luhn(chiffres: str) -> bool:
@@ -82,13 +98,18 @@ def _luhn(chiffres: str) -> bool:
 
 
 def interdire_donnees_bancaires(texte) -> None:
-    """Jamais de numéro de carte (13 à 19 chiffres valides, quels que soient les séparateurs) ni d'IBAN."""
-    t = str(texte or "")
-    for bloc in re.findall(r"(?:\d[ .\-]?){13,19}", t):
+    """Jamais de numéro de carte (13 à 19 chiffres valides, quels que soient les séparateurs : espaces multiples,
+    « / », points, tirets) ni d'IBAN (même découpé)."""
+    from ..securite import texte_normal
+    t = texte_normal(texte)
+    for bloc in re.findall(r"\d(?:[ ./\-_]{0,3}\d){12,18}", t):
         chiffres = re.sub(r"\D", "", bloc)
-        if 13 <= len(chiffres) <= 19 and _luhn(chiffres):
-            raise ErreurOutil("Ça ressemble à un numéro de carte : je ne saisis pas de données bancaires.")
-    if IBAN.search(t.upper()):
+        for n in range(13, min(19, len(chiffres)) + 1):  # une carte collée à d'autres chiffres
+            for i in range(0, len(chiffres) - n + 1):
+                if _luhn(chiffres[i:i + n]) and n in (13, 15, 16, 19) and chiffres[i] in "3456":
+                    raise ErreurOutil("Ça ressemble à un numéro de carte : je ne saisis pas de données bancaires.")
+    compact = re.sub(r"(?<=[A-Za-z0-9])[ ./\-_]{1,3}(?=[A-Za-z0-9])", "", t.upper())
+    if IBAN.search(compact) or IBAN.search(t.upper()):
         raise ErreurOutil("Ça ressemble à un IBAN : je ne saisis pas de données bancaires.")
 
 
@@ -105,7 +126,9 @@ DISCUSSIONS_IA = {"claude", "chatgpt", "le chat", "mistral", "perplexity", "gemi
 # Clics qui demandent confirmation (envoyer, publier, supprimer…). « Répondre » ou « Transférer » ouvrent seulement
 # une fenêtre : pas de confirmation (Mathieu veut que MacAI agisse librement, sauf pour l'important).
 ENVOI = re.compile(r"envoy|\bsend\b|publi|\bposter\b|\bpost\b|partag|\bshare\b|soumett|submit|supprim|delete|"
-                   r"effac|\bvider\b|\bempty\b|erase|d[ée]sinstall|uninstall", re.I)
+                   r"effac|\bvider\b|\bempty\b|erase|d[ée]sinstall|uninstall|corbeille|\btrash\b|\bbin\b|"
+                   r"transf[ée]r|forward|virement|\breply all\b|r[ée]pondre [àa] tous|tweet|retweet|repost|"
+                   r"\bcommit\b|\bpush\b|\bmerge\b|d[ée]connect|sign out|log out|r[ée]initialis|reset", re.I)
 
 
 def nom_appli(nom: str) -> str:

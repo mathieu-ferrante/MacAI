@@ -147,3 +147,42 @@ déverrouillé, et accepte « codesign veut utiliser la clé MacAI Local » (mot
 
 Banc : `macai banc --scenarios` → 62 scénarios (dernier passage : 60/62, les 2 échecs corrigés et revérifiés).
 Mémoire mesurée : 32 % de la RAM utilisée au repos, MacAI ≈ 49 Mo (app 18 + moteur 20 + Ollama 11).
+
+## Fiabilité et sécurité du 23/11 : à essayer après `./installer.sh`
+
+L'app a changé (confirmation vocale, connexion au moteur) : **`./installer.sh` est nécessaire**, écran déverrouillé.
+Le moteur, lui, est à jour dès le prochain démarrage de l'app. 393 tests automatiques passent, dont 92 qui rejouent
+les attaques trouvées par la relecture de sécurité ; rien de ce qui suit n'a encore tourné dans l'app sur le Mac.
+
+| Essai | Attendu |
+|---|---|
+| « ferme Safari » alors qu'il n'est pas ouvert | « Safari n'était pas ouvert. » (plus de « c'est fermé ») |
+| « ouvre Minecraft » (non installé) | « pas installée sur ce Mac » ; aucune autre appli ouverte à la place |
+| « ouvre Téléchargements » | le dossier s'ouvre dans le Finder |
+| Une longue demande, puis **Stop** pendant que MacAI réfléchit | arrêt en moins d'une seconde |
+| « demande à Claude quels sont les meilleurs claviers » | comme avant, **sans** confirmation |
+| Mode oral : une action à confirmer, répondre « oui » à la voix | rien ne se passe : il faut cliquer (« non » à la voix refuse toujours) |
+| Résumer un mail qui contient une adresse, puis « ouvre le lien du mail » | ouvert sans confirmation (lien lu tel quel) |
+| « tous les matins à 8h, fais-moi un résumé de mes mails » | une confirmation avant de programmer la tâche (nouveau) |
+| Dans Messages, « tape bonjour et appuie sur Entrée » | confirmation avec l'appli et le texte |
+| `macai modeles` dans le Terminal | empreintes des deux modèles |
+
+## Limites connues (sécurité)
+
+Ce qui n'est **pas** couvert, en connaissance de cause :
+
+- **Un logiciel malveillant qui tourne déjà sous ton compte** peut modifier `lancement.json`, `macai.toml`, le code ou
+  l'environnement Python, lire les clés du Trousseau créées par `security`, ou signer une app avec le certificat
+  « MacAI Local ». Fermer ces portes demande le « hardened runtime » (`codesign --options runtime` + droits
+  micro / Apple Events) et un Python embarqué dans l'app signée : à faire avec toi, car il faudra redonner les
+  autorisations macOS et vérifier que micro et automatisation marchent encore.
+- **Petits secrets en clair** : un mot de passe de lettres seules (« soleil ») glissé dans une question à une IA
+  après la lecture d'un contenu n'est pas détecté (les codes avec chiffres, les clés et les textes longs le sont ;
+  les adresses web le sont toujours).
+- **Numéro de carte réparti dans plusieurs champs** d'un formulaire, cryptogramme, date d'expiration : non détectés
+  (le paiement reste interdit par ailleurs).
+- `lire_page_web` revérifie chaque redirection mais pas un « DNS rebinding » entre la vérification et la connexion.
+- Une appli qui passe au premier plan entre la confirmation d'un raccourci et son envoi le reçoit (fenêtre de
+  quelques dixièmes de seconde).
+- Dépendances Python sans empreintes figées (`uv.lock` à ajouter) ; le journal garde les demandes en clair (fichier
+  lisible par toi seul).

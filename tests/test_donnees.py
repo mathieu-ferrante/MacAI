@@ -231,12 +231,27 @@ def serveur_http(cfg):
 def test_serveur_corps_trop_gros(serveur_http):
     app, serveur, _ = serveur_http
     with socket.create_connection(serveur.server_address, timeout=5) as s:
-        s.sendall(b"POST /demande HTTP/1.1\r\nHost: x\r\nX-MacAI-Jeton: j\r\nContent-Length: 5000000\r\n\r\n")
+        s.sendall(b"POST /demande HTTP/1.1\r\nHost: 127.0.0.1\r\nX-MacAI-Jeton: j\r\nContent-Length: 5000000\r\n\r\n")
         reponse = s.recv(4096)
     assert reponse.startswith(b"HTTP/1.1 413") and b"Connection: close" in reponse
     with socket.create_connection(serveur.server_address, timeout=5) as s:
-        s.sendall(b"POST /arret HTTP/1.1\r\nHost: x\r\nX-MacAI-Jeton: j\r\nContent-Length: -5\r\n\r\n")
+        s.sendall(b"POST /arret HTTP/1.1\r\nHost: 127.0.0.1\r\nX-MacAI-Jeton: j\r\nContent-Length: -5\r\n\r\n")
         assert s.recv(4096).startswith(b"HTTP/1.1 200")
+
+
+def test_serveur_refuse_navigateur_et_hote_etranger(serveur_http):
+    """Une page web envoie toujours Origin ; un DNS rebinding se trahit par un Host étranger."""
+    _, serveur, _ = serveur_http
+    for entetes in (b"Host: 127.0.0.1\r\nOrigin: https://evil.example\r\n", b"Host: evil.example\r\n",
+                    b"Host: 127.0.0.1\r\n"):
+        with socket.create_connection(serveur.server_address, timeout=5) as s:  # jeton valide dans les trois cas
+            s.sendall(b"GET /etat HTTP/1.1\r\n" + entetes + b"X-MacAI-Jeton: j\r\n\r\n")
+            r = s.recv(4096)
+        attendu = b"HTTP/1.1 200" if entetes == b"Host: 127.0.0.1\r\n" else b"HTTP/1.1 401"
+        assert r.startswith(attendu), (entetes, r[:40])
+    with socket.create_connection(serveur.server_address, timeout=5) as s:  # en-tête non ASCII : refus, pas plantage
+        s.sendall("GET /etat HTTP/1.1\r\nHost: 127.0.0.1\r\nX-MacAI-Jeton: é\r\n\r\n".encode("latin-1"))
+        assert s.recv(4096).startswith(b"HTTP/1.1 401")
 
 
 def test_diagnostic_ferme_par_defaut_puis_limite(serveur_http):
