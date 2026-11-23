@@ -16,7 +16,7 @@ class FauxOllama:
         self.reponses = list(reponses or [])
         self.recus = []
 
-    def discuter(self, modele, messages, outils=None, reflexion=False, sur_texte=None, options=None):
+    def discuter(self, modele, messages, outils=None, reflexion=False, sur_texte=None, options=None, arret=None):
         self.recus.append({"messages": [dict(m) for m in messages], "outils": outils, "reflexion": reflexion})
         r = self.reponses.pop(0) if self.reponses else Reponse(texte="fin")
         if sur_texte and r.texte:

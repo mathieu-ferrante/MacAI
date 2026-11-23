@@ -58,6 +58,11 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D38 | Questions factuelles : rechercher_et_lire (3 pages lues, passages choisis sans modèle, sources citées) ; adresses locales/privées refusées | Vu en essai : horaires inventés ; et une page piégée ne doit pas interroger le Mac ou le réseau local. |
 | D39 | `macai banc --scenarios` : 50 demandes réelles dans le vrai moteur, outils simulés, comparaison avec le passage précédent | Mesurer chaque changement et repérer les régressions. |
 | D40 | Plan à valider seulement si la demande touche à l'important (envoyer à quelqu'un, supprimer, ranger, installer, acheter…) ; ouvrir une appli, y taper, cliquer, interroger Claude/ChatGPT : on agit directement. « Envoyer » une question à une IA n'est plus sensible (supprimer y reste sensible) | Mathieu : accepter chaque étape pour « ouvre Claude et demande-lui… » faisait perdre l'intérêt de MacAI. Les étapes sensibles gardent leur confirmation. |
+| D41 | **Bilan honnête** : la réponse finale d'une demande d'action est confrontée à la trace des outils ; si rien n'a eu d'effet, elle est remplacée par la raison réelle, et une étape restée en échec est signalée | Journal du Mac (oct.-nov.) : « j'ai déplacé le fichier » après deux échecs, « les services ont été fermés » alors que rien n'était ouvert. |
+| D42 | `Resultat.sans_effet` : un outil qui réussit sans rien changer (appli déjà fermée) ne compte pas comme une action | Même cause : faux succès annoncés. |
+| D43 | `ouvrir_application` : plus de « Vouliez-vous… ? » (le modèle ouvrait FilmCraft pour Minecraft) ; « Téléchargements », « Documents »… ouvrent le dossier ; Finder signalé comme non fermable | Journal du Mac du 23/10. |
+| D44 | Plan rédigé avec les capacités réelles (descriptions des outils retenus, sans leur nom) ; étapes réduites à un nom d'outil écartées | Plans hors-sol (« cliquer sur Quitter dans la barre des applications ») suivis à la lettre. |
+| D45 | Stop coupe la connexion à Ollama (socket fermée par un fil de veille) : arrêt immédiat même pendant le chargement du modèle ou la lecture du prompt | Avant, Stop n'agissait qu'entre deux étapes (jusqu'à 40 s d'attente). Mesuré sur le Mac : arrêt en 0 s avant le premier mot. |
 
 ## Lots
 

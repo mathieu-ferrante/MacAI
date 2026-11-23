@@ -74,6 +74,13 @@ PLAN_REFUS = "D'accord, je ne fais rien."
 CONSIGNE_PLAN = ("Tu prépares une tâche sur le Mac de l'utilisateur, sans rien faire pour l'instant. Écris "
                  "uniquement un plan numéroté de 1 à {n} étapes concrètes et courtes, en français (une action par "
                  "ligne : « 1. Ouvrir Mail », « 2. … »). Pas d'introduction, pas de conclusion.")
+CONSIGNE_PLAN_MOYENS = ("\n\nCe que tu sais faire (rien d'autre) :\n{moyens}\n\nChaque étape doit correspondre à "
+                        "l'une de ces capacités, la plus directe possible. N'invente ni bouton, ni menu, ni fenêtre. "
+                        "Écris chaque étape comme une phrase en français courant (« Fermer Google Chrome »). Si la "
+                        "demande est impossible avec ces capacités, écris une seule étape : « 1. Expliquer que ce "
+                        "n'est pas possible ».")
+# Étape réduite à un nom d'outil (« ranger_dossier ») : vu à l'essai réel, illisible pour l'utilisateur.
+NOM_OUTIL = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)+(?:\(.*\))?$")
 ETAPE_PLAN = re.compile(r"^\s*(?:\d+\s*[.)\-:]|[-*•])\s*(.+?)\s*$")
 
 # Propositions de compétence : seulement pour ce qui se répète vraiment.
@@ -272,10 +279,18 @@ class Orchestrateur:
         if precedent:
             contenu += ("\n\nPlan précédent :\n" + "\n".join(f"{i}. {e}" for i, e in enumerate(precedent, 1))
                         + f"\n\nCorrection demandée par l'utilisateur : {correction}\nRefais le plan en en tenant compte.")
-        messages = [{"role": "system", "content": CONSIGNE_PLAN.format(n=PLAN_ETAPES_MAX)},
-                    {"role": "user", "content": contenu}]
+        # Le plan est écrit avec les moyens réels (les outils que le routeur retient pour cette demande). Sans eux,
+        # le modèle inventait des boutons et des menus (« cliquer sur Quitter dans la barre des applications »),
+        # puis suivait ce plan faux au lieu d'appeler le bon outil (vu dans le journal du Mac). Décrits sans leur
+        # nom technique : avec, le modèle recopiait « ranger_dossier » comme étape (vu à l'essai réel).
+        noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
+        moyens = "\n".join(dict.fromkeys(f"- {_premiere_phrase(o.description)}"
+                                          for n in noms if (o := ctx.registre.get(n)) is not None))
+        consigne = CONSIGNE_PLAN.format(n=PLAN_ETAPES_MAX) + (CONSIGNE_PLAN_MOYENS.format(moyens=moyens)
+                                                              if moyens else "")
+        messages = [{"role": "system", "content": consigne}, {"role": "user", "content": contenu}]
         rep = ctx.ollama.discuter(ctx.config.modeles["agent"], messages, None, reflexion=False,
-                                  options={"num_predict": 300, "temperature": 0})
+                                  options={"num_predict": 300, "temperature": 0}, arret=ctx.arret)
         return lire_plan(rep.texte)
 
     def _boucle(self, demande: str, trace: list, plan: list[str] | None = None) -> str:
@@ -315,7 +330,7 @@ class Orchestrateur:
                 break  # le modèle tourne en rond : bilan immédiat
             nb_hist = self._tailler(messages, nb_hist, outils)
             rep = ctx.ollama.discuter(modele, messages, outils, reflexion=reflexion,
-                                      sur_texte=lambda t: ctx.emettre("texte", morceau=t))
+                                      sur_texte=lambda t: ctx.emettre("texte", morceau=t), arret=ctx.arret)
             if not rep.appels:
                 texte = rep.texte.strip()
                 if not texte:
@@ -323,7 +338,8 @@ class Orchestrateur:
                     if not vide_relance:
                         vide_relance, reflexion = True, False
                         continue
-                    return "C'est fait." if _action_reussie(trace) else "Je n'ai pas pu produire de réponse."
+                    return bilan_honnete("C'est fait." if _action_reussie(trace)
+                                         else "Je n'ai pas pu produire de réponse.", trace, imperatif)
                 # Un petit modèle s'arrête souvent en décrivant ce qu'il reste à faire : on le relance une fois.
                 norme = routeur.normaliser(texte)
                 if (not relance and imperatif and INACHEVE.search(norme)
@@ -342,8 +358,12 @@ class Orchestrateur:
                                                              "lire sa fenêtre et ses menus, cliquer, taper). "
                                                              "Essaie maintenant avec eux."}]
                     continue
-                # Garde-fou d'honnêteté : « J'ai ouvert TextEdit et écrit… » alors qu'aucun outil n'a réussi
-                # (vu en essai réel). On ne laisse pas passer une action inventée.
+                # Garde-fou d'honnêteté, d'après ce que les outils ont VRAIMENT fait (pas d'après ce que dit le
+                # modèle) : rien n'a abouti → la raison réelle ; une étape a échoué → elle est signalée.
+                verifie = bilan_honnete(texte, trace, imperatif)
+                if verifie != texte:
+                    return verifie
+                # « J'ai ouvert TextEdit et écrit… » alors qu'aucun outil n'a réussi (vu en essai réel).
                 if ACTION_AFFIRMEE.search(norme) and not any(t["ok"] for t in trace):
                     echecs = [t["outil"] for t in trace if not t["ok"]]
                     return ("Je n'ai pas réussi à le faire" + (f" ({', '.join(dict.fromkeys(echecs))} a échoué)"
@@ -371,8 +391,12 @@ class Orchestrateur:
                         observations.clear()  # une action a eu lieu : relire redevient normal
                         if r.ok and self._modifie(appel.nom, appel.arguments):
                             version += 1  # l'état a changé : refaire un appel déjà vu redevient légitime
+                agit = self._agit(appel.nom, appel.arguments)
                 trace.append({"outil": appel.nom, "arguments": appel.arguments, "ok": r.ok,
-                              "cles": sorted(r.donnees) if isinstance(r.donnees, dict) else []})
+                              "cles": sorted(r.donnees) if isinstance(r.donnees, dict) else [],
+                              # Pour le bilan honnête : l'outil agit-il, a-t-il eu un effet, qu'a-t-il répondu ?
+                              "agit": agit, "effet": bool(agit and r.ok and not r.sans_effet),
+                              "texte": _couper(r.texte, 300)})
                 if not r.ok and "AUTORISATION MANQUANTE" in r.texte:
                     # Rien à tenter de plus : c'est à l'utilisateur d'accorder l'autorisation (vu en essai : le modèle
                     # ouvrait les Réglages en boucle, ou conseillait de désactiver l'autorisation).
@@ -387,12 +411,18 @@ class Orchestrateur:
         messages.append({"role": "user", "content": "Arrête-toi ici et dis brièvement ce qui a été fait "
                                                     "et ce qui reste à faire."})
         self._tailler(messages, nb_hist, None)
-        rep = ctx.ollama.discuter(modele, messages, None, sur_texte=lambda t: ctx.emettre("texte", morceau=t))
-        return rep.texte.strip() or "Je n'ai pas réussi à terminer cette demande."
+        rep = ctx.ollama.discuter(modele, messages, None, sur_texte=lambda t: ctx.emettre("texte", morceau=t),
+                                  arret=ctx.arret)
+        return bilan_honnete(rep.texte.strip() or "Je n'ai pas réussi à terminer cette demande.", trace, imperatif)
 
     def _modifie(self, nom: str, args: dict) -> bool:
         o = self.ctx.registre.get(nom)
         return o is not None and _risque(o, preparer(o, args)[0]) >= Risque.MODIFICATION
+
+    def _agit(self, nom: str, args: dict) -> bool:
+        """L'outil fait quelque chose sur le Mac (ouvrir, créer, déplacer, envoyer…) : pas une simple lecture."""
+        o = self.ctx.registre.get(nom)
+        return o is not None and nom not in OBSERVATION and _risque(o, preparer(o, args)[0]) >= Risque.CREATION
 
     # --- Budget de contexte -----------------------------------------------------
 
@@ -520,7 +550,7 @@ def lire_plan(texte: str) -> list[str]:
     etapes = []
     for ligne in texte.splitlines():
         m = ETAPE_PLAN.match(ligne)
-        if m and (e := m.group(1).strip(" *_`")):
+        if m and (e := m.group(1).strip(" *_`")) and not NOM_OUTIL.match(e):
             etapes.append(e[:200])
     return etapes[:PLAN_ETAPES_MAX]
 
@@ -597,7 +627,59 @@ def _risque_fixe(o: Outil) -> Risque:
 
 
 def _action_reussie(trace: list) -> bool:
-    return any(t["ok"] and t["outil"] not in OBSERVATION for t in trace)
+    return any(t.get("effet", t["ok"]) and t["outil"] not in OBSERVATION for t in trace)
+
+
+# Phrases d'un message d'outil destinées au modèle (« Utilise rechercher_fichiers… »), pas à l'utilisateur.
+POUR_LE_MODELE = re.compile(r"^(utilise|relis|verifie|change|essaie|reessaie|precise|donne|appelle|parametres de|"
+                            r"n'ouvre pas|ne la refais pas|dis-le)\b")
+MAUVAIS_USAGE = ("Paramètre manquant", "Valeur invalide", "Appel identique")
+
+
+def _raison(echec: dict) -> str:
+    """Ce qu'un outil a répondu en échouant, sans les conseils destinés au modèle."""
+    texte = str(echec.get("texte") or "").strip()
+    if not texte or texte.startswith(MAUVAIS_USAGE):
+        return f"je n'ai pas su utiliser « {echec['outil']} » correctement."
+    phrases = [p for p in re.split(r"(?<=[.!?])\s+", texte) if not POUR_LE_MODELE.match(routeur.normaliser(p))]
+    raison = _couper(" ".join(phrases).strip() or texte, 240)
+    return raison if raison.endswith((".", "!", "?", "…", "]")) else raison + "."
+
+
+def bilan_honnete(texte: str, trace: list, imperatif: bool = True) -> str:
+    """Réponse finale confrontée à ce que les outils ont réellement fait.
+
+    Vu dans le journal du Mac : « j'ai déplacé le fichier » après deux déplacements échoués, « les services ont
+    été fermés » alors que rien n'était ouvert. Un petit modèle résume mal ses propres échecs : quand on lui a
+    demandé d'AGIR, c'est la trace qui fait foi.
+    - aucune action n'a eu d'effet : la réponse du modèle est remplacée par la raison réelle ;
+    - certaines ont réussi mais une étape a échoué sans jamais aboutir ensuite : elle est signalée."""
+    actions = [t for t in trace if t.get("agit")]
+    if not imperatif or not actions:
+        return texte
+    echecs = [t for t in actions if not t["ok"] and t.get("texte") != REFUS]
+    if not any(t.get("effet") for t in actions):
+        if not echecs:
+            if any(not t["ok"] for t in actions):
+                return "D'accord, je ne le fais pas."  # tout a été refusé par l'utilisateur
+            # Rien à faire (« Safari n'était pas ouvert ») : les faits, tels que les outils les rapportent.
+            return " ".join(dict.fromkeys(t["texte"] for t in actions if t.get("texte"))) or texte
+        vrais = [t for t in echecs if not str(t.get("texte") or "").startswith(MAUVAIS_USAGE)]
+        return "Je n'ai pas réussi à le faire : " + _raison((vrais or echecs)[-1])
+    restants: dict[str, dict] = {}  # dernier échec de chaque outil qui n'a jamais réussi ensuite
+    for t in actions:
+        if t["ok"]:
+            restants.pop(t["outil"], None)
+        elif t.get("texte") != REFUS:
+            restants[t["outil"]] = t
+    if not restants:
+        return texte
+    dernier = list(restants.values())[-1]
+    return f"{texte}\n\nAttention, une étape n'a pas abouti ({dernier['outil']}) : {_raison(dernier)}"
+
+
+def _premiere_phrase(description: str, n: int = 110) -> str:
+    return _couper(re.split(r"(?<=[.!?])\s", str(description or "").strip(), maxsplit=1)[0], n)
 
 
 def _couper(texte: str, n: int) -> str:

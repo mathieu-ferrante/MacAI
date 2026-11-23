@@ -70,30 +70,57 @@ def trouver_application(nom: str) -> Path | None:
     return apps[proche[0]] if proche else None
 
 
-def suggestions(nom: str) -> list[str]:
-    apps = applications_installees()
-    return [apps[k].stem for k in difflib.get_close_matches(normaliser(nom), list(apps), n=3, cutoff=0.5)]
+# « Ouvre Téléchargements », « ouvre le Bureau » : un dossier, pas une application (vu dans le journal du Mac :
+# le modèle appelait ouvrir_application("Documents") puis ouvrait Raccourcis, proposé à la place).
+DOSSIERS_CONNUS = {"bureau": "~/Desktop", "desktop": "~/Desktop", "telechargements": "~/Downloads",
+                   "downloads": "~/Downloads", "documents": "~/Documents", "applications": "/Applications",
+                   "images": "~/Pictures", "pictures": "~/Pictures", "films": "~/Movies", "movies": "~/Movies",
+                   "dossier personnel": "~", "dossier utilisateur": "~", "home": "~", "icloud drive":
+                   "~/Library/Mobile Documents/com~apple~CloudDocs"}
+
+
+def dossier_connu(nom: str) -> Path | None:
+    """Dossier courant désigné par son nom (« Téléchargements », « le dossier Documents », « mon bureau »)."""
+    cle = re.sub(r"^(le |la |les |mon |ma |mes |l'|l’)?(dossier (des |de |du |d')?)?(mon |ma |mes )?", "",
+                 normaliser(str(nom or "")).strip()).strip()
+    chemin = DOSSIERS_CONNUS.get(cle) or DOSSIERS_CONNUS.get(normaliser(str(nom or "")).strip())
+    if chemin is None or cle in applications_installees():
+        return None
+    p = Path(chemin).expanduser()
+    return p if p.is_dir() else None
 
 
 @outil("ouvrir_application", "Ouvre (ou met au premier plan) une application installée.", "applications",
        {"nom": ("string", "nom de l'application, ex. Safari, Spotify, PhotoCraft")}, risque=Risque.CREATION,
        annonce=lambda a: f"Ouvrir {a['nom']}")
 def ouvrir_application(ctx, nom):
+    dossier = dossier_connu(nom)
+    if dossier is not None:
+        commun.executer(["open", str(dossier)])
+        return Resultat(True, f"Dossier {dossier.name} ouvert dans le Finder.", {"dossier": str(dossier)})
     app = trouver_application(nom)
     if app is None:
         from ..agent.rapide import SITES
         if normaliser(nom) in SITES:
             commun.executer(["open", SITES[normaliser(nom)]])
             return f"{nom} ouvert dans le navigateur."
-        s = suggestions(nom)
-        raise ErreurOutil(f"Application « {nom} » introuvable." + (f" Vouliez-vous : {', '.join(s)} ?" if s else ""))
+        # Pas de « Vouliez-vous… ? » : trouver_application accepte déjà les noms proches (fautes de frappe).
+        # Les propositions plus lointaines envoyaient le modèle ouvrir une AUTRE appli (FilmCraft pour Minecraft,
+        # JavaLauncher pour ArtCraft Launcher) puis annoncer un succès.
+        raise ErreurOutil(f"Application « {nom} » introuvable : elle n'est pas installée sur ce Mac. N'ouvre pas "
+                          "une autre application à la place : dis-le à l'utilisateur.")
     commun.executer(["open", "-a", str(app)])
     return Resultat(True, f"{app.stem} est ouvert.", {"application": app.stem})
 
 
 # Jamais fermés par l'agent : le moteur d'IA lui-même et les éléments vitaux de macOS.
-PROTEGEES = {"ollama", "llamaserver", "llama", "macai", "python", "finder", "loginwindow", "windowserver",
-             "dock", "systemuiserver", "controlcenter", "kernel_task", "launchd"}
+MOTEUR_IA = {"ollama", "llamaserver", "llama", "macai", "python"}
+PROTEGEES = MOTEUR_IA | {"finder", "loginwindow", "windowserver", "dock", "systemuiserver", "controlcenter",
+                         "kernel_task", "launchd"}
+
+
+def _protegee(nom: str) -> bool:
+    return normaliser(str(nom or "")).replace(" ", "").replace("-", "").replace("_", "") in PROTEGEES
 
 
 @outil("quitter_application", "Quitte proprement une application (elle peut proposer d'enregistrer).",
@@ -103,14 +130,15 @@ def quitter_application(ctx, nom):
     app = trouver_application(nom)
     if app is None:
         raise ErreurOutil(f"Aucune application « {nom} » installée. Vérifie le nom avec applications_ouvertes.")
-    if normaliser(app.stem).replace(" ", "").replace("-", "") in PROTEGEES or \
-            normaliser(nom).replace(" ", "").replace("-", "") in PROTEGEES:
-        raise ErreurOutil(f"{app.stem} fait partie de MacAI ou de macOS : je ne le ferme pas. Le modèle d'IA se "
-                          "décharge tout seul 2 minutes après la dernière demande.")
+    if _protegee(app.stem) or _protegee(nom):
+        if {normaliser(app.stem).replace(" ", ""), normaliser(nom).replace(" ", "").replace("-", "")} & MOTEUR_IA:
+            raise ErreurOutil(f"{app.stem} fait partie de MacAI : je ne le ferme pas. Le modèle d'IA se décharge "
+                              "tout seul 2 minutes après la dernière demande.")
+        raise ErreurOutil(f"{app.stem} fait partie de macOS et reste toujours ouvert : je ne le ferme pas.")
     from ..mac import accessibilite as ax
     ouvertes = [a for a in ax.applis_ouvertes() if a["paquet"] == app.stem]
     if not ouvertes:
-        return f"{app.stem} n'était pas ouvert."
+        return Resultat(True, f"{app.stem} n'était pas ouvert.", sans_effet=True)
     commun.osascript(f"tell application {commun.chaine_as(app.stem)} to quit", delai=30)
     time.sleep(1)
     if any(a["paquet"] == app.stem for a in ax.applis_ouvertes()):
@@ -129,7 +157,12 @@ def applications_ouvertes(ctx):
     asn = commun.executer(["lsappinfo", "front"], verifier=False).strip()
     avant = commun.executer(["lsappinfo", "info", "-only", "name", asn], verifier=False) if asn else ""
     front = re.search(r'"LSDisplayName"="([^"]+)"', avant) or re.search(r'^"([^"]+)" ASN', avant.strip())
-    texte = "Ouvertes : " + ", ".join(noms)
+    # Finder et consorts ne se ferment pas : séparés, sinon « ferme toutes mes applis » s'acharne dessus.
+    fermables = [n for n in noms if not _protegee(n)]
+    texte = "Ouvertes : " + (", ".join(fermables) or "aucune")
+    if len(fermables) < len(noms):
+        texte += "\nToujours actifs (macOS ou MacAI, ne se ferment pas) : " + ", ".join(
+            n for n in noms if _protegee(n))
     if front:
         texte += f"\nAu premier plan : {front.group(1)}"
     return Resultat(True, texte, {"applications": noms})

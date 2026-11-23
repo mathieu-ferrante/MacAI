@@ -29,6 +29,9 @@ class Resultat:
     ok: bool
     texte: str
     donnees: Any = None
+    # Réussi mais rien n'a changé (« Safari n'était pas ouvert ») : ne compte pas comme une action accomplie,
+    # sinon le modèle annonce « c'est fermé » alors que rien n'a été fait (vu dans le journal du Mac).
+    sans_effet: bool = False
 
     @classmethod
     def echec(cls, texte: str) -> "Resultat":

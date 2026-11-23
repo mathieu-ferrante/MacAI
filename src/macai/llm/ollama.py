@@ -5,8 +5,11 @@ import http.client
 import json
 import os
 import re
+import socket
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable, Iterator
@@ -43,6 +46,64 @@ class Reponse:
     duree_s: float = 0.0
 
 
+class _FluxArretable:
+    """Requête en flux que « Stop » peut couper à tout moment.
+
+    urllib ne rend la main qu'à l'arrivée des en-têtes, c'est-à-dire après le chargement du modèle et la lecture
+    du prompt (10 à 40 s sur un 8 Go) : impossible d'interrompre avant. Ici la connexion est ouverte à la main et
+    un fil veille sur l'événement d'arrêt ; quand il est levé, la socket est fermée des deux côtés, la lecture
+    en cours échoue aussitôt et Ollama abandonne le calcul (« client closing the connection »)."""
+
+    def __init__(self, client: "Ollama", chemin: str, corps: dict, arret: threading.Event, delai: float = 300):
+        self.client, self.chemin, self.corps, self.arret, self.delai = client, chemin, corps, arret, delai
+        self.conn: http.client.HTTPConnection | None = None
+        self.sock: socket.socket | None = None
+        self.fini = threading.Event()
+
+    def _veiller(self) -> None:
+        while not self.fini.is_set():
+            if self.arret.wait(0.2):
+                if not self.fini.is_set():
+                    try:
+                        self.sock.shutdown(socket.SHUT_RDWR)
+                    except (OSError, AttributeError):
+                        pass  # déjà fermée : la lecture verra l'arrêt
+                return
+
+    def __enter__(self):
+        u = urllib.parse.urlsplit(self.client.hote)
+        classe = http.client.HTTPSConnection if u.scheme == "https" else http.client.HTTPConnection
+        self.conn = classe(u.hostname or "127.0.0.1", u.port, timeout=self.delai)
+        try:
+            self.conn.connect()
+            # Gardée à part : http.client oublie sa socket (conn.sock = None) dès que la réponse est de type
+            # « jusqu'à la fermeture », alors que la lecture continue dessus.
+            self.sock = self.conn.sock
+            threading.Thread(target=self._veiller, daemon=True, name="ollama-arret").start()
+            self.conn.request("POST", self.chemin, body=json.dumps(self.corps).encode(),
+                              headers={"Content-Type": "application/json"})
+            rep = self.conn.getresponse()
+        except (OSError, http.client.HTTPException) as e:
+            self.__exit__()
+            if self.arret.is_set():
+                raise InterruptedError("Arrêté par l'utilisateur.") from None
+            raise ErreurOllama(f"Ollama injoignable sur {self.client.hote} ({e}). Est-il démarré ?") from e
+        if rep.status >= 400:
+            try:
+                detail = rep.read().decode(errors="replace")[:300]
+            except (OSError, http.client.HTTPException):
+                detail = ""
+            self.__exit__()
+            raise ErreurOllama(f"Ollama {rep.status} : {detail}")
+        return rep
+
+    def __exit__(self, *a):
+        self.fini.set()
+        if self.conn is not None:
+            self.conn.close()
+        return False
+
+
 class Ollama:
     def __init__(self, hote: str = HOTE, garder: str = "2m", contexte: int = 8192):
         self.hote = hote.rstrip("/")
@@ -74,8 +135,12 @@ class Ollama:
 
     def discuter(self, modele: str, messages: list[dict], outils: list[dict] | None = None,
                  reflexion: bool = False, sur_texte: Callable[[str], None] | None = None,
-                 options: dict | None = None) -> Reponse:
-        """Envoie la conversation ; diffuse le texte au fil de l'eau si `sur_texte` est donné."""
+                 options: dict | None = None, arret: threading.Event | None = None) -> Reponse:
+        """Envoie la conversation ; diffuse le texte au fil de l'eau si `sur_texte` est donné.
+
+        `arret` : événement « Stop » de l'utilisateur. Dès qu'il est levé, la connexion est coupée (Ollama
+        abandonne aussitôt le calcul) et InterruptedError est levée, même pendant le chargement du modèle ou la
+        lecture du prompt."""
         corps = {
             "model": modele,
             "messages": messages,
@@ -92,7 +157,7 @@ class Ollama:
         def relais(t: str) -> None:
             diffuse.append(True)
             sur_texte(t)
-        return self._sans_saturation(lambda: self._discuter(corps, relais if sur_texte else None),
+        return self._sans_saturation(lambda: self._discuter(corps, relais if sur_texte else None, arret),
                                      deja_diffuse=lambda: bool(diffuse))
 
     def _sans_saturation(self, appel: Callable, deja_diffuse: Callable[[], bool] = lambda: False):
@@ -111,9 +176,10 @@ class Ollama:
             time.sleep(2)
             return appel()
 
-    def _discuter(self, corps: dict, sur_texte: Callable[[str], None] | None) -> Reponse:
+    def _discuter(self, corps: dict, sur_texte: Callable[[str], None] | None,
+                  arret: threading.Event | None = None) -> Reponse:
         rep = Reponse()
-        for morceau in self._flux("/api/chat", corps):
+        for morceau in self._flux("/api/chat", corps, arret):
             msg = morceau.get("message") or {}
             if t := msg.get("content"):
                 rep.texte += t
@@ -137,19 +203,28 @@ class Ollama:
                 rep.duree_s = morceau.get("total_duration", 0) / 1e9
         return rep
 
-    def _flux(self, chemin: str, corps: dict) -> Iterator[dict]:
-        with self._requete(chemin, corps) as r:
+    def _flux(self, chemin: str, corps: dict, arret: threading.Event | None = None) -> Iterator[dict]:
+        def arrete() -> bool:
+            return arret is not None and arret.is_set()
+
+        with (self._requete(chemin, corps) if arret is None else _FluxArretable(self, chemin, corps, arret)) as r:
             lignes = iter(r)
             while True:
                 try:
                     ligne = next(lignes, None)
+                    if arrete():  # connexion coupée par « Stop » : ni une erreur d'Ollama ni une réponse complète
+                        raise InterruptedError("Arrêté par l'utilisateur.")
                     if ligne is None:
                         return
                     ligne = ligne.strip()
                     if not ligne:
                         continue
                     morceau = json.loads(ligne)
+                except InterruptedError:
+                    raise
                 except ERREURS_FLUX as e:
+                    if arrete():
+                        raise InterruptedError("Arrêté par l'utilisateur.") from None
                     raise ErreurOllama(f"réponse d'Ollama interrompue ({type(e).__name__} : {e})") from e
                 if not isinstance(morceau, dict):
                     continue
