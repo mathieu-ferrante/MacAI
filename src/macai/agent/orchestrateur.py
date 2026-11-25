@@ -319,6 +319,8 @@ class Orchestrateur:
             # mails lus pour une simple question). Seuls les outils de lecture restent.
             noms = [n for n in noms if (o := ctx.registre.get(n)) is not None and not o.toujours_confirmer
                     and _risque_fixe(o) == Risque.LECTURE and o.groupe not in ("organisation",)]
+        if redaction_seule(demande):
+            noms = []  # « écris-moi une phrase sur la mer » : la réponse est le texte, aucun fichier (banc du 25/11)
         ctx.emettre("routage", mode="agent", outils=noms)
         outils = ctx.registre.schemas(noms)
 
@@ -553,6 +555,25 @@ class Orchestrateur:
             if suite_outils(etapes) == outils:
                 return True
         return False
+
+
+# « Écris-moi / rédige / donne-moi / propose-moi un texte, une phrase, un poème… » : une réponse écrite suffit.
+REDACTION = re.compile(r"^(?:peux-tu |tu peux |stp )?(?:ecri[st]|redige|compose|invente|imagine|propose|donne|trouve)"
+                       r"(?:-moi| moi)? (?:un|une|des|quelques|\d+) (?:\w+ ){0,2}?(?:phrase|texte|poeme|haiku|"
+                       r"slogan|titre|blague|histoire|paragraphe|citation|idee|liste|devinette|chanson|vers|"
+                       r"definition|exemple|nom|mots?|resume|recette|message|sms|courriel|lettre|discours|toast)s?\b")
+# … sauf si un fichier, une appli ou un destinataire est nommé : il faut alors agir.
+CIBLE = re.compile(r"\b(fichier|document|docx|word|pdf|tableur|excel|note|notes|mail|bureau|dossier|textedit|pages|"
+                   r"envoie|envoyer|envoi|dans |sur le |enregistre|sauvegarde|copie|colle|presse-papier)|"
+                   r"\bmes (?:rappels|mails|messages|fichiers|notes|rendez|evenements|événements|documents|photos|"
+                   r"taches|tâches|depenses|dépenses|souvenirs|competences|compétences|applis|applications|"
+                   r"telechargements|téléchargements|contacts|favoris|onglets)|~/|\.\w{2,4}\b", re.I)
+DESTINATAIRE = re.compile(r"\b[aà] [A-ZÉÈ]")  # « à Paul », « à Maman »
+
+
+def redaction_seule(demande: str) -> bool:
+    t = routeur.normaliser(demande).strip()
+    return bool(REDACTION.search(t)) and not CIBLE.search(demande) and not DESTINATAIRE.search(demande)
 
 
 def demande_complexe(demande: str) -> bool:

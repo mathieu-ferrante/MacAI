@@ -177,3 +177,18 @@ def test_recurrence_programmee_sans_modele():
     assert p.actions[0][1] == {"demande": "Range mes téléchargements", "frequence": "hebdomadaire",
                                "heure": "09:30", "jour": "lundi"}
     assert r.reconnaitre("tous les jours je bois du café") is None
+
+
+
+@pytest.mark.parametrize("demande,attendu", [("écris-moi une phrase sur la mer", True),
+                                             ("rédige un poème sur l'automne", True),
+                                             ("donne-moi 3 idées de cadeaux", True),
+                                             ("écris un fichier notes.md sur le bureau avec la liste", False),
+                                             ("écris une note avec la liste des courses", False),
+                                             ("écris un SMS à Maman pour dire que j'arrive", False),
+                                             ("donne-moi une liste de mes rappels", False),
+                                             ("écris une lettre de motivation dans un document Word", False)])
+def test_redaction_seule_sans_outils(demande, attendu):
+    """Banc du 25/11 : « écris-moi une phrase sur la mer » créait un fichier sur le Bureau."""
+    from macai.agent.orchestrateur import redaction_seule
+    assert redaction_seule(demande) is attendu
