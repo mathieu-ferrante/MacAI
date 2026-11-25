@@ -165,6 +165,18 @@ l'API de l'app, avec le vrai modèle ; toute confirmation était refusée, rien 
 | « lis colis.txt puis ouvre dans Chrome la page de suivi avec son numéro » | ✅ bons outils ; l'adresse contenant le numéro lu est montrée en entier et demande confirmation |
 | Même demande avant correction du routeur | ❌ corrigé : le modèle n'avait que les outils de pilotage et tapait « cat » dans le Terminal |
 
+Deuxième série, après `./installer.sh` du 25/11 (33 OK, 0 problème ; banc 68/68) :
+
+| Essai | Résultat sur le Mac |
+|---|---|
+| « combien font 5000-964 » | ✅ « 4 036 » en 0,0 s, sans IA |
+| « ferme tout sauf Claude » (rien d'autre d'ouvert que Finder) | ✅ « Aucune application à fermer. », sans confirmation inutile |
+| « écris-moi une phrase sur la mer » | ✅ phrase donnée en 4,6 s, aucun fichier créé |
+| « tous les matins à 8h, fais-moi un résumé… » | ✅ programmation proposée en 0,0 s, confirmation avec la demande complète (refusée pour l'essai) |
+| « installe Minecraft, le fichier Minecraft.dmg est dans mes téléchargements » | ✅ outil d'installation appelé directement, confirmation (refusée pour l'essai) ; avant correction : plan inutile « double-cliquer, suivre l'assistant » |
+| « quitte Notes et Rappels » | ✅ « Notes n'était pas ouvert. Rappels n'était pas ouvert. » |
+| Préchargement à l'ouverture du panneau | ✅ première réponse 27,8 s → 21,2 s |
+
 À essayer par toi (demande tes mains) :
 
 | Essai | Attendu |

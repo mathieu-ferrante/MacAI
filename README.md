@@ -11,8 +11,8 @@ Son « cerveau » est un modèle d'IA de 4 milliards de paramètres (`qwen3.5:4b
 Ollama. **Aucune demande, aucun fichier, aucun mail ne part dans le cloud.** Il est conçu pour un MacBook Air M2 de
 8 Go : au repos, l'ensemble occupe environ 50 Mo de mémoire.
 
-> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 433 tests automatiques, un banc de
-> 67 demandes réelles passées dans le vrai moteur avec le vrai modèle, et quatre relectures de sécurité. Ce qui reste à
+> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 442 tests automatiques, un banc de
+> 68 demandes réelles passées dans le vrai moteur avec le vrai modèle (68/68), et quatre relectures de sécurité. Ce qui reste à
 > essayer de ton côté est listé dans [A_VALIDER.md](A_VALIDER.md).
 
 ---
@@ -283,7 +283,7 @@ Reconnues mot pour mot, exécutées en moins d'une seconde :
 | « Mets Daft Punk Get Lucky sur YouTube » | lance la vidéo |
 | « Cherche des recettes de crêpes sur YouTube / sur Google » | ouvre la recherche |
 | « Demande à Claude quels sont les meilleurs claviers » | pose la question à l'app Claude et rapporte la réponse |
-| « Fais-moi un résumé chaque matin à 8 h » | programme la tâche (**confirmé**) |
+| « Tous les matins à 8 h, fais-moi un résumé de mes mails », « chaque lundi à 9 h, range mes téléchargements », « toutes les heures, … » | programme la tâche (**confirmé**, avec la demande complète) |
 | « Annule » | défait la dernière action sur des fichiers |
 
 Tout ce qui n'est pas reconnu passe à l'agent : tu peux formuler librement.
@@ -306,6 +306,9 @@ Tout ce qui n'est pas reconnu passe à l'agent : tu peux formuler librement.
 - « Une présentation de 5 diapositives sur le recyclage » : PowerPoint, une diapositive de titre puis une par point.
 - « Crée un fichier notes.md avec… », « fais un CSV des participants ».
 - « Crée un dossier Projets/2026 ».
+- « Écris-moi une phrase sur la mer », « rédige un poème », « donne-moi 3 idées de cadeaux » : la réponse est
+  écrite directement dans le panneau, **aucun fichier n'est créé**. Pour un fichier, nomme-le (« écris un fichier
+  notes.md sur le Bureau avec… »).
 - Un fichier existant n'est **jamais écrasé** sans ton accord : un nouveau nom est choisi (« notes (2).md »). Pour le
   remplacer, il demande **confirmation** (l'ancienne version va à la Corbeille).
 
@@ -677,7 +680,7 @@ Changer de modèle : `macai banc --candidats` compare les modèles adaptés à 8
 | `macai modeles [--accepter]` | empreintes des modèles ; `--accepter` après une mise à jour volontaire |
 | `macai secret onshape` | enregistre des clés dans le Trousseau |
 | `macai mcp tester` / `macai mcp detecter` | teste les serveurs MCP configurés / cherche ceux installés |
-| `macai banc --scenarios [filtre]` | 67 demandes réelles passées dans le vrai moteur avec le vrai modèle, outils **simulés** (rien n'est exécuté) ; compare avec le passage précédent |
+| `macai banc --scenarios [filtre]` | 68 demandes réelles passées dans le vrai moteur avec le vrai modèle, outils **simulés** (rien n'est exécuté) ; compare avec le passage précédent |
 | `macai banc --candidats` | compare la vitesse et la justesse de plusieurs modèles |
 | `macai serveur` | démarre le moteur (normalement lancé par l'app) |
 
@@ -737,7 +740,8 @@ MacAI.app (Swift, ~25 Mo)                 moteur Python (~35 Mo au repos)       
 - Code : `src/macai/` (Python 3.12, stdlib au maximum, imports paresseux), `app/` (Swift, SwiftPM),
   `installer.sh`. Structure détaillée dans [CLAUDE.md](CLAUDE.md), décisions dans [PLAN.md](PLAN.md), cahier des
   charges dans [CAHIER_DES_CHARGES.md](CAHIER_DES_CHARGES.md).
-- Tests : `.venv/bin/python -m pytest` (433 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
+- Tests : `.venv/bin/python -m pytest` (442 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
   ce qui permet de développer aussi sur Windows).
-- Qualité réelle : `macai banc --scenarios` (67 demandes, vrai modèle, outils simulés).
+- Qualité réelle : `macai banc --scenarios` (68 demandes, vrai modèle, outils simulés ; 68/68 le 25/11, 13 s par
+  demande en moyenne).
 - Sécurité : `tests/test_securite.py` rejoue chaque attaque trouvée lors des relectures.

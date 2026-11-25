@@ -71,6 +71,16 @@ def trouver_application(nom: str) -> Path | None:
     return apps[proche[0]] if proche else None
 
 
+def nom_affiche(app: Path) -> str:
+    """Nom tel que macOS l'affiche (« Rappels », « Calculatrice »), sinon le nom du paquet (« Reminders »)."""
+    try:
+        from Foundation import NSFileManager
+        nom = NSFileManager.defaultManager().displayNameAtPath_(str(app))
+        return str(nom).removesuffix(".app") if nom else app.stem
+    except ImportError:
+        return app.stem
+
+
 # « Ouvre Téléchargements », « ouvre le Bureau » : un dossier, pas une application (vu dans le journal du Mac :
 # le modèle appelait ouvrir_application("Documents") puis ouvrait Raccourcis, proposé à la place).
 DOSSIERS_CONNUS = {"bureau": "~/Desktop", "desktop": "~/Desktop", "telechargements": "~/Downloads",
@@ -111,7 +121,7 @@ def ouvrir_application(ctx, nom):
         raise ErreurOutil(f"Application « {nom} » introuvable : elle n'est pas installée sur ce Mac. N'ouvre pas "
                           "une autre application à la place : dis-le à l'utilisateur.")
     commun.executer(["open", "-a", str(app)])
-    return Resultat(True, f"{app.stem} est ouvert.", {"application": app.stem})
+    return Resultat(True, f"{nom_affiche(app)} est ouvert.", {"application": app.stem})
 
 
 # Jamais fermés par l'agent : le moteur d'IA lui-même et les éléments vitaux de macOS.
@@ -139,7 +149,7 @@ def quitter_application(ctx, nom):
     from ..mac import accessibilite as ax
     ouvertes = [a for a in ax.applis_ouvertes() if a["paquet"] == app.stem]
     if not ouvertes:
-        return Resultat(True, f"{app.stem} n'était pas ouvert.", sans_effet=True)
+        return Resultat(True, f"{nom_affiche(app)} n'était pas ouvert.", sans_effet=True)
     commun.osascript(f"tell application {commun.chaine_as(app.stem)} to quit", delai=30)
     time.sleep(1)
     if any(a["paquet"] == app.stem for a in ax.applis_ouvertes()):
@@ -268,16 +278,27 @@ def _annonce_fermer(a: dict) -> str:
     try:
         noms = [x["nom"] for x in _a_fermer(a.get("sauf", ""))]
     except Exception:  # noqa: BLE001 - liste illisible : annonce générique
-        noms = []
-    liste = f" : {', '.join(noms)}" if noms else ""
-    return f"Fermer {len(noms) or 'toutes les'} application{'s' if len(noms) != 1 else ''}{liste}" + (
+        return "Fermer toutes les applications ouvertes" + (f" (je garde {a['sauf']})" if a.get("sauf") else "")
+    if not noms:
+        return "Aucune application à fermer"
+    return f"Fermer {len(noms)} application{'s' if len(noms) > 1 else ''} : {', '.join(noms)}" + (
         f" (je garde {a['sauf']})" if a.get("sauf") else "")
+
+
+def _risque_fermer(a: dict) -> Risque:
+    """Confirmé avec la liste, sauf s'il n'y a rien à fermer (rien ne se passe)."""
+    try:
+        return Risque.SENSIBLE if _a_fermer(a.get("sauf", "")) else Risque.LECTURE
+    except Exception:  # noqa: BLE001 - liste illisible : on demande
+        return Risque.SENSIBLE
 
 
 @outil("fermer_applications", "Ferme toutes les applications ouvertes, sauf celles indiquées (jamais le Finder ni "
        "MacAI). Chaque appli peut proposer d'enregistrer.", "applications",
        {"sauf": ("string", "applications à garder ouvertes, séparées par des virgules, facultatif")}, requis=[],
-       risque=Risque.SENSIBLE, annonce=_annonce_fermer, delai_max=180)
+       risque=_risque_fermer, annonce=_annonce_fermer, delai_max=180,
+       mots_cles=["ferme tout", "ferme toutes", "quitte tout", "toutes les applis", "toutes les applications",
+                  "toutes mes applis", "toutes mes applications"])
 def fermer_applications(ctx, sauf=""):
     from ..mac import accessibilite as ax
     cibles = _a_fermer(sauf)
@@ -318,6 +339,8 @@ def _evaluation_gatekeeper(app: Path) -> tuple[bool, str]:
        "(la copie dans Applications), seulement si elle est signée et notariée par Apple. Les .pkg s'installent "
        "à la main.", "applications", {"chemin": ("string", "chemin du .dmg, .zip ou .app")},
        risque=Risque.SENSIBLE, toujours_confirmer=True, delai_max=300,
+       mots_cles=["installe", "installer", "installation", ".dmg", "dmg", "finis l'installation",
+                  "fini l'installation"],
        annonce=lambda a: f"Installer l'application contenue dans {a['chemin']} (vérifiée par Gatekeeper)")
 def installer_application(ctx, chemin):
     import shutil

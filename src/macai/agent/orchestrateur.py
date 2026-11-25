@@ -234,7 +234,7 @@ class Orchestrateur:
             trace.append({"outil": nom, "arguments": args, "ok": r.ok, "direct": True})
             if not r.ok and not getattr(plan, "tolerant", False):
                 # Refus de l'utilisateur : on s'arrête. Autre échec (nom d'appli mal compris…) : l'agent reprend.
-                return r.texte if r.texte == REFUS else None
+                return "D'accord, je ne le fais pas." if r.texte == REFUS else None
             textes.append(r.texte)
         if plan.reponse:
             return plan.reponse.format(*textes)
@@ -256,7 +256,14 @@ class Orchestrateur:
             return False  # question ou simple lecture : pas de plan
         if mode == "toujours":
             return True
-        return demande_complexe(demande) and bool(PLAN_IMPORTANT.search(t)) and not _vers_une_ia(t)
+        if not (demande_complexe(demande) and PLAN_IMPORTANT.search(t) and not _vers_une_ia(t)):
+            return False
+        # L'outil principal est déjà confirmé avec tous ses détails (installer une app, envoyer un message,
+        # programmer une tâche…) : un plan en plus n'apporte rien (vu à l'essai : plan « double-cliquer sur le
+        # .dmg, suivre l'assistant » pour une installation que installer_application fait d'un coup).
+        noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
+        principal = ctx.registre.get(noms[0]) if noms else None
+        return not (principal is not None and principal.toujours_confirmer)
 
     def _plan(self, demande: str) -> list[str] | bool | None:
         """None : pas de plan (on agit directement). False : refusé. Liste : plan validé à suivre."""
