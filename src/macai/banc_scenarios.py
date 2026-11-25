@@ -198,7 +198,7 @@ def registre_simule(reel: Registre, appels: list) -> Registre:
     return reg
 
 
-def jouer(scenario: Scenario, ollama, cfg, reel: Registre) -> dict:
+def jouer(scenario: Scenario, ollama, cfg, reel: Registre, classifieur=None) -> dict:
     from .agent.contexte import Contexte
     from .agent.orchestrateur import Orchestrateur
     from .agent.rapide import CommandesRapides
@@ -208,6 +208,8 @@ def jouer(scenario: Scenario, ollama, cfg, reel: Registre) -> dict:
         ctx = Contexte(config=cfg, ollama=ollama, registre=registre_simule(reel, appels),
                        journal=Journal(Path(d) / "journal.jsonl"), emettre=lambda *a, **k: None)
         ctx.demander_confirmation = lambda phrase, nom, args: confirmations.append(nom) or True
+        if classifieur is not None:
+            ctx.services["classifieur"] = classifieur
         debut = time.monotonic()
         try:
             texte = Orchestrateur(ctx, CommandesRapides()).traiter(scenario.demande)
@@ -245,8 +247,14 @@ def banc_scenarios(filtre: str = "") -> int:
     choisis = [s for s in SCENARIOS if not filtre or filtre in s.categorie or filtre in s.demande]
     print(f"{len(choisis)} scénarios avec {cfg.modeles['agent']} (outils simulés, rien n'est exécuté)\n")
     resultats = []
+    # Classifieur de demandes (MACAI_SANS_CLASSIFIEUR=1 pour mesurer sans lui).
+    import os
+    classifieur = None
+    if not os.environ.get("MACAI_SANS_CLASSIFIEUR"):
+        from .agent.classifieur import Classifieur
+        classifieur = Classifieur(o, cfg.modeles["embeddings"], cfg.chemin("classifieur.cache"))
     for s in choisis:
-        r = jouer(s, o, cfg, reel)
+        r = jouer(s, o, cfg, reel, classifieur)
         resultats.append(r)
         print(f"{'✓' if r['ok'] else '✗'} [{s.categorie:<12}] {s.demande[:58]:<58} {r['duree_s']:>5} s"
               + ("" if r["ok"] else f"  → {'; '.join(r['problemes'])} (outils : {', '.join(r['outils']) or 'aucun'})"),

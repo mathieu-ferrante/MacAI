@@ -133,17 +133,24 @@ def _contient(texte: str, mot: str) -> bool:
     return re.search(rf"(?<![a-z0-9]){re.escape(mot)}{fin}", texte) is not None
 
 
-def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] | None = None) -> list[str]:
-    """Renvoie les noms d'outils à proposer au modèle, les plus pertinents d'abord."""
+def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] | None = None,
+            decision=None) -> list[str]:
+    """Renvoie les noms d'outils à proposer au modèle, les plus pertinents d'abord. `decision` : avis du
+    classifieur (agent/classifieur.py) ; ses domaines comptent davantage que les mots-clés."""
     t = normaliser(demande)
     mots = {**MOTS_GROUPES, **(mots_extra or {})}
     groupes = registre.groupes()
 
     scores = {g: sum(_contient(t, normaliser(m)) for m in ms) for g, ms in mots.items() if g in groupes}
+    domaines = dict(getattr(decision, "domaines", None) or [])
+    for g, s in domaines.items():
+        if g in groupes:
+            scores[g] = scores.get(g, 0) + 1 + 3 * s  # domaine reconnu par le sens : passe devant les mots-clés
     choisis = [g for g, s in sorted(scores.items(), key=lambda x: -x[1]) if s > 0]
     # « Ouvre Claude et demande-lui… », « ouvre Réglages, va dans Wi-Fi » : agir DANS l'appli ouverte.
     dans_appli = "fenetres" in groupes and (("applications" in choisis and bool(ACTION_DANS_APPLI.search(t)))
-                                            or bool(VERS_APPLI.search(t)) or _nomme_une_appli(t))
+                                            or bool(VERS_APPLI.search(t)) or _nomme_une_appli(t)
+                                            or domaines.get("fenetres", 0) >= 0.5)
     if not choisis:
         choisis = [g for g in GROUPES_DEFAUT if g in groupes]
 

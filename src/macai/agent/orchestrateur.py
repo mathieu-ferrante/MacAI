@@ -177,6 +177,7 @@ class Orchestrateur:
             try:
                 texte = self._commande_directe(demande, trace)
                 if texte is None:
+                    self._classer(demande)
                     plan = self._plan(demande)
                     self.plan_valide = bool(plan)
                     texte = PLAN_REFUS if plan is False else self._boucle(demande, trace, plan or None)
@@ -221,6 +222,24 @@ class Orchestrateur:
         if isinstance(derniere, dict):
             derniere.update(app="", pid=0, elements=[])
 
+    def _choisir(self, demande: str) -> list[str]:
+        return routeur.choisir(demande, self.ctx.registre, self.ctx.services.get("mots_routeur"),
+                               self.ctx.services.get("decision"))
+
+    def _classer(self, demande: str) -> None:
+        """Avis du classifieur pour cette demande (intention, domaines), noté au journal. Sans classifieur ou s'il
+        échoue : None, et le routage par mots-clés suffit."""
+        ctx = self.ctx
+        ctx.services["decision"] = None
+        classifieur = ctx.service("classifieur")
+        if classifieur is None or not ctx.config.agent.get("classifieur", True):
+            return
+        decision = classifieur.classer(demande)
+        ctx.services["decision"] = decision
+        if decision is not None:
+            ctx.journal.ecrire("classement", intention=decision.intention, confiance=decision.confiance,
+                               domaines=[d for d, _ in decision.domaines])
+
     def _commande_directe(self, demande: str, trace: list) -> str | None:
         if not self.rapide:
             return None
@@ -261,7 +280,7 @@ class Orchestrateur:
         # L'outil principal est déjà confirmé avec tous ses détails (installer une app, envoyer un message,
         # programmer une tâche…) : un plan en plus n'apporte rien (vu à l'essai : plan « double-cliquer sur le
         # .dmg, suivre l'assistant » pour une installation que installer_application fait d'un coup).
-        noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
+        noms = self._choisir(demande)
         principal = ctx.registre.get(noms[0]) if noms else None
         return not (principal is not None and principal.toujours_confirmer)
 
@@ -307,7 +326,7 @@ class Orchestrateur:
         # le modèle inventait des boutons et des menus (« cliquer sur Quitter dans la barre des applications »),
         # puis suivait ce plan faux au lieu d'appeler le bon outil (vu dans le journal du Mac). Décrits sans leur
         # nom technique : avec, le modèle recopiait « ranger_dossier » comme étape (vu à l'essai réel).
-        noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
+        noms = self._choisir(demande)
         moyens = "\n".join(dict.fromkeys(f"- {_premiere_phrase(o.description)}"
                                           for n in noms if (o := ctx.registre.get(n)) is not None))
         consigne = CONSIGNE_PLAN.format(n=PLAN_ETAPES_MAX) + (CONSIGNE_PLAN_MOYENS.format(moyens=moyens)
@@ -320,14 +339,18 @@ class Orchestrateur:
     def _boucle(self, demande: str, trace: list, plan: list[str] | None = None) -> str:
         ctx = self.ctx
         cfg = ctx.config
-        noms = routeur.choisir(demande, ctx.registre, ctx.services.get("mots_routeur"))
-        if SAVOIR.search(routeur.normaliser(demande).strip()):
+        noms = self._choisir(demande)
+        decision = ctx.services.get("decision")
+        sure = decision is not None and decision.sure(SEUIL_DECISION)
+        if SAVOIR.search(routeur.normaliser(demande).strip()) or (sure and decision.intention == "explication"):
             # « Comment envoyer un mail ? » : on explique, on n'agit pas (vu en essai : brouillons préparés et
             # mails lus pour une simple question). Seuls les outils de lecture restent.
             noms = [n for n in noms if (o := ctx.registre.get(n)) is not None and not o.toujours_confirmer
                     and _risque_fixe(o) == Risque.LECTURE and o.groupe not in ("organisation",)]
-        if redaction_seule(demande):
+        if redaction_seule(demande) or (sure and decision.intention in ("redaction", "conversation")):
             noms = []  # « écris-moi une phrase sur la mer » : la réponse est le texte, aucun fichier (banc du 25/11)
+        elif sure and decision.intention == "planifier" and ctx.registre.get("planifier_tache") is not None:
+            noms = ["planifier_tache"] + [n for n in noms if n != "planifier_tache"]
         ctx.emettre("routage", mode="agent", outils=noms)
         outils = ctx.registre.schemas(noms)
 
@@ -564,6 +587,7 @@ class Orchestrateur:
         return False
 
 
+SEUIL_DECISION = 0.7  # confiance du classifieur à partir de laquelle son intention change les outils proposés
 # « Écris-moi / rédige / donne-moi / propose-moi un texte, une phrase, un poème… » : une réponse écrite suffit.
 REDACTION = re.compile(r"^(?:peux-tu |tu peux |stp )?(?:ecri[st]|redige|compose|invente|imagine|propose|donne|trouve)"
                        r"(?:-moi| moi)? (?:un|une|des|quelques|\d+) (?:\w+ ){0,2}?(?:phrase|texte|poeme|haiku|"

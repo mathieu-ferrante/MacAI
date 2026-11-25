@@ -76,6 +76,10 @@ class Application:
             self.journal.ecrire("erreur_service", service="index", texte=str(e))
         from .competences.competences import Bibliotheque
         s["competences"] = Bibliotheque(cfg.chemin("competences"), self.registre)
+        # Classifieur de demandes (intention, domaines) : aiguille l'agent vers les bons outils. Rien n'est calculé
+        # au démarrage : les vecteurs des exemples le sont à la première demande (puis gardés en cache).
+        from .agent.classifieur import Classifieur
+        s["classifieur"] = Classifieur(self.ollama, cfg.modeles["embeddings"], cfg.chemin("classifieur.cache"))
         if cfg.mcp:
             from .mcp.client import GestionnaireMCP
             g = GestionnaireMCP(cfg.mcp, self.registre, cfg.chemin("mcp_cache.json"))
@@ -230,6 +234,9 @@ class Application:
         def charger():
             from .agent import consignes
             from .llm.ollama import ErreurOllama
+            classifieur = self.ctx.service("classifieur")
+            if classifieur is not None and not self._arret_prechauffage.is_set():
+                classifieur.prechauffer()  # modèle d'embeddings (1 Go) chargé, vecteurs des exemples prêts
             try:
                 self.ollama.discuter(self.cfg.modeles["agent"], [{"role": "system", "content": consignes.construire()},
                                                                  {"role": "user", "content": "."}],

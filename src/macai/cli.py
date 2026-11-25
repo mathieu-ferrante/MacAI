@@ -146,6 +146,63 @@ def cmd_modeles(args) -> int:
     return 0
 
 
+def cmd_classifieur(args) -> int:
+    """Justesse du classifieur sur le jeu de test, et couverture du routage avec et sans lui."""
+    import time
+    from . import config
+    from .agent import routeur
+    from .agent.classifieur import Classifieur, lire_exemples
+    from .llm.ollama import Ollama
+    from .outils.base import charger_tous
+    cfg = config.charger()
+    o = Ollama(garder="5m")
+    c = Classifieur(o, cfg.modeles["embeddings"], cfg.chemin("classifieur.cache"))
+    test = lire_exemples(jeu="test")
+    if not test:
+        print("Aucun exemple de test dans exemples_routage.jsonl.")
+        return 1
+    reg = charger_tous()
+    groupes = {g: {x.nom for x in outils} for g, outils in reg.groupes().items()}
+    t0 = time.monotonic()
+    c._preparer()
+    print(f"Vecteurs des exemples prêts en {time.monotonic() - t0:.1f} s")
+    bons_int = bons_dom = avec_dom = couvert_avec = couvert_sans = n_dom = 0
+    durees, erreurs = [], []
+    for e in test:
+        t0 = time.monotonic()
+        d = c.classer(e["texte"])
+        durees.append(time.monotonic() - t0)
+        if d is None:
+            erreurs.append((e["texte"], "aucune décision", ""))
+            continue
+        if d.intention == e["intention"]:
+            bons_int += 1
+        else:
+            erreurs.append((e["texte"], f"intention {d.intention} ({d.confiance})", e["intention"]))
+        if e["domaines"]:
+            avec_dom += 1
+            if d.domaines and d.domaines[0][0] in e["domaines"]:
+                bons_dom += 1
+            for dom in e["domaines"]:
+                if dom not in groupes:
+                    continue
+                n_dom += 1
+                couvert_avec += bool(set(routeur.choisir(e["texte"], reg, decision=d)) & groupes[dom])
+                couvert_sans += bool(set(routeur.choisir(e["texte"], reg)) & groupes[dom])
+    print(f"Intention juste : {bons_int}/{len(test)} ({bons_int / len(test):.0%})")
+    if avec_dom:
+        print(f"Domaine principal juste : {bons_dom}/{avec_dom} ({bons_dom / avec_dom:.0%})")
+    if n_dom:
+        print(f"Routage qui couvre les domaines attendus : sans classifieur {couvert_sans}/{n_dom} "
+              f"({couvert_sans / n_dom:.0%}), avec {couvert_avec}/{n_dom} ({couvert_avec / n_dom:.0%})")
+    durees.sort()
+    print(f"Durée par demande : médiane {durees[len(durees) // 2] * 1000:.0f} ms, max {durees[-1] * 1000:.0f} ms")
+    if args.erreurs:
+        for texte, obtenu, attendu in erreurs:
+            print(f"- {texte!r} : {obtenu}, attendu {attendu}")
+    return 0
+
+
 def cmd_verifier(args) -> int:
     from .verification import verifier
     return verifier(json_sortie=args.json)
@@ -189,6 +246,10 @@ def main(argv=None) -> int:
     s = sub.add_parser("modeles", help="empreintes des modèles Ollama (--accepter après une mise à jour)")
     s.add_argument("--accepter", action="store_true")
     s.set_defaults(func=cmd_modeles)
+
+    s = sub.add_parser("classifieur", help="mesure le classifieur de demandes sur son jeu de test")
+    s.add_argument("--erreurs", action="store_true", help="liste les demandes mal classées")
+    s.set_defaults(func=cmd_classifieur)
 
     s = sub.add_parser("verifier", help="contrôle l'installation et produit un rapport")
     s.add_argument("--json", action="store_true")
