@@ -51,9 +51,11 @@ ignorer = ["Library", ".Trash", "node_modules", ".git", ".venv", "venv", "__pyca
            ".cache", "Caches", "DerivedData", "Pods", "build", "dist", ".npm", ".gradle",
            "Applications", "Movies", "Music"]
 images = true
-# N'indexer que sur secteur et après N minutes sans utilisation du Mac.
+# Indexer après N minutes sans utilisation du Mac : sur secteur, ou sur batterie au-dessus de batterie_min %
+# (après deux fois plus d'inactivité).
 secteur_seulement = true
 inactivite_minutes = 5
+batterie_min = 60
 taille_max_mo = 50
 
 [chrome]

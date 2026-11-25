@@ -287,3 +287,32 @@ def ouvrir_reglage(ctx, rubrique):
         cle = proches[0]
     commun.executer(["open", f"x-apple.systempreferences:{RUBRIQUES[cle]}"])
     return f"Réglages Système ouverts sur « {cle} ». Pour y changer quelque chose : lire_fenetre puis cliquer."
+
+
+# --- Wi-Fi et apparence -----------------------------------------------------------------------------------------
+
+def _interface_wifi() -> str:
+    sortie = commun.executer(["/usr/sbin/networksetup", "-listallhardwareports"], verifier=False)
+    m = re.search(r"Hardware Port: (?:Wi-Fi|AirPort)\s*\nDevice: (\w+)", sortie)
+    return m.group(1) if m else "en0"
+
+
+@outil("regler_wifi", "Active ou coupe le Wi-Fi du Mac.", "systeme", {"actif": ("boolean", "true pour activer")},
+       risque=Risque.MODIFICATION, annonce=lambda a: ("Activer" if a.get("actif") else "Couper") + " le Wi-Fi")
+def regler_wifi(ctx, actif):
+    interface = _interface_wifi()
+    commun.executer(["/usr/sbin/networksetup", "-setairportpower", interface, "on" if actif else "off"])
+    etat = commun.executer(["/usr/sbin/networksetup", "-getairportpower", interface], verifier=False)
+    voulu = "On" if actif else "Off"
+    if voulu not in etat:
+        return Resultat(False, f"Le Wi-Fi n'a pas changé d'état ({etat.strip()}).")
+    return "Wi-Fi activé." if actif else "Wi-Fi coupé."
+
+
+@outil("mode_sombre", "Active ou désactive le mode sombre de macOS.", "systeme",
+       {"actif": ("boolean", "true pour le mode sombre, false pour le mode clair")}, risque=Risque.MODIFICATION,
+       annonce=lambda a: "Passer en mode " + ("sombre" if a.get("actif") else "clair"))
+def mode_sombre(ctx, actif):
+    commun.osascript('tell application "System Events" to tell appearance preferences to set dark mode to '
+                     + ("true" if actif else "false"))
+    return "Mode sombre activé." if actif else "Mode clair activé."

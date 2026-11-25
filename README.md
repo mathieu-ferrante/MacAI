@@ -106,6 +106,10 @@ Dans le **Terminal** : `macai demander "range mes téléchargements"`.
 
 ### Système
 - « Volume à 30 », « pause », « chanson suivante », « prends une capture d'écran ».
+- **Instantané, sans IA** : « combien font 5000-964 », « 20 % de 150 », « coupe le wifi », « active le wifi »,
+  « passe en mode sombre », « ferme Chrome, Finder et Claude », « ferme tout sauf Claude » (confirmé, avec la liste).
+- « Installe Minecraft, le .dmg est dans mes téléchargements » : seulement si l'app est signée et notariée par Apple
+  (Gatekeeper), toujours confirmé, annulable ; un .pkg s'installe à la main.
 - « Pourquoi mon Mac rame ? », « combien de batterie il me reste ? », « quelle heure est-il ? ».
 - « Exécute la commande ls -la ~/Documents » : sans confirmation si c'est une simple lecture, sinon il demande.
 

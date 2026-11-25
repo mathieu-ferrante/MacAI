@@ -20,7 +20,9 @@ def test_risque_ecriture_depend_de_l_existence(tmp_path):
     f = tmp_path / "x.txt"
     assert fichiers._risque_ecriture({"chemin": str(f)}) == Risque.CREATION
     f.write_text("a")
-    assert fichiers._risque_ecriture({"chemin": str(f)}) == Risque.MODIFICATION
+    # Sans « ecraser », un nom libre est choisi (« x (2).txt ») : simple création ; remplacer : confirmé.
+    assert fichiers._risque_ecriture({"chemin": str(f)}) == Risque.CREATION
+    assert fichiers._risque_ecriture({"chemin": str(f), "ecraser": True}) == Risque.SENSIBLE
 
 
 def test_deplacer_renommer_copier(ctx, tmp_path):

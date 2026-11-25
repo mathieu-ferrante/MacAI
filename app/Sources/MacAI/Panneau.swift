@@ -45,6 +45,7 @@ final class Panneau: NSPanel {
         NSApp.activate()
         makeKeyAndOrderFront(nil)
         etat.apparitions += 1  // le champ de saisie reprend le focus
+        if !auto { etat.prechauffer() }
     }
 
     override func cancelOperation(_ sender: Any?) {

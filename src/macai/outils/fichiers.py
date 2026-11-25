@@ -194,17 +194,25 @@ def creer_dossier(ctx, chemin):
 
 
 def _risque_ecriture(args):
+    """Nouveau fichier (ou nom libre « (2) » si le fichier existe) : création. Remplacer un fichier existant : confirmé
+    (l'ancienne version va à la Corbeille, mais c'est le document de l'utilisateur ; vu à l'essai : le modèle
+    demandait « ecraser » de lui-même)."""
     try:
-        return Risque.MODIFICATION if commun.chemin(args.get("chemin", "")).exists() else Risque.CREATION
+        existe = commun.chemin(args.get("chemin", "")).exists()
     except OSError:
-        return Risque.CREATION
+        return Risque.SENSIBLE
+    if existe and args.get("ecraser") in (True, "true", "oui", 1):
+        return Risque.SENSIBLE
+    return Risque.CREATION
 
 
 @outil("ecrire_fichier_texte", "Crée un fichier texte (txt, md, py, html, json…) avec le contenu donné. "
        "Par défaut n'écrase pas un fichier existant.", "fichiers",
        {"chemin": ("string", "chemin du fichier, ex. ~/Desktop/notes.md"), "contenu": ("string", "texte complet"),
         "ecraser": ("boolean", "remplacer le fichier s'il existe")}, requis=["chemin", "contenu"],
-       risque=_risque_ecriture, mac_seulement=False, annonce=lambda a: f"Écrire {a['chemin']}")
+       risque=_risque_ecriture, mac_seulement=False,
+       annonce=lambda a: (f"REMPLACER le fichier existant {a['chemin']} (l'ancien va à la Corbeille)"
+                          if a.get("ecraser") and commun.chemin(a["chemin"]).exists() else f"Écrire {a['chemin']}"))
 def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     p = resoudre(chemin, ecriture=True)
     ops: list[dict] = []
@@ -221,6 +229,25 @@ def ecrire_fichier_texte(ctx, chemin, contenu, ecraser=False):
     ops.append({"type": "corbeille", "chemin": str(p)})
     annulation.enregistrer(ctx, f"{'Remplacement' if remplace else 'Création'} de {p.name}", ops)
     return Resultat(True, f"Fichier écrit : {p} ({len(contenu)} caractères)", {"fichier": str(p)})
+
+
+def oublier_dans_index(ctx, *chemins: Path) -> None:
+    """Un fichier (ou dossier) que MacAI vient de déplacer, renommer ou jeter n'est plus à cet endroit : l'index
+    l'oublie tout de suite (le nouvel emplacement est indexé au prochain passage). Sans ça, la recherche proposait
+    l'ancien chemin, puis l'outil répondait « n'existe pas » (vu dans le journal du Mac)."""
+    index = ctx.service("index") if ctx is not None else None
+    if index is None:
+        return
+    try:
+        anciens = []
+        for c in chemins:
+            c = str(c)
+            anciens.append(c)
+            anciens += list(index.chemins(c.rstrip("/") + "/"))
+        if anciens:
+            index.oublier(anciens)
+    except Exception:  # noqa: BLE001 - l'index n'est qu'une aide : jamais bloquant
+        pass
 
 
 DOSSIERS_DU_COMPTE = {"desktop", "documents", "downloads", "pictures", "movies", "music", "library", "applications",
@@ -273,6 +300,7 @@ def deplacer(ctx, source, destination):
     dest = sans_collision(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src), str(dest))
+    oublier_dans_index(ctx, src)
     ops.append({"type": "deplacer", "de": str(dest), "vers": str(src)})
     annulation.enregistrer(ctx, f"Déplacement de {src.name} vers {dest.parent.name}", ops)
     return Resultat(True, f"Déplacé : {src.name} → {dest}", {"fichier": str(dest)})
@@ -296,6 +324,7 @@ def renommer(ctx, chemin, nouveau_nom):
         nouveau_nom += src.suffix
     dest = sans_collision(verifier_chemin(src.with_name(nouveau_nom), ecriture=True))
     src.rename(dest)
+    oublier_dans_index(ctx, src)
     annulation.enregistrer(ctx, f"Renommage de {src.name} en {dest.name}",
                            [{"type": "deplacer", "de": str(dest), "vers": str(src)}])
     return Resultat(True, f"Renommé en {dest.name}", {"fichier": str(dest)})
@@ -362,6 +391,7 @@ def mettre_a_la_corbeille(ctx, chemin):
     if p.resolve() == maison or len(p.parts) <= 3 or p.resolve().parent == maison:
         raise ErreurOutil(f"Refusé : {p} est un dossier principal de ton compte.")
     jete = mettre_corbeille(p)
+    oublier_dans_index(ctx, p)
     if isinstance(jete, Path):
         annulation.enregistrer(ctx, f"Mise à la Corbeille de {p.name}",
                                [{"type": "restaurer", "depuis": str(jete), "vers": str(p)}])

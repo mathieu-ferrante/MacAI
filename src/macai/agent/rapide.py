@@ -36,6 +36,20 @@ NOM_NON_APPLI = re.compile(r"^(tout|toutes|mes|ma|mon|un|une|le dernier|la derni
 class Plan:
     actions: list[tuple[str, dict]] = field(default_factory=list)
     reponse: str = ""
+    tolerant: bool = False  # plusieurs actions indépendantes : un échec n'arrête pas les autres
+
+
+def _calcul(original: str) -> Plan | None:
+    """« Combien font 5000-964 », « 12 fois 7 », « 20 % de 150 » : calculé exactement, sans modèle."""
+    from ..calcul import CalculImpossible, calculer, en_francais, expression
+    if expression(original) is None:
+        return None
+    try:
+        return Plan([], f"{en_francais(calculer(original))}")
+    except CalculImpossible as e:
+        return Plan([], f"Calcul impossible : {e}.")
+    except (OverflowError, ValueError):
+        return None
 
 
 def _norm(texte: str) -> str:
@@ -77,7 +91,23 @@ class CommandesRapides:
              self._youtube_lire),
             (P(rf"^{demande}(?:cherche|recherche)(?: moi)? (?P<q>.+?) sur (?P<site>google|youtube)$"), self._chercher_sur),
             (P(rf"^{demande}(?:ouvre|lance|demarre)(?: moi)? (?P<nom>.+)$"), self._ouvrir),
+            # « Ferme tout sauf Claude », « quitte toutes mes applis » : un seul outil, confirmé avec la liste.
+            (P(rf"^{demande}(?:ferme|quitte)(?: moi)? (?:tout|toutes? (?:les |mes )?(?:applis|applications|"
+               r"logiciels|programmes|fenetres)(?: ouvertes| lancees)?)(?: sauf (?P<sauf>.+))?$"),
+             lambda m, t: Plan([("fermer_applications", {"sauf": self._extrait(m, t, "sauf") if m.group("sauf")
+                                                          else ""})])),
+            (P(rf"^{demande}(?:ferme|quitte)(?: moi)? (?P<noms>[^,]+(?:,[^,]+)*,? et [^,]+|[^,]+(?:,[^,]+)+)$"),
+             self._quitter_plusieurs),
             (P(rf"^{demande}(?:ferme|quitte)(?: moi)? (?P<nom>.+)$"), self._quitter),
+            (P(rf"^{demande}(?:coupe|desactive|eteins|eteint|arrete|deconnecte)(?: moi)? (?:le )?wi-?fi$"),
+             lambda m, t: Plan([("regler_wifi", {"actif": False})])),
+            (P(rf"^{demande}(?:active|allume|remets|rallume|reactive|reconnecte)(?: moi)? (?:le )?wi-?fi$"),
+             lambda m, t: Plan([("regler_wifi", {"actif": True})])),
+            (P(rf"^{demande}(?:active|passe en|mets(?: le)?|bascule en) (?:le )?mode (?:sombre|nuit|dark)$"),
+             lambda m, t: Plan([("mode_sombre", {"actif": True})])),
+            (P(rf"^{demande}(?:desactive|enleve|quitte|passe en|mets(?: le)?|bascule en) (?:le )?mode "
+               r"(?:sombre|nuit|dark|clair)$"),
+             lambda m, t: Plan([("mode_sombre", {"actif": "clair" in m.group(0)})])),
             (P(r"^(?:mets |regle |monte |baisse )?(?:le )?(?:volume|son) (?:a |au )?(?P<n>\d{1,3}) ?%?$"), self._volume),
             (P(r"^(?:monte|augmente) (?:le )?(?:son|volume)$"), lambda m, t: self._media("volume_plus")),
             (P(r"^(?:baisse|diminue) (?:le )?(?:son|volume)$"), lambda m, t: self._media("volume_moins")),
@@ -98,6 +128,9 @@ class CommandesRapides:
 
     def reconnaitre(self, demande: str, registre=None) -> Plan | None:
         original = demande.strip().rstrip(" ?!.")
+        calcul = _calcul(original)
+        if calcul is not None:
+            return calcul
         t = _norm(original)
         t_court = re.sub(r"\s+", " ", t)
         if t_court != t:  # espaces multiples : on repart d'un original compacté
@@ -151,6 +184,22 @@ class CommandesRapides:
         if re.match(r"^(https?://|www\.)|^[a-z0-9-]+\.(com|fr|org|net|io|dev|tv)$", cle):
             return Plan([("ouvrir_url", {"url": nom if nom.startswith("http") else "https://" + nom})])
         return Plan([("ouvrir_application", {"nom": nom})])
+
+    def _quitter_plusieurs(self, m, original):
+        """« Ferme Chrome, Finder et Claude » : chaque nom doit être une appli installée, sinon l'agent s'en charge."""
+        if NE_PAS_INTERCEPTER.search(m.group(0)):
+            return None
+        brut = self._extrait(m, original, "noms")
+        noms = [_nettoyer(n) for n in re.split(r",|\bet\b", brut, flags=re.I) if _nettoyer(n)]
+        if len(noms) < 2 or len(noms) > 8 or any(len(n.split()) > 4 for n in noms):
+            return None
+        try:
+            from ..outils.applications import trouver_application
+            if any(trouver_application(n) is None for n in noms):
+                return None
+        except Exception:  # noqa: BLE001 - hors Mac : on laisse l'agent
+            return None
+        return Plan([("quitter_application", {"nom": n}) for n in noms], tolerant=True)
 
     def _quitter(self, m, original):
         if NE_PAS_INTERCEPTER.search(m.group(0)) or not _nom_simple(m.group("nom")):

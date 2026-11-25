@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import difflib
+import os
 import re
 import time
 from pathlib import Path
@@ -243,3 +244,154 @@ def afficher_dans_finder(ctx, chemin):
         raise ErreurOutil(f"{p} n'existe pas.")
     commun.executer(["open", "-R", str(p)])
     return f"{p.name} affiché dans le Finder."
+
+
+# --- Fermer plusieurs applications ------------------------------------------------------------------------------
+
+def _a_fermer(sauf: str) -> list[dict]:
+    """Applications ouvertes à fermer : toutes sauf celles nommées, macOS (Finder…) et MacAI lui-même."""
+    from ..mac import accessibilite as ax
+    garder = set()
+    for n in re.split(r",|\bet\b", str(sauf or ""), flags=re.I):
+        n = n.strip()
+        if n and (app := trouver_application(n)) is not None:
+            garder.add(app.stem)
+        elif n:
+            garder.add(n)
+    garder_norm = {normaliser(g) for g in garder}
+    return [a for a in ax.applis_ouvertes()
+            if a["paquet"] not in garder and normaliser(a["nom"]) not in garder_norm
+            and normaliser(a["paquet"]) not in garder_norm and not _protegee(a["paquet"]) and not _protegee(a["nom"])]
+
+
+def _annonce_fermer(a: dict) -> str:
+    try:
+        noms = [x["nom"] for x in _a_fermer(a.get("sauf", ""))]
+    except Exception:  # noqa: BLE001 - liste illisible : annonce générique
+        noms = []
+    liste = f" : {', '.join(noms)}" if noms else ""
+    return f"Fermer {len(noms) or 'toutes les'} application{'s' if len(noms) != 1 else ''}{liste}" + (
+        f" (je garde {a['sauf']})" if a.get("sauf") else "")
+
+
+@outil("fermer_applications", "Ferme toutes les applications ouvertes, sauf celles indiquées (jamais le Finder ni "
+       "MacAI). Chaque appli peut proposer d'enregistrer.", "applications",
+       {"sauf": ("string", "applications à garder ouvertes, séparées par des virgules, facultatif")}, requis=[],
+       risque=Risque.SENSIBLE, annonce=_annonce_fermer, delai_max=180)
+def fermer_applications(ctx, sauf=""):
+    from ..mac import accessibilite as ax
+    cibles = _a_fermer(sauf)
+    if not cibles:
+        return Resultat(True, "Aucune application à fermer.", sans_effet=True)
+    for a in cibles:
+        try:
+            commun.osascript(f"tell application id {commun.chaine_as(a['id'])} to quit" if a.get("id") else
+                             f"tell application {commun.chaine_as(a['paquet'] or a['nom'])} to quit", delai=20)
+        except ErreurOutil:
+            pass
+    time.sleep(1.5)
+    restantes = {a["pid"] for a in ax.applis_ouvertes()}
+    fermees = [a["nom"] for a in cibles if a["pid"] not in restantes]
+    ouvertes = [a["nom"] for a in cibles if a["pid"] in restantes]
+    texte = (f"Fermé : {', '.join(fermees)}." if fermees else "Rien n'a pu être fermé.") + (
+        f" Encore ouvert (document à enregistrer ?) : {', '.join(ouvertes)}." if ouvertes else "")
+    return Resultat(bool(fermees), texte, {"fermees": fermees, "ouvertes": ouvertes})
+
+
+# --- Installer une application ----------------------------------------------------------------------------------
+
+APPLICATIONS = Path("/Applications")
+
+
+def _evaluation_gatekeeper(app: Path) -> tuple[bool, str]:
+    """Gatekeeper (spctl) : l'app est-elle signée par un développeur identifié ET notariée par Apple ?"""
+    import subprocess
+    r = subprocess.run(["/usr/sbin/spctl", "--assess", "--type", "execute", "-vv", str(app)],
+                       capture_output=True, text=True, timeout=60)
+    sortie = (r.stdout + r.stderr).strip()
+    ok = r.returncode == 0 and "accepted" in sortie and re.search(r"source=(Notarized Developer ID|Apple System|"
+                                                                    r"Mac App Store|Apple)", sortie) is not None
+    return ok, sortie
+
+
+@outil("installer_application", "Installe une application à partir d'un fichier .dmg, .zip ou .app téléchargé "
+       "(la copie dans Applications), seulement si elle est signée et notariée par Apple. Les .pkg s'installent "
+       "à la main.", "applications", {"chemin": ("string", "chemin du .dmg, .zip ou .app")},
+       risque=Risque.SENSIBLE, toujours_confirmer=True, delai_max=300,
+       annonce=lambda a: f"Installer l'application contenue dans {a['chemin']} (vérifiée par Gatekeeper)")
+def installer_application(ctx, chemin):
+    import shutil
+    import subprocess
+    import tempfile
+
+    from .fichiers import verifier_chemin
+    source = verifier_chemin(commun.chemin(chemin))
+    if not source.exists():
+        raise ErreurOutil(f"{source} n'existe pas. Utilise rechercher_fichiers pour le retrouver.")
+    ext = source.suffix.lower()
+    if ext in (".pkg", ".mpkg"):
+        raise ErreurOutil("C'est un installateur .pkg : il demande ton mot de passe administrateur, ouvre-le toi-même "
+                          "(double-clic) et suis ses étapes.")
+    if ext not in (".dmg", ".zip", ".app"):
+        raise ErreurOutil("Je sais installer une application depuis un .dmg, un .zip ou un .app.")
+    montage = temporaire = None
+    try:
+        if ext == ".dmg":
+            montage = Path(tempfile.mkdtemp(prefix="macai-dmg-"))
+            r = subprocess.run(["/usr/bin/hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen",
+                                "-mountpoint", str(montage), str(source)], capture_output=True, text=True,
+                               timeout=180, input="Y\n")  # accepte l'affichage de licence éventuel
+            if r.returncode != 0:
+                raise ErreurOutil(f"Impossible d'ouvrir l'image disque : {r.stderr.strip()[:200]}")
+            dossier = montage
+        elif ext == ".zip":
+            temporaire = Path(tempfile.mkdtemp(prefix="macai-zip-"))
+            r = subprocess.run(["/usr/bin/ditto", "-x", "-k", str(source), str(temporaire)], capture_output=True,
+                               text=True, timeout=180)
+            if r.returncode != 0:
+                raise ErreurOutil(f"Impossible de décompresser : {r.stderr.strip()[:200]}")
+            dossier = temporaire
+        else:
+            dossier = None
+        if dossier is None:
+            apps = [source]
+        else:
+            apps = [p for p in dossier.glob("*.app") if not p.is_symlink()] or \
+                   [p for p in dossier.glob("*/*.app") if not p.is_symlink()]
+        if not apps:
+            raise ErreurOutil("Aucune application (.app) dans ce fichier. S'il contient un installateur, ouvre-le "
+                              "toi-même.")
+        if len(apps) > 1:
+            raise ErreurOutil("Plusieurs applications dans ce fichier : " + ", ".join(a.name for a in apps)
+                              + ". Installe celle que tu veux à la main.")
+        app = apps[0]
+        ok, avis = _evaluation_gatekeeper(app)
+        if not ok:
+            raise ErreurOutil(f"Refusé : {app.name} n'est pas signée et notariée par Apple (Gatekeeper : "
+                              f"{avis[:160]}). Ne l'installe que si tu fais confiance à sa source.")
+        cible_dossier = APPLICATIONS if os.access(APPLICATIONS, os.W_OK) else Path.home() / "Applications"
+        cible_dossier.mkdir(exist_ok=True)
+        cible = cible_dossier / app.name
+        if cible.exists():
+            return Resultat(True, f"{app.stem} est déjà installé dans {cible_dossier}. Pour le mettre à jour, "
+                                  "mets d'abord l'ancienne version à la Corbeille.", sans_effet=True)
+        r = subprocess.run(["/usr/bin/ditto", str(app), str(cible)], capture_output=True, text=True, timeout=240)
+        if r.returncode != 0:
+            shutil.rmtree(cible, ignore_errors=True)
+            raise ErreurOutil(f"Copie impossible : {r.stderr.strip()[:200]}")
+        from .. import annulation
+        annulation.enregistrer(ctx, f"Installation de {app.stem}", [{"type": "desinstaller_app", "chemin": str(cible)}])
+        global _cache
+        _cache = None  # la nouvelle appli doit être trouvable tout de suite
+        return Resultat(True, f"{app.stem} est installé dans {cible_dossier} (signé et notarié). Ouvre-le avec "
+                              "ouvrir_application.", {"application": app.stem, "chemin": str(cible)})
+    finally:
+        if montage is not None:
+            subprocess.run(["/usr/bin/hdiutil", "detach", str(montage), "-quiet", "-force"], capture_output=True,
+                           timeout=60)
+            try:
+                montage.rmdir()
+            except OSError:
+                pass
+        if temporaire is not None:
+            shutil.rmtree(temporaire, ignore_errors=True)

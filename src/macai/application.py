@@ -220,11 +220,33 @@ class Application:
         with self._occupe:
             return self.orchestrateur.traiter(texte)
 
+    def prechauffer(self) -> bool:
+        """Charge le modèle de l'agent et calcule ses consignes (préfixe gardé en cache par Ollama) pendant que
+        l'utilisateur écrit ou parle. Abandonné dès qu'une demande arrive. Jamais pendant une demande."""
+        if self.occupe() or getattr(self, "_prechauffage", None) is not None and self._prechauffage.is_alive():
+            return False
+        self._arret_prechauffage = threading.Event()
+
+        def charger():
+            from .agent import consignes
+            from .llm.ollama import ErreurOllama
+            try:
+                self.ollama.discuter(self.cfg.modeles["agent"], [{"role": "system", "content": consignes.construire()},
+                                                                 {"role": "user", "content": "."}],
+                                     None, options={"num_predict": 1}, arret=self._arret_prechauffage)
+            except (ErreurOllama, InterruptedError, OSError):
+                pass
+        self._prechauffage = threading.Thread(target=charger, daemon=True, name="prechauffage")
+        self._prechauffage.start()
+        return True
+
     def traiter_en_fond(self, texte: str) -> bool:
         # Verrou pris ici (et non dans le fil) : deux demandes simultanées ne peuvent pas partir toutes les deux.
         if not self._occupe.acquire(blocking=False):
             return False
         self._arret_avant_debut = False
+        if getattr(self, "_arret_prechauffage", None) is not None:
+            self._arret_prechauffage.set()  # la demande passe avant le préchauffage (Ollama : un calcul à la fois)
         try:
             threading.Thread(target=self._traiter_verrouille, args=(texte,), daemon=True, name="demande").start()
         except RuntimeError:

@@ -159,6 +159,17 @@ def _appliquer(op: dict) -> tuple[bool, str]:
         _verifier(p)
         fichiers.mettre_corbeille(p)
         return True, f"{p.name} mis à la Corbeille"
+    if genre == "desinstaller_app":
+        # Seule exception à l'écriture hors du dossier personnel : une .app que MacAI a lui-même installée,
+        # directement dans /Applications ou ~/Applications.
+        p = Path(op.get("chemin") or "")
+        if p.suffix.lower() != ".app" or p.is_symlink() or \
+                p.parent.resolve() not in (Path("/Applications").resolve(), (Path.home() / "Applications").resolve()):
+            return False, f"{p.name} : emplacement inattendu, rien fait"
+        if not p.exists():
+            return False, f"{p.name} n'est plus installé"
+        fichiers.mettre_corbeille(p)
+        return True, f"{p.stem} désinstallé (dans la Corbeille)"
     if genre == "supprimer_dossier_vide":
         p = Path(op.get("chemin") or "")
         if not p.is_dir():

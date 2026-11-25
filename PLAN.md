@@ -70,6 +70,12 @@ MacAI.app (Swift, ~25 Mo)                    moteur Python (~35 Mo au repos)    
 | D50 | `planifier_tache` toujours confirmé ; `creer_competence` confirmé (sauf bouton de l'app) et jamais d'écrasement ; « mon/ma/mes » ne vaut plus accord pour `retenir` | Persistance d'une consigne piégée qui s'exécuterait plus tard, sans témoin. |
 | D51 | À la voix, une confirmation ou un plan peut être refusé mais jamais accepté | Un « oui » d'une vidéo ou d'une autre personne validait un envoi. |
 | D52 | Serveur : jeton comparé en octets, Host local exigé, tout en-tête Origin refusé ; app : connexion seulement au pid du moteur qu'elle a lancé, Python `-I` et environnement minimal ; empreinte des modèles Ollama retenue au premier usage | DNS rebinding, faux moteur après un plantage, `PYTHONPATH`/`DYLD_*` hérités, modèle remplacé par un programme local (Ollama sans authentification). |
+| D53 | Calculs exacts sans modèle (`calcul.py`, `ast`, jamais `eval`) ; commandes directes : fermer plusieurs applis, tout fermer sauf…, Wi-Fi, mode sombre | Journal : « combien font 5000-964 » partait en recherche web ; « ferme Chrome, Finder et Claude » échouait. |
+| D54 | `installer_application` (.dmg, .zip, .app) : Gatekeeper exige signature + notarisation, toujours confirmé, annulable ; .pkg refusé (mot de passe admin) | Journal : « finis l'installation de Minecraft » impossible. |
+| D55 | Préchargement du modèle (et de ses consignes) à l'ouverture du panneau ou au début de l'écoute, abandonné si la demande arrive | Mesuré : première réponse 27,8 s → 21,2 s (13,8 s modèle chaud). |
+| D56 | Groupe mémoire plus ajouté à chaque demande ; routeur : outils du domaine gardés quand on pilote une appli, verbe de la demande favorisé | ~350 jetons de moins par demande ; essai réel : le modèle tapait « cat » dans le Terminal faute de lire_document. |
+| D57 | Index : binaires exclus (.dll, .jar…), fichiers déplacés/jetés par MacAI oubliés aussitôt, résultats disparus écartés, indexation aussi sur batterie > 60 % (Mac inutilisé 10 min) | Index d'un mois de retard, 3/4 de binaires, fichiers proposés puis « introuvables ». |
+| D58 | Remplacer un fichier existant (`ecraser`) : confirmé ; « écris une phrase… » sans fichier nommé = réponse directe | Essai réel : le modèle écrasait de lui-même un fichier du Bureau pour une simple phrase. |
 
 ## Lots
 

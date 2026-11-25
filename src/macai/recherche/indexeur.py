@@ -43,6 +43,13 @@ def genre_de(p: Path) -> str:
 # (des milliers de fichiers sans intérêt pour « retrouve ma facture », et une indexation bien plus longue).
 MARQUEURS_PROJET = {".git", "package.json", "build.gradle", "build.gradle.kts", "settings.gradle", "Cargo.toml",
                     "pyproject.toml", "setup.py", "go.mod", "pom.xml", "Package.swift", "Gemfile", "composer.json"}
+# Binaires et fichiers techniques : rien à y chercher pour l'utilisateur (vu sur le Mac : 1 180 .dll, .jar, .exe d'un
+# dossier d'installation Windows occupaient les trois quarts de l'index).
+BINAIRES = {".dll", ".exe", ".jar", ".class", ".so", ".dylib", ".o", ".a", ".lib", ".pdb", ".bin", ".dat", ".pak",
+            ".msi", ".cab", ".sys", ".node", ".wasm", ".pyc", ".pyo", ".db", ".sqlite", ".sqlite3", ".db-wal",
+            ".db-shm", ".lock", ".crdownload", ".part", ".download", ".tmp", ".cache", ".idx", ".pack", ".map",
+            ".policy", ".properties", ".cfg", ".ini", ".plist", ".nib", ".car", ".strings", ".mo", ".ttf", ".otf",
+            ".woff", ".woff2", ".eot", ".iso", ".img", ".vmdk", ".qcow2", ".ipsw", ".apk", ".aab", ".deb", ".rpm"}
 # Fichier iCloud non téléchargé (« dataless ») : le lire déclencherait son téléchargement.
 SF_DATALESS = 0x40000000
 # Explorés en premier : là où sont les fichiers personnels.
@@ -99,6 +106,8 @@ def parcourir(dossiers: list[str], ignorer: list[str], taille_max: int, images: 
                 continue
             if not images and p.suffix.lower() in extraction.IMAGES:
                 continue
+            if p.suffix.lower() in BINAIRES:
+                continue
             if projet and genre_de(p) in ("code", "autre"):
                 continue
             if _interdit(p):
@@ -115,6 +124,18 @@ def sur_secteur() -> bool:
         return "AC Power" in subprocess.run(["pmset", "-g", "ps"], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.SubprocessError):
         return True
+
+
+def niveau_batterie() -> int:
+    """Pourcentage de batterie (100 hors Mac ou si illisible)."""
+    if sys.platform != "darwin":
+        return 100
+    try:
+        sortie = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 100
+    m = re.search(r"(\d+)%", sortie)
+    return int(m.group(1)) if m else 100
 
 
 def inactivite_s() -> float:
@@ -151,9 +172,14 @@ class Indexeur:
         if force:
             return True, ""
         r = self.cfg.recherche
+        attente = float(r.get("inactivite_minutes", 5)) * 60
         if r.get("secteur_seulement", True) and not sur_secteur():
-            return False, "sur batterie"
-        if inactivite_s() < float(r.get("inactivite_minutes", 5)) * 60:
+            # Vu sur le Mac : sur secteur ET inutilisé n'arrivait presque jamais, l'index avait un mois de retard.
+            # Sur batterie bien chargée, on indexe aussi, après une inactivité plus longue.
+            if niveau_batterie() < int(r.get("batterie_min", 60)):
+                return False, "batterie trop basse"
+            attente *= 2
+        if inactivite_s() < attente:
             return False, "Mac en cours d'utilisation"
         return True, ""
 
@@ -171,7 +197,8 @@ class Indexeur:
         nouveaux.sort(key=lambda x: -x[1].st_mtime)
         # Les mails et notes (« mail://… », « note://… ») ont leur propre suivi : jamais pris pour des fichiers disparus.
         disparus = [c for c in connus if c not in vus and "://" not in c
-                    and (not os.path.lexists(c) or _interdit(Path(c)))]  # indexés avant les règles actuelles
+                    and (not os.path.lexists(c) or _interdit(Path(c))
+                         or Path(c).suffix.lower() in BINAIRES)]  # indexés avant les règles actuelles
         return nouveaux, disparus
 
     def traiter(self, p: Path, st: os.stat_result) -> None:

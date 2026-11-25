@@ -169,7 +169,11 @@ def test_commandes_rapides():
     # Demandes complexes : laissées à l'agent.
     assert r.reconnaitre("ouvre le fichier rapport.pdf") is None
     assert r.reconnaitre("ouvre onshape et fais moi un cube de 1 m") is None
-    assert r.reconnaitre("quitte tout") is None
+    assert r.reconnaitre("quitte tout").actions == [("fermer_applications", {"sauf": ""})]  # confirmé avec la liste
+    assert r.reconnaitre("ferme tout sauf Claude et Mail").actions == [("fermer_applications",
+                                                                        {"sauf": "Claude et Mail"})]
+    assert r.reconnaitre("combien font 5000-964").reponse == "4\u202f036"
+    assert r.reconnaitre("combien coûte une Porsche 964") is None
     assert r.reconnaitre("résume ce document") is None
 
 

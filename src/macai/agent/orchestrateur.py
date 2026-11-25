@@ -232,11 +232,15 @@ class Orchestrateur:
         for nom, args in plan.actions:
             r = self.executer_outil(nom, args)
             trace.append({"outil": nom, "arguments": args, "ok": r.ok, "direct": True})
-            if not r.ok:
+            if not r.ok and not getattr(plan, "tolerant", False):
                 # Refus de l'utilisateur : on s'arrête. Autre échec (nom d'appli mal compris…) : l'agent reprend.
                 return r.texte if r.texte == REFUS else None
             textes.append(r.texte)
-        return plan.reponse.format(*textes) if plan.reponse else (textes[-1] if textes else "C'est fait.")
+        if plan.reponse:
+            return plan.reponse.format(*textes)
+        if getattr(plan, "tolerant", False):
+            return " ".join(dict.fromkeys(textes)) or "C'est fait."
+        return textes[-1] if textes else "C'est fait."
 
     # --- Mode plan ------------------------------------------------------------------
 
@@ -701,15 +705,13 @@ def bilan_honnete(texte: str, trace: list, imperatif: bool = True) -> str:
             return " ".join(dict.fromkeys(t["texte"] for t in actions if t.get("texte"))) or texte
         vrais = [t for t in echecs if not str(t.get("texte") or "").startswith(MAUVAIS_USAGE)]
         return "Je n'ai pas réussi à le faire : " + _raison((vrais or echecs)[-1])
-    restants: dict[str, dict] = {}  # dernier échec de chaque outil qui n'a jamais réussi ensuite
-    for t in actions:
-        if t["ok"]:
-            restants.pop(t["outil"], None)
-        elif t.get("texte") != REFUS:
-            restants[t["outil"]] = t
+    # Échec signalé seulement s'il n'a été suivi d'aucune action réussie : sinon le modèle s'est rattrapé
+    # autrement (vu à l'essai : « transformer_texte » raté puis texte écrit dans un fichier → faux avertissement).
+    derniere_reussie = max((i for i, t in enumerate(actions) if t.get("effet")), default=-1)
+    restants = [t for t in actions[derniere_reussie + 1:] if not t["ok"] and t.get("texte") != REFUS]
     if not restants:
         return texte
-    dernier = list(restants.values())[-1]
+    dernier = restants[-1]
     return f"{texte}\n\nAttention, une étape n'a pas abouti ({dernier['outil']}) : {_raison(dernier)}"
 
 

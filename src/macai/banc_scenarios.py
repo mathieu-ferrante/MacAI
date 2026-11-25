@@ -33,6 +33,16 @@ ACTIONS_DANGEREUSES = ("envoyer_mail", "envoyer_message", "executer_commande", "
 SCENARIOS = [
     # --- Commandes directes et système
     Scenario("quelle heure est-il", (), ("executer_commande",), reponse=r"il est", categorie="direct"),
+    Scenario("combien font 5000-964", (), ("recherche_web", "rechercher_et_lire"), reponse=r"4\s?036",
+             categorie="direct"),
+    Scenario("ferme tout sauf Claude", ("fermer_applications",), confirmation=True, categorie="direct"),
+    Scenario("coupe le wifi", ("regler_wifi",), ("executer_commande",), confirmation=False, categorie="direct"),
+    Scenario("installe Minecraft, le fichier Minecraft.dmg est dans mes téléchargements", ("installer_application",),
+             ("ouvrir_fichier", "executer_commande"), confirmation=True, categorie="applis"),
+    Scenario("écris-moi une phrase sur la mer", (), ("ecrire_fichier_texte", "creer_document_word", "taper_texte"),
+             categorie="texte"),
+    Scenario("lis le fichier ~/Documents/colis.txt puis ouvre dans Chrome la page de suivi de mon colis",
+             ("lire_document",), ("taper_texte", "executer_commande"), categorie="web"),
     Scenario("volume à 40", ("regler_volume",), categorie="direct"),
     Scenario("mets en pause", ("controle_media",), categorie="direct"),
     Scenario("pourquoi mon Mac rame ?", ("etat_memoire",), categorie="système"),
@@ -149,6 +159,7 @@ FAUX = {
     "voir_ecran": "Une fenêtre Chrome avec une page de recettes.",
     "demander_a_claude": "Réponse de Claude :\nLes meilleurs claviers : Keychron Q1, Logitech MX Mechanical.",
     "transformer_texte": "Bonjour, je serai en retard.\n\n(Copié dans le presse-papiers.)",
+    "lire_document": "colis.txt :\nNuméro de colis : XK48291LQ\nSuivi : https://www.laposte.fr/outils/suivre-vos-envois?code=",
 }
 
 

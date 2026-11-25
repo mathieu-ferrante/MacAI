@@ -108,9 +108,17 @@ def test_arret_reste_arrete(ctx):
 def test_commandes_rapides_ne_detournent_pas_les_demandes_complexes():
     r = CommandesRapides()
     for d in ["ouvre un nouvel onglet", "ouvre Safari puis cherche la météo", "ouvre Notes, crée une note",
-              "ouvre mes mails", "ouvre le dernier téléchargement", "quitte Safari et Mail", "ouvre l'onglet 2",
+              "ouvre mes mails", "ouvre le dernier téléchargement", "quitte Safari et ouvre Mail", "ouvre l'onglet 2",
               "ouvre Notes ensuite écris bonjour", "lance Spotify : joue du jazz"]:
         assert r.reconnaitre(d) is None, d
+    # Plusieurs applis à fermer (chacune installée) : une fermeture par appli, sans modèle.
+    from macai.outils import applications
+    import pytest as _pt
+    with _pt.MonkeyPatch.context() as mp:
+        mp.setattr(applications, "trouver_application", lambda n: object())
+        p = r.reconnaitre("quitte Safari et Mail")
+    assert p.actions == [("quitter_application", {"nom": "Safari"}), ("quitter_application", {"nom": "Mail"})]
+    assert p.tolerant
     assert r.reconnaitre("ouvre https://github.com").actions == [("ouvrir_url", {"url": "https://github.com"})]
     assert r.reconnaitre("ouvre Safari").actions == [("ouvrir_application", {"nom": "Safari"})]
 

@@ -129,6 +129,8 @@ def creer_gestionnaire(app: Application, jeton: str):
             if self.path == "/confirmation":
                 ok = app.repondre_confirmation(str(d.get("id", "")), bool(d.get("accepter")))
                 return self._json(200 if ok else 404, {"ok": ok})
+            if self.path == "/prechauffer":
+                return self._json(202, {"ok": app.prechauffer()})
             if self.path == "/arret":
                 app.arreter()
                 return self._json(200, {"ok": True})

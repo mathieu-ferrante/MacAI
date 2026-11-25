@@ -14,9 +14,11 @@ MOTS_GROUPES: dict[str, list[str]] = {
     "systeme": ["volume", "son", "muet", "musique", "pause", "lecture", "suivant", "precedent",
                 "presse-papier", "copie", "colle", "capture", "screenshot", "memoire", "ram", "lent",
                 "rame", "ralenti", "batterie", "notification", "terminal", "commande", "shell",
-                "heure", "date", "disque", "stockage", "espace", "wifi", "luminosite", "veille"],
+                "heure", "date", "disque", "stockage", "espace", "wifi", "wi-fi", "luminosite", "veille", "mode sombre",
+                "mode clair", "mode nuit"],
     "applications": ["ouvre", "ouvrir", "lance", "lancer", "ferme", "fermer", "quitte", "quitter",
-                     "appli", "application", "logiciel", "app", "programme", "bascule", "demarre"],
+                     "appli", "application", "logiciel", "app", "programme", "bascule", "demarre", "installe", "installer",
+                     "installation", "dmg"],
     "fichiers": ["fichier", "dossier", "document", "pdf", "word", "docx", "excel", "xlsx", "tableur",
                  "tableau", "csv", "powerpoint", "pptx", "presentation", "texte", "markdown", "cree",
                  "creer", "ecris", "ecrire", "redige", "range", "ranger", "deplace", "renomme",
@@ -32,15 +34,19 @@ MOTS_GROUPES: dict[str, list[str]] = {
                      "evenement", "note", "notes", "mail", "mails", "e-mail", "email", "courriel", "message",
                      "planning", "emploi du temps", "imessage", "sms", "texto", "reponds", "aujourd'hui", "demain",
                      "j'ai quoi", "dentiste", "medecin"],
-    "memoire": ["souviens", "souvenir", "retiens", "retenir", "oublie", "oublier", "rappelle-toi",
-                "sais-tu", "prefere", "preference", "je m'appelle", "mon nom", "qui suis-je", "j'aime"],
+    "memoire": ["souviens", "souvenir", "souvenirs", "retiens", "retenir", "oublie", "oublier", "rappelle-toi",
+                "sais-tu", "sais de moi", "tu sais sur moi", "connais de moi", "prefere", "preference",
+                "je m'appelle", "mon nom", "qui suis-je", "j'aime", "je n'aime pas", "memorise", "note que",
+                "n'oublie pas", "j'habite", "je travaille"],
     "competences": ["competence", "skill", "recette", "automatise", "comme la derniere fois"],
     "onshape": ["onshape", "cao", "3d", "cube", "piece", "cylindre", "pave", "modelise", "extrusion",
                 "esquisse", "cad"],
 }
 
 GROUPES_DEFAUT = ["applications", "fichiers", "recherche", "web", "systeme"]
-TOUJOURS = ["memoire"]
+# (Le groupe mémoire n'est plus ajouté à chaque demande : 3 outils et ~350 jetons de moins ; l'apprentissage
+# automatique, lui, tourne après chaque réponse sans modèle d'outils.)
+TOUJOURS: list[str] = []
 MAX_OUTILS = 14
 MAX_DESIGNES = 9
 # Outils de haut niveau d'abord (s'ils existent) : ils doivent survivre à la limite du nombre d'outils.

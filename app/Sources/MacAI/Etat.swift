@@ -476,6 +476,15 @@ final class Etat: ObservableObject {
     // Début et fin sont lancés de façon synchrone (pas dans une Task) : un appui puis un relâchement
     // rapides s'exécutent toujours dans cet ordre, et le micro ne peut pas rester ouvert.
 
+    /// Le panneau s'ouvre ou l'utilisateur commence à parler : le moteur charge le modèle pendant qu'il écrit,
+    /// au lieu d'attendre la demande (jusqu'à 40 s de chargement mesurées sur le Mac). Au plus une fois par minute.
+    private var dernierPrechauffage = Date.distantPast
+    func prechauffer() {
+        guard connecte, !occupe, Date().timeIntervalSince(dernierPrechauffage) > 60 else { return }
+        dernierPrechauffage = Date()
+        Task { _ = await client.envoyer("/prechauffer") }
+    }
+
     func commencerEcoute() {
         if suivi != nil || (relanceEcoute && finEcouteEnCours) {
             // Écoute automatique ouverte : on la referme, l'écoute normale suit (si la touche est encore tenue).
@@ -484,6 +493,7 @@ final class Etat: ObservableObject {
             return
         }
         guard !ecoute, !dictee, !finEcouteEnCours, connecte else { return }
+        prechauffer()
         voix.taire()
         ecouteAutoInterdite = false
         ecoute = true

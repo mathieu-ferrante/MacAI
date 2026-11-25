@@ -69,9 +69,10 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
         d = chemin(dossier) if dossier else None
         if d is not None and not d.is_dir():
             d = None  # dossier inventé par le modèle : ignoré plutôt que de tout filtrer
-        trouvailles = index.rechercher(requete, int(nombre or 8), genres=genres,
-                                       dossier=str(d) if d else None, apres=_date_min(periode),
-                                       exclure=None if genres else APPLE)
+        trouvailles = trouvailles_valides(index, index.rechercher(requete, int(nombre or 8), genres=genres,
+                                                                  dossier=str(d) if d else None,
+                                                                  apres=_date_min(periode),
+                                                                  exclure=None if genres else APPLE))
     lignes = [ligne_trouvaille(t) for t in trouvailles]
     deja = {t.chemin for t in trouvailles}
     complements = [c for c in spotlight(requete) if c not in deja][: max(0, 5 - len(trouvailles))]
@@ -83,6 +84,26 @@ def rechercher_fichiers(ctx, requete, genre="", periode="", dossier="", nombre=8
     if conseil:
         lignes.append(f"(Recherche par le sens indisponible :{conseil})")
     return Resultat(True, "\n".join(lignes), {"resultats": [t.chemin for t in trouvailles] + complements})
+
+
+def trouvailles_valides(index, trouvailles: list) -> list:
+    """Résultats encore présents et lisibles : un fichier disparu depuis l'indexation est oublié sur-le-champ
+    (au lieu d'être proposé puis déclaré « introuvable »), un fichier devenu interdit n'est pas montré."""
+    from .fichiers import chemin_interdit
+    gardes, disparus = [], []
+    for t in trouvailles:
+        if "://" in t.chemin:
+            gardes.append(t)
+        elif not Path(t.chemin).exists():
+            disparus.append(t.chemin)
+        elif not chemin_interdit(t.chemin):
+            gardes.append(t)
+    if disparus:
+        try:
+            index.oublier(disparus)
+        except Exception:  # noqa: BLE001 - l'index n'est qu'une aide
+            pass
+    return gardes
 
 
 def ligne_trouvaille(t) -> str:
@@ -125,8 +146,8 @@ def chercher_partout(ctx, requete, sources="tout", periode="", nombre=8):
     if index is None:
         return Resultat(False, "Recherche indisponible (index absent).")
     genres, exclus = genres_de_sources(sources)
-    trouvailles = index.rechercher(requete, int(nombre or 8), genres=genres, exclure=exclus,
-                                   apres=_date_min(periode))
+    trouvailles = trouvailles_valides(index, index.rechercher(requete, int(nombre or 8), genres=genres,
+                                                              exclure=exclus, apres=_date_min(periode)))
     if not trouvailles:
         n_apple = len(index.chemins("mail://")) + len(index.chemins("note://"))
         conseil = "" if n_apple else (" Aucun mail ni note n'est encore indexé (indexation Mac branché et inutilisé, "

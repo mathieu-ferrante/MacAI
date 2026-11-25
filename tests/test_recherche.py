@@ -127,3 +127,21 @@ def test_parcours_ignore_le_code_des_projets(tmp_path):
     (tmp_path / "script.py").write_text("print(1)")
     noms = {p.name for p, _ in parcourir([str(tmp_path)], [], 10**6)}
     assert noms == {"cahier des charges.docx", "script.py"}
+
+
+def test_index_suit_les_deplacements_et_oublie_les_disparus(ctx, tmp_path, monkeypatch):
+    """Vu dans le journal : un fichier rangé ailleurs restait proposé à son ancien chemin, puis « n'existe pas »."""
+    from macai.outils import fichiers, recherche_outils
+    from .conftest import FauxOllama
+    monkeypatch.setattr(fichiers, "_ecriture_permise", lambda p: True)
+    index = Index(tmp_path / "index.db", FauxOllama(), "m")
+    ctx.services["index"] = index
+    a = tmp_path / "facture.txt"
+    a.write_text("facture EDF de mars")
+    index.enregistrer(a, a.stat().st_mtime, a.stat().st_size, "document", "facture EDF de mars")
+    fantome = tmp_path / "disparu.txt"
+    index.enregistrer(fantome, 1.0, 10, "document", "facture EDF disparue")
+    r = recherche_outils.rechercher_fichiers(ctx, "facture EDF")
+    assert "disparu.txt" not in r.texte and str(fantome) not in index.chemins()
+    fichiers.deplacer(ctx, str(a), str(tmp_path / "Archives" / ""))
+    assert str(a) not in index.chemins()
