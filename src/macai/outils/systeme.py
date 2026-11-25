@@ -148,8 +148,12 @@ LECTURE_SEULE = {"ls", "cat", "head", "tail", "wc", "df", "du", "find", "grep", 
 SHELL = re.compile(r"[\n\r;&|`$<>(){}*?!\\]")
 # Sous-commandes autorisées en lecture seule, ou options interdites.
 SOUS_COMMANDES = {"diskutil": {"list", "info"}, "defaults": {"read"}, "pmset": {"-g"}}
-OPTIONS_INTERDITES = {"find": ("-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls"),
-                      "sysctl": ("-w",), "top": (), "file": ("-C",)}
+OPTIONS_INTERDITES = {"find": ("-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf",
+                               "-fls"),
+                      "sysctl": ("-w",), "top": (), "file": ("-C", "-f", "-m"), "grep": ("-f", "--file")}
+PREDICATS_FIND = {"-name", "-iname", "-path", "-ipath", "-type", "-maxdepth", "-mindepth", "-mtime", "-mmin",
+                  "-atime", "-ctime", "-newer", "-size", "-empty", "-print", "-print0", "-not", "-and", "-or", "-a",
+                  "-o", "-user", "-perm", "-depth", "-L", "-H", "-P", "-x", "-E", "-s", "-d", "-ls"}
 # Lettres d'options (groupées ou non : « -rn ») qui lisent trop ou bloquent : grep récursif (descend dans ~/.ssh),
 # ps e/E (affiche l'environnement des processus, donc les clés d'API exportées), tail -f (ne finit jamais).
 LETTRES_INTERDITES = {"grep": "rR", "ps": "eE", "tail": "fF"}
@@ -199,10 +203,26 @@ def analyser_commande(cmd: str, dossier: str = "~") -> list[str] | None:
         return None
     if chemin_interdit(base):
         return None
+    if nom == "find":
+        # Liste BLANCHE des prédicats de find (contre-audit : « -fprint0 » écrasait un fichier, en « lecture »).
+        for m in reste:
+            if m.startswith("-") and m not in PREDICATS_FIND:
+                return None
     for m in reste:
-        valeur = m.split("=", 1)[1] if m.startswith("-") and "=" in m else ("" if m.startswith("-") else m)
-        if valeur and chemin_interdit(base / Path(valeur).expanduser()):
-            return None
+        if m.startswith("/dev/") or m == "-":
+            return None  # /dev/zero, /dev/urandom : sortie sans fin qui saturerait la mémoire ; « - » lit l'entrée
+        if m.startswith("--"):
+            valeurs = [m.split("=", 1)[1]] if "=" in m else []
+        elif m.startswith("-") and len(m) > 2:
+            # Option courte avec sa valeur collée (« -f/…/.ssh/id_ed25519 ») : la valeur peut être un chemin.
+            valeurs = [m[2:], m[1:]]
+        elif m.startswith("-"):
+            valeurs = []
+        else:
+            valeurs = [m]
+        for valeur in valeurs:
+            if valeur.startswith("/dev/") or chemin_interdit(base / Path(valeur).expanduser()):
+                return None
     return mots
 
 

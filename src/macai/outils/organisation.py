@@ -578,7 +578,7 @@ def repondre_mail(ctx, recherche, texte=""):
 @outil("preparer_mail", "Prépare un mail dans l'app Mail et l'affiche, SANS l'envoyer (l'utilisateur relit).",
        "organisation", {"destinataire": ("string", "adresse e-mail"), "sujet": ("string", "sujet"),
                         "corps": ("string", "texte du mail")}, risque=Risque.CREATION,
-       annonce=lambda a: f"Préparer un mail à {a['destinataire']}")
+       annonce=lambda a: f"Préparer un mail (non envoyé) à {a['destinataire']} : « {_abrege(a.get('corps', ''), 300)} »")
 def preparer_mail(ctx, destinataire, sujet, corps):
     interdire_donnees_bancaires(f"{sujet}\n{corps}")
     commun.osascript(f'''tell application "Mail"

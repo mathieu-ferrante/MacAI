@@ -120,7 +120,7 @@ def lister_taches(ctx):
 
 @outil("supprimer_tache", "Supprime une tâche planifiée (par son identifiant ou un mot de sa description).",
        "taches", {"id_ou_description": ("string", "identifiant entre crochets, ou un mot de la tâche")},
-       risque=Risque.MODIFICATION, mac_seulement=False,
+       risque=Risque.SENSIBLE, toujours_confirmer=True, mac_seulement=False,
        mots_cles=["supprime la tache", "arrete la tache", "deprogramme", "annule la tache", "ne fais plus"],
        annonce=lambda a: f"Supprimer la tâche planifiée « {a.get('id_ou_description', '')} »")
 def supprimer_tache(ctx, id_ou_description):

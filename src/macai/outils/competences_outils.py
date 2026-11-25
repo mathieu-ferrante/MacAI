@@ -57,7 +57,7 @@ def lister_competences(ctx):
 
 
 @outil("supprimer_competence", "Supprime une compétence apprise.", "competences",
-       {"nom": ("string", "nom de la compétence")}, risque=Risque.MODIFICATION, mac_seulement=False,
+       {"nom": ("string", "nom de la compétence")}, risque=Risque.SENSIBLE, toujours_confirmer=True, mac_seulement=False,
        annonce=lambda a: f"Supprimer la compétence {a['nom']}")
 def supprimer_competence(ctx, nom):
     if not _biblio(ctx).supprimer(nom):

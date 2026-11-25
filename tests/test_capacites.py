@@ -163,3 +163,17 @@ def test_prechauffage_charge_puis_s_efface_devant_une_demande(cfg):
     assert app.prechauffer() is False            # déjà en cours : pas de second chargement
     assert app.traiter_en_fond("quelle heure est-il")
     assert o.coupe.wait(3)                        # la demande a interrompu le préchauffage
+
+
+
+def test_recurrence_programmee_sans_modele():
+    """Banc du 25/11 : « tous les matins à 8h, fais-moi un résumé… » était parfois fait tout de suite."""
+    from macai.agent.rapide import CommandesRapides
+    r = CommandesRapides()
+    p = r.reconnaitre("tous les matins à 8h, fais-moi un résumé de mes mails et de mon agenda")
+    assert p.actions == [("planifier_tache", {"demande": "Fais-moi un résumé de mes mails et de mon agenda",
+                                              "frequence": "quotidien", "heure": "08:00"})]
+    p = r.reconnaitre("chaque lundi à 9h30 range mes téléchargements")
+    assert p.actions[0][1] == {"demande": "Range mes téléchargements", "frequence": "hebdomadaire",
+                               "heure": "09:30", "jour": "lundi"}
+    assert r.reconnaitre("tous les jours je bois du café") is None

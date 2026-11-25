@@ -184,8 +184,10 @@ Ce qui n'est **pas** couvert, en connaissance de cause :
   micro / Apple Events) et un Python embarqué dans l'app signée : à faire avec toi, car il faudra redonner les
   autorisations macOS et vérifier que micro et automatisation marchent encore.
 - **Petits secrets en clair** : un mot de passe de lettres seules (« soleil ») glissé dans une question à une IA
-  après la lecture d'un contenu n'est pas détecté (les codes avec chiffres, les clés et les textes longs le sont ;
-  les adresses web le sont toujours).
+  ou une recherche après la lecture d'un contenu n'est pas détecté (tout chiffre absent de ta demande, les clés et
+  les textes longs le sont ; les adresses web le sont toujours, port et identifiant compris).
+- **Notes partagées** : ajouter à une note iCloud partagée un texte lu ailleurs n'est pas contrôlé (les notes sont
+  presque toujours personnelles ; un agenda ou une liste de rappels nommés, eux, le sont).
 - **Numéro de carte réparti dans plusieurs champs** d'un formulaire, cryptogramme, date d'expiration : non détectés
   (le paiement reste interdit par ailleurs).
 - `lire_page_web` revérifie chaque redirection mais pas un « DNS rebinding » entre la vérification et la connexion.

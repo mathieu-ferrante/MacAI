@@ -12,6 +12,8 @@ DEMANDE_DE_RETENIR = re.compile(
     r"\b(retiens|retenir|souviens|souvenir|rappelle[- ]toi|memorise|memoriser|note (?:que|bien)|n'oublie pas|"
     r"garde en (?:tete|memoire)|je suis|je m'appelle|appelle[- ]moi|j'aime|je n'aime pas|je deteste|je prefere|"
     r"j'habite|je vis|je travaille)\b")
+EXPLICITE = re.compile(r"\b(retiens|retenir|souviens|rappelle[- ]toi|memorise|memoriser|note (?:que|bien)|"
+                       r"n'oublie pas|garde en (?:tete|memoire))\b")
 # (« mon », « ma », « mes » retirés : « résume mes mails » suffisait à faire retenir sans accord un fait dicté par
 # un mail piégé, relu ensuite dans chaque demande.)
 
@@ -41,7 +43,13 @@ def retenir(ctx, fait):
     demande = ctx.services.get("demande")  # posée par l'orchestrateur à chaque demande
     if demande is not None:
         from ..agent.routeur import normaliser
-        if not DEMANDE_DE_RETENIR.search(normaliser(str(demande)).replace("\u2019", "'")):
+        texte_demande = normaliser(str(demande)).replace("\u2019", "'")
+        from .. import securite
+        # Après un contenu lu (page, mail, fichier), seul un ordre explicite de mémoriser vaut accord : « je
+        # travaille ce matin, résume le mail de Paul » ne doit pas laisser un mail piégé implanter un souvenir.
+        accord = (EXPLICITE.search(texte_demande) if securite.contenu_lu(ctx)
+                  else DEMANDE_DE_RETENIR.search(texte_demande))
+        if not accord:
             phrase = f"Retenir durablement : « {fait} »"
             ctx.emettre("confirmation", outil="retenir", arguments={"fait": fait}, phrase=phrase)
             if not ctx.demander_confirmation(phrase, "retenir", {"fait": fait}):

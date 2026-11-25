@@ -85,6 +85,14 @@ class CommandesRapides:
             (P(rf"^{demande}(?:fais|fait|prepare|donne)[- ]moi (?:un|le) (?:resume|point|briefing)"
                r"(?: de (?:ma|la) journee| du jour| du matin)? (?:chaque matin|tous les matins)"
                r"(?: (?:a|vers) (?P<h>\d{1,2}) ?(?:h|:|heures?)? ?(?P<mn>\d{2})?)?$"), self._resume_matin),
+            # « Tous les matins à 8h, fais-moi un résumé… », « chaque lundi à 9h, range mes téléchargements » :
+            # programmé à coup sûr (le modèle faisait parfois le résumé tout de suite au lieu de le programmer).
+            # Toujours confirmé, avec la demande complète.
+            (P(r"^(?P<freq>tous les (?:jours|matins|soirs)|chaque (?:jour|matin|soir|semaine|lundi|mardi|mercredi|"
+               r"jeudi|vendredi|samedi|dimanche)|tous les (?:lundis|mardis|mercredis|jeudis|vendredis|samedis|"
+               r"dimanches)|toutes les heures|en semaine|du lundi au vendredi)"
+               r"(?: (?:a|vers|des) (?P<h>\d{1,2}) ?(?:h|:|heures?)? ?(?P<mn>\d{2})?)?\s*[,:]?\s+(?P<q>.{6,})$"),
+             self._planifier),
             (P(rf"^{demande}(?:lance|ouvre|va sur) youtube et (?:cherche|recherche|trouve)(?: moi)? (?:une |des )?(?:videos? (?:de |sur |d')?)?(?P<q>.+)$"),
              self._youtube_chercher),
             (P(rf"^{demande}(?:mets|joue|lance|regarde)(?: moi)? (?:la |une )?(?:video|musique|chanson|clip)? ?(?:de |d')?(?P<q>.+?) sur youtube$"),
@@ -217,6 +225,32 @@ class CommandesRapides:
             return None
         return Plan([("planifier_tache", {"demande": RESUME_MATIN, "frequence": "quotidien",
                                           "heure": f"{h:02d}:{mn:02d}"})])
+
+    def _planifier(self, m, original):
+        freq = m.group("freq")
+        jour = ""
+        if "heures" in freq:
+            frequence = "horaire"
+        elif "semaine" in freq and "chaque" not in freq or "lundi au vendredi" in freq:
+            frequence = "jours_ouvres"
+        elif any(j in freq for j in ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")) \
+                or "chaque semaine" in freq:
+            frequence = "hebdomadaire"
+            jour = next((j for j in ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
+                         if j in freq), "lundi")
+        else:
+            frequence = "quotidien"
+        h = int(m.group("h")) if m.group("h") else (19 if "soir" in freq else 8)
+        mn = int(m.group("mn") or 0)
+        if h > 23 or mn > 59:
+            return None
+        q = self._extrait(m, original, "q").strip(" ,.")
+        if re.match(r"(?i)(je|j'|j’|on|nous|il|elle|ils|elles|tu|c'est|ca|ça|mon|ma|mes|le|la|les)\b", q):
+            return None  # « tous les jours je bois du café » : un constat, pas une tâche
+        args = {"demande": q[:1].upper() + q[1:], "frequence": frequence, "heure": f"{h:02d}:{mn:02d}"}
+        if jour:
+            args["jour"] = jour
+        return Plan([("planifier_tache", args)])
 
     def _volume(self, m, original):
         return Plan([("regler_volume", {"niveau": min(int(m.group("n")), 100)})])

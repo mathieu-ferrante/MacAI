@@ -12,6 +12,7 @@ compétence) sans venir de la demande de l'utilisateur demande sa confirmation.
 """
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import unicodedata
@@ -120,7 +121,7 @@ def raccourci_sensible(mods: list[str], touche: str, categorie: str, contenu_lu:
         return True  # ⌘⌫ Corbeille, ⌘⌥⇧⌫ vide la Corbeille sans dialogue
     if touche == "d" and {"cmd", "maj"} <= m:
         return True  # Mail : envoyer
-    if touche == "v" and "cmd" in m and (categorie == "execution" or (categorie in ("ia", "messagerie")
+    if touche == "v" and "cmd" in m and (categorie == "execution" or (categorie in ("ia", "messagerie", "navigateur")
                                                                       and contenu_lu)):
         return True  # coller dans un Terminal exécute la ligne ; le presse-papiers contourne les autres filtres
     return False
@@ -169,6 +170,7 @@ LUS_MAX = 400_000
 def debut_demande(ctx) -> None:
     ctx.services["contenu_lu"] = False
     ctx.services["textes_lus"] = []
+    ctx.services["urls_sorties"] = {}
 
 
 def marquer_lu(ctx, nom: str, texte: str) -> None:
@@ -195,8 +197,11 @@ def donnees_nouvelles(texte, demande) -> list[str]:
     longs = [w for w in nouveaux if len(w) >= 3]
     if (sum(len(w) for w in longs) > 30 or any(len(w) >= 16 for w in nouveaux)
             or any(sum(c.isdigit() for c in w) >= 6 for w in nouveaux)
-            or any(len(w) >= 5 and re.search(r"[a-z]", w) and re.search(r"\d", w) for w in nouveaux)):
-        return nouveaux  # beaucoup de texte nouveau, ou un mot qui ressemble à un code (« azerty12 », « sk9f8e… »)
+            or any(re.search(r"\d", w) and len(w) >= 2 for w in nouveaux)
+            or sum(c.isdigit() for c in "".join(nouveaux)) >= 4):
+        # beaucoup de texte nouveau, ou des chiffres absents de la demande (code, numéro, même découpé
+        # « 123 456 »), ou un mot qui ressemble à une clé
+        return nouveaux
     return []
 
 
@@ -210,8 +215,10 @@ def url_vue(ctx, url: str) -> bool:
     return u_sans in demande or any(u_sans in t for t in ctx.services.get("textes_lus", []))
 
 
-def adresse_locale(url: str) -> bool:
-    """Le Mac lui-même, la box, le réseau local : une page ne doit pas pouvoir les faire interroger."""
+def adresse_locale(url: str, resoudre: bool = True) -> bool:
+    """Le Mac lui-même, la box, le réseau local : une page ne doit pas pouvoir les faire interroger. `resoudre` :
+    interroger le DNS ; jamais dans un calcul de risque (contre-audit : la requête DNS elle-même faisait sortir un
+    secret placé dans le nom, « azerty12.evil.example », avant toute confirmation)."""
     import ipaddress
     import socket
     if not re.match(r"^[a-z][a-z0-9+.-]*://", str(url), re.I):
@@ -220,7 +227,13 @@ def adresse_locale(url: str) -> bool:
     if not hote or hote == "localhost" or hote.endswith((".local", ".localhost", ".internal", ".lan", ".home")):
         return True
     try:
-        adresses = {i[4][0] for i in socket.getaddrinfo(hote, None)}
+        adresses = {str(ipaddress.ip_address(hote))}
+    except ValueError:
+        adresses = set()
+    if not adresses and not resoudre:
+        return False
+    try:
+        adresses = adresses or {i[4][0] for i in socket.getaddrinfo(hote, None)}
     except (OSError, UnicodeError):
         return False  # inconnue : le navigateur échouera aussi
     for a in adresses:
@@ -239,7 +252,8 @@ def adresse_locale(url: str) -> bool:
 SORTIES_TEXTE = {"chrome_rechercher": "requete", "youtube_lire": "requete", "recherche_web": "requete",
                  "rechercher_et_lire": "question", "demander_a_claude": "question", "ecrire_et_envoyer": "texte",
                  "remplir_page": "texte", "taper_texte": "texte", "saisir_element": "texte",
-                 "retenir": "fait", "creer_competence": "description", "creer_evenement": "titre"}
+                 "retenir": "fait", "creer_competence": "description", "creer_evenement": "titre",
+                 "creer_rappel": "titre"}
 SORTIES_URL = {"ouvrir_url": "url", "lire_page_web": "url"}
 # Taper ou saisir n'est une sortie que dans ces applis (dans TextEdit ou Pages, c'est un document local).
 APPLIS_SORTIE = {"navigateur", "ia", "messagerie", "execution"}
@@ -252,6 +266,20 @@ def sortie_a_confirmer(ctx, nom: str, args: dict, categorie: str = "") -> str:
     demande = ctx.services.get("demande", "")
     if nom in SORTIES_URL:
         url = str(args.get(SORTIES_URL[nom]) or "")
+        partie = urllib.parse.urlparse(url if "://" in url else "https://" + url)
+        try:
+            port = partie.port
+        except ValueError:
+            port = -1
+        if partie.username or partie.password or (port not in (None, 80, 443)
+                                                  and f":{port}" not in simple(demande)):
+            return "cette adresse contient un identifiant ou un port qui ne viennent pas de ta demande"
+        # Plusieurs liens « vus » vers un même site, l'un après l'autre : un caractère du secret par lien
+        # (contre-audit). Au-delà de deux adresses distinctes vers un même hôte, on demande.
+        vues = ctx.services.setdefault("urls_sorties", {}).setdefault(simple(partie.hostname or ""), set())
+        vues.add(simple(url))
+        if len(vues) > 2:
+            return "plusieurs adresses différentes vers le même site après avoir lu un contenu"
         if url_vue(ctx, url):
             return ""
         # Adresse construite par le modèle : chaque mot du chemin et des paramètres doit venir de la demande (un
@@ -269,8 +297,9 @@ def sortie_a_confirmer(ctx, nom: str, args: dict, categorie: str = "") -> str:
     if nom in SORTIES_TEXTE:
         if nom in ("taper_texte", "saisir_element") and categorie not in APPLIS_SORTIE:
             return ""
-        if nom == "creer_evenement" and not str(args.get("calendrier") or "").strip():
-            return ""  # agenda par défaut : personnel ; un calendrier nommé peut être partagé avec d'autres
+        if (nom == "creer_evenement" and not str(args.get("calendrier") or "").strip()) or \
+                (nom == "creer_rappel" and not str(args.get("liste") or "").strip()):
+            return ""  # agenda / liste par défaut : personnels ; nommés, ils peuvent être partagés avec d'autres
         if donnees_nouvelles(args.get(SORTIES_TEXTE[nom]) or "", demande):
             return "ce texte contient des informations qui ne viennent pas de ta demande"
     return ""

@@ -91,7 +91,7 @@ def _risque_ouvrir_url(args: dict) -> Risque:
     déclencher une action (requête GET) : confirmation. Les données qui sortiraient dans l'adresse sont
     contrôlées par l'orchestrateur (securite.sortie_a_confirmer)."""
     from .. import securite
-    return Risque.SENSIBLE if securite.adresse_locale(str(args.get("url", ""))) else Risque.CREATION
+    return Risque.SENSIBLE if securite.adresse_locale(str(args.get("url", "")), resoudre=False) else Risque.CREATION
 
 
 @outil("ouvrir_url", "Ouvre une adresse web (une page, un lien) dans Chrome, dans un nouvel onglet.", "web",
@@ -102,6 +102,12 @@ def ouvrir_url(ctx, url):
         if re.match(r"^[a-z][a-z0-9+.-]*:", url, re.I) and not re.match(r"^[\w.-]+:\d", url):
             raise ErreurOutil("Seules les adresses web (http ou https) s'ouvrent ici.")  # file:, javascript:…
         url = "https://" + url.lstrip("/")
+    # Le nom ne pointait pas visiblement vers le réseau local (vérifié sans DNS au calcul du risque) : on résout
+    # maintenant, après les confirmations éventuelles.
+    from .. import securite
+    if securite.adresse_locale(url):
+        securite.confirmer_pendant(ctx, f"Ouvrir {url} : cette adresse mène à ton réseau local (box, imprimante, "
+                                        "le Mac lui-même)", "ouvrir_url", {"url": url})
     ouvrir_onglet(ctx, url)
     return f"{url} ouvert dans Chrome."
 

@@ -11,8 +11,8 @@ Son « cerveau » est un modèle d'IA de 4 milliards de paramètres (`qwen3.5:4b
 Ollama. **Aucune demande, aucun fichier, aucun mail ne part dans le cloud.** Il est conçu pour un MacBook Air M2 de
 8 Go : au repos, l'ensemble occupe environ 50 Mo de mémoire.
 
-> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 415 tests automatiques, un banc de
-> 67 demandes réelles passées dans le vrai moteur avec le vrai modèle, et trois relectures de sécurité. Ce qui reste à
+> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 433 tests automatiques, un banc de
+> 67 demandes réelles passées dans le vrai moteur avec le vrai modèle, et quatre relectures de sécurité. Ce qui reste à
 > essayer de ton côté est listé dans [A_VALIDER.md](A_VALIDER.md).
 
 ---
@@ -737,7 +737,7 @@ MacAI.app (Swift, ~25 Mo)                 moteur Python (~35 Mo au repos)       
 - Code : `src/macai/` (Python 3.12, stdlib au maximum, imports paresseux), `app/` (Swift, SwiftPM),
   `installer.sh`. Structure détaillée dans [CLAUDE.md](CLAUDE.md), décisions dans [PLAN.md](PLAN.md), cahier des
   charges dans [CAHIER_DES_CHARGES.md](CAHIER_DES_CHARGES.md).
-- Tests : `.venv/bin/python -m pytest` (415 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
+- Tests : `.venv/bin/python -m pytest` (433 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
   ce qui permet de développer aussi sur Windows).
 - Qualité réelle : `macai banc --scenarios` (67 demandes, vrai modèle, outils simulés).
 - Sécurité : `tests/test_securite.py` rejoue chaque attaque trouvée lors des relectures.

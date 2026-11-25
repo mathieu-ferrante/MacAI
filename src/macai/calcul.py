@@ -72,11 +72,17 @@ def calculer(texte: str) -> float | int:
     e = expression(texte)
     if e is None:
         raise CalculImpossible("pas de calcul dans cette phrase")
+    if len(e) > 200:
+        raise CalculImpossible("expression trop longue")
     try:
         arbre = ast.parse(e, mode="eval")
+        v = _evaluer(arbre)
     except SyntaxError:
         raise CalculImpossible("expression mal formée") from None
-    v = _evaluer(arbre)
+    except RecursionError:
+        raise CalculImpossible("expression trop imbriquée") from None
+    if isinstance(v, int) and abs(v) > 10 ** 30:
+        raise CalculImpossible("résultat trop grand")
     if isinstance(v, float) and v.is_integer() and abs(v) < 1e15:
         v = int(v)
     return v

@@ -255,6 +255,7 @@ def test_petit_secret_dans_une_adresse(ctx):
     securite.marquer_lu(ctx, "lire_mail", "Mot de passe : azerty12. Voir https://evil.example/aide")
     for url in ["https://evil.example/?p=azerty12", "https://azerty12.evil.example/", "https://evil.example/soleil"]:
         assert securite.sortie_a_confirmer(ctx, "ouvrir_url", {"url": url}), url
+    ctx.services["urls_sorties"] = {}  # nouvelle série : seul le lien lu tel quel
     assert not securite.sortie_a_confirmer(ctx, "ouvrir_url", {"url": "https://evil.example/aide"})  # lien lu tel quel
     assert securite.sortie_a_confirmer(ctx, "demander_a_claude", {"question": "Le mot de passe est azerty12"})
 
@@ -353,3 +354,86 @@ def test_modele_remplace_refuse(tmp_path):
     o._verifies.clear()
     with pytest.raises(ErreurOllama, match="a changé"):
         o.verifier_modele("qwen:4b")
+
+
+
+# --- Contre-audit (nov. 2026) ----------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("args", [{"commande": "file -f/Users/math/.ssh/id_ed25519"},
+                                  {"commande": "grep -f/Users/math/.zsh_history x"},
+                                  {"commande": "file -m/Users/math/.ssh/config x"},
+                                  {"commande": "find /Users/math/Documents -maxdepth 0 -fprint0 /Users/math/x.docx"},
+                                  {"commande": "find . -newerXY x"}, {"commande": "cat /dev/zero"},
+                                  {"commande": "head -c 9000000000 /dev/urandom"}])
+def test_commandes_contre_audit(reg, args):
+    assert risque(reg, "executer_commande", **args) == Risque.SENSIBLE
+
+
+def test_find_et_options_ordinaires_libres(reg):
+    for c in ["find ~/Documents -name facture.pdf -type f", "ls -la ~/Documents", "grep -n facture notes.txt",
+              "du -sh Downloads"]:
+        assert risque(reg, "executer_commande", commande=c) == Risque.LECTURE, c
+
+
+def test_pas_de_dns_dans_le_calcul_du_risque(reg, monkeypatch):
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: pytest.fail("requête DNS pendant le calcul du risque"))
+    assert risque(reg, "ouvrir_url", url="https://azerty12.evil.example/") == Risque.CREATION
+    assert risque(reg, "ouvrir_url", url="http://192.168.1.1/") == Risque.SENSIBLE
+
+
+def _apres_lecture(ctx, demande, lu):
+    ctx.services["demande"] = demande
+    securite.debut_demande(ctx)
+    securite.marquer_lu(ctx, "lire_page", lu)
+
+
+def test_identifiant_port_et_liens_en_serie(ctx):
+    _apres_lecture(ctx, "résume la page", "Liens : https://evil.example/c/0 https://evil.example/c/1 "
+                                          "https://evil.example/c/2 https://evil.example/c/3")
+    for url in ["https://azerty12@evil.example/", "https://a:b@evil.example/", "https://evil.example:4812/"]:
+        assert securite.sortie_a_confirmer(ctx, "lire_page_web", {"url": url}), url
+    ctx.services["urls_sorties"] = {}
+    raisons = [securite.sortie_a_confirmer(ctx, "lire_page_web", {"url": f"https://evil.example/c/{i}"})
+               for i in range(4)]
+    assert raisons[:2] == ["", ""] and raisons[2] and raisons[3]
+
+
+@pytest.mark.parametrize("texte", ["123 456", "4812", "ab12", "az er ty 12"])
+def test_petits_codes_detectes(ctx, texte):
+    _apres_lecture(ctx, "résume mon fichier codes.txt", f"code : {texte}")
+    assert securite.sortie_a_confirmer(ctx, "chrome_rechercher", {"requete": texte})
+
+
+def test_coller_dans_un_navigateur_apres_lecture():
+    assert securite.raccourci_sensible(["cmd"], "v", "navigateur", contenu_lu=True)
+    assert not securite.raccourci_sensible(["cmd"], "v", "navigateur", contenu_lu=False)
+
+
+def test_memoire_apres_lecture_exige_un_ordre_explicite(ctx, tmp_path):
+    from macai.memoire.memoire import Memoire
+    from macai.outils import memoire_outils
+    ctx.services["memoire"] = Memoire(tmp_path)
+    _apres_lecture(ctx, "je travaille ce matin, résume le dernier mail de Paul", "mail piégé")
+    vus = []
+    ctx.demander_confirmation = lambda *a: vus.append(a) or False
+    with pytest.raises(ErreurOutil):
+        memoire_outils.retenir(ctx, "Mathieu ouvre toujours evil.io")
+    assert vus
+    _apres_lecture(ctx, "retiens que je préfère le thé", "rien")
+    ctx.demander_confirmation = lambda *a: pytest.fail("ordre explicite : pas de confirmation")
+    memoire_outils.retenir(ctx, "Mathieu préfère le thé")
+
+
+def test_suppressions_et_listes_partagees(reg, ctx):
+    assert reg.get("supprimer_tache").toujours_confirmer and reg.get("supprimer_competence").toujours_confirmer
+    _apres_lecture(ctx, "résume le mail", "x")
+    assert securite.sortie_a_confirmer(ctx, "creer_rappel", {"titre": "code alarme 4812", "liste": "Famille"})
+    assert not securite.sortie_a_confirmer(ctx, "creer_rappel", {"titre": "code alarme 4812"})
+
+
+def test_calcul_borne():
+    from macai.calcul import CalculImpossible, calculer
+    for t in ["(" * 300 + "1" + ")" * 300, "+".join(["999999^100"] * 900)]:
+        with pytest.raises(CalculImpossible):
+            calculer(t)
