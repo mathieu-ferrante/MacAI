@@ -233,6 +233,31 @@ Pratique pour tester ou pour enchaîner dans un script. Sans interface, les conf
    AppleScript de Mail, Notes, Calendrier, Rappels, Chrome), MacAI passe par elle plutôt que par l'écran. En dernier
    recours, il lit la fenêtre (Accessibilité), puis regarde l'écran (vision).
 
+### Le classifieur : un « modèle de décision » qui épaule l'agent
+
+Avant que l'agent réfléchisse, un **classifieur** range la demande, sur le principe des modèles de décision comme
+Jev : il ne rédige rien, il décide.
+
+- **Intention** : action, information, explication, rédaction, tâche à programmer ou simple conversation.
+- **Domaines** : fichiers, web, mails et agenda, pilotage d'une appli, système…
+
+Il compare ta demande, par le sens, à **663 exemples français étiquetés** (`src/macai/agent/exemples_routage.jsonl`),
+avec le petit modèle d'embeddings déjà utilisé pour la recherche. Rien de plus à installer, rien ne quitte le Mac,
+environ **50 ms** par demande.
+
+Ce qu'il change :
+- l'agent reçoit **les bons outils** : sur 147 demandes de test, le routage couvre les domaines utiles dans **96 %**
+  des cas, contre 82 % avec les seuls mots-clés ;
+- une rédaction (« un petit poème sur l'automne ») ou une conversation (« merci ») est servie **sans outils** : la
+  réponse est le texte, aucun fichier n'est créé par erreur ;
+- une question « comment faire… » ne reçoit que des outils de lecture ;
+- une demande récurrente met l'outil de programmation en tête.
+
+Il n'est qu'un **aiguilleur** : il n'agit pas et ne contourne aucune confirmation. S'il hésite (confiance sous 70 %),
+ou si un fichier, une appli ou un destinataire est nommé, ses conseils ne retirent jamais d'outils. S'il est
+indisponible, les mots-clés prennent le relais. Mesure : `macai classifieur` (`--erreurs` pour voir ce qu'il rate).
+Pour lui apprendre une tournure, ajoute une ligne d'exemple au fichier.
+
 ### Ce qui se passe pendant une demande
 
 - **Annonce** : une action qui modifie quelque chose (déplacer, renommer, cliquer dans une appli) est affichée avant
@@ -678,6 +703,7 @@ Changer de modèle : `macai banc --candidats` compare les modèles adaptés à 8
 | `macai outils` | liste des 102 outils |
 | `macai indexer [--force] [--limite N]` | indexe maintenant (`--force` : même sur batterie ou Mac utilisé) |
 | `macai modeles [--accepter]` | empreintes des modèles ; `--accepter` après une mise à jour volontaire |
+| `macai classifieur [--erreurs]` | justesse du classifieur sur ses 147 demandes de test, et ce qu'il rate |
 | `macai secret onshape` | enregistre des clés dans le Trousseau |
 | `macai mcp tester` / `macai mcp detecter` | teste les serveurs MCP configurés / cherche ceux installés |
 | `macai banc --scenarios [filtre]` | 68 demandes réelles passées dans le vrai moteur avec le vrai modèle, outils **simulés** (rien n'est exécuté) ; compare avec le passage précédent |

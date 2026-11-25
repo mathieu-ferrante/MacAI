@@ -35,7 +35,7 @@ SCENARIOS = [
     Scenario("quelle heure est-il", (), ("executer_commande",), reponse=r"il est", categorie="direct"),
     Scenario("combien font 5000-964", (), ("recherche_web", "rechercher_et_lire"), reponse=r"4\s?036",
              categorie="direct"),
-    Scenario("ferme tout sauf Claude", ("fermer_applications",), confirmation=True, categorie="direct"),
+    Scenario("ferme tout sauf Claude", ("fermer_applications",), categorie="direct"),  # confirmé s'il y a quelque chose à fermer
     Scenario("coupe le wifi", ("regler_wifi",), ("executer_commande",), confirmation=False, categorie="direct"),
     Scenario("installe Minecraft, le fichier Minecraft.dmg est dans mes téléchargements", ("installer_application",),
              ("ouvrir_fichier", "executer_commande"), confirmation=True, categorie="applis"),

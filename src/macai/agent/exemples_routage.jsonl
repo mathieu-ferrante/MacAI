@@ -1,0 +1,663 @@
+{"texte": "ouvre Safari", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "lance spotify stp", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le dossier Projets", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre moi le dossier factures", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre téléchargements", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le bureau dans le finder", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "quitte Pages", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme Spotify", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme chrome finder et notes", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme tout sauf Claude", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme toutes mes applis sauf Mail et Calendrier", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme tout", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "tu peux fermer toutes les applications ouvertes", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "quitte toutes les applis sauf le terminal", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme toute mes application lancé sauf musique", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "quelles applis sont ouvertes ?", "intention": "information", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "jai quelle appli lancée", "intention": "information", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "c'est quoi l'appli au premier plan là", "intention": "information", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "est-ce que Word est ouvert", "intention": "information", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "montre rapport.pdf dans le finder", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre ce pdf avec aperçu", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le fichier budget.xlsx", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre devis_cuisine.pdf qui est sur le bureau", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "installe Minecraft le dmg est dans mes téléchargements", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "jai un fichier vlc.dmg sur le bureau installe le", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "finis l'installation de l'appli que j'ai téléchargée, le zip est dans Téléchargements", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "installe VLC", "intention": "action", "domaines": ["applications", "web"], "jeu": "entrainement"}
+{"texte": "télécharge et installe Firefox", "intention": "action", "domaines": ["applications", "web"], "jeu": "entrainement"}
+{"texte": "lance word", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre excel et powerpoint", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "démarre l'appli Musique", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre minecraft", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "quitte xcode il plante", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le dossier Documents/Impôts", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvr le dosier photos vacances", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre l'appli calculatrice", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme l'appli Rappels et l'appli Notes", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "mets le finder au premier plan", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le dossier Société", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre mon dossier Applications", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "lance vs code", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "quitte toutes les applis sauf Chrome et Spotify", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le fichier cv.docx avec Pages", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "affiche dans le finder la photo IMG_2045.jpg", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "fais apparaître le dossier Captures dans le Finder", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre l'app Plans", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "lance Photos et Musique", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ferme Teams", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre facture.pdf", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "ouvre le dossier Musique du bureau", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "dans TextEdit crée un nouveau document et écris Bonjour", "intention": "action", "domaines": ["fenetres", "applications"], "jeu": "entrainement"}
+{"texte": "ouvre TextEdit et écris une liste de courses dedans", "intention": "action", "domaines": ["applications", "fenetres"], "jeu": "entrainement"}
+{"texte": "dans Pages exporte le document en PDF", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "clique sur le bouton Enregistrer", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "appuie sur cmd s", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "fais cmd maj n dans le finder", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "tape bonjour à tous dans la fenêtre active", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "choisis Fichier > Imprimer dans Aperçu", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "lis la fenêtre du Finder et dis-moi combien d'éléments tu vois", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "qu'est-ce qu'il y a à l'écran", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "regarde mon écran et dis moi ce qui cloche", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "tu vois quoi sur mon ecran", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "demande à Claude quels sont les meilleurs claviers mécaniques", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "ouvre claude va en mode chat et demande lui une idée de recette rapide", "intention": "action", "domaines": ["fenetres", "applications"], "jeu": "entrainement"}
+{"texte": "écris à ChatGPT pour lui demander une recette de crêpes", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "demande a chatgpt de m'expliquer les trous noirs", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "pose la question à Claude : quel ssd choisir pour un mac mini", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Slack écris à l'équipe que la réunion est décalée", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "envoie sur WhatsApp à Paul que je suis en route", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans les réglages de Zoom coche la case couper le micro", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "comment on fait pour exporter en PDF dans Pages ?", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "où je clique pour ajouter une signature dans Mail", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "montre moi où est le menu pour insérer un tableau dans Pages", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Keynote comment on change le thème", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "guide moi pour activer le suivi des modifications dans Word", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "traduis la zone de l'écran que je vais sélectionner", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "extrais le texte de la zone que je vais sélectionner", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "explique-moi ce graphique à l'écran", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "ferme la fenêtre active", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Numbers ajoute une ligne en bas du tableau", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "appuie sur entrée", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "clique sur l'onglet Général dans la fenêtre ouverte", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "quels menus il y a dans GarageBand", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "attends que l'appli ait fini de charger puis clique sur Continuer", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "ouvre la calculatrice et calcule 12 fois 7", "intention": "action", "domaines": ["applications", "fenetres"], "jeu": "entrainement"}
+{"texte": "clique sur le bouton bleu en bas à droite de l'écran", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Aperçu fais pivoter l'image vers la gauche", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "écris dans le champ nom de la fenêtre : Dupont", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "tape mon texte dans Notes là où est le curseur", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "lis-moi ce qui est écrit dans la fenêtre de l'installeur", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans le Finder trie les fichiers par date", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "fais echap", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "demande à Gemini un résumé de la révolution française", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "ouvre claude code et demande dans la conversation en cours quel modèle tourne en local", "intention": "action", "domaines": ["fenetres", "applications"], "jeu": "entrainement"}
+{"texte": "regarde l'écran et dis moi si la vidéo est en pause", "intention": "information", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "annule la frappe avec cmd z", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "clique sur Accepter dans la fenêtre de Zoom", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Word mets le titre en gras", "intention": "action", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "résume le fichier ~/Documents/rapport.pdf", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "lis moi ce document contrat.docx", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "qu'est-ce qu'il y a dans le dossier Factures ?", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "liste les fichiers du bureau", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "décris l'image photo.jpg", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "qu'est-ce qu'on voit sur la capture qui est sur le bureau", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "c'est quoi le total dans facture_mars.pdf", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "combien de pages fait le pdf memoire.pdf", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "lis le fichier colis.txt", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "y a quoi dans mes téléchargements", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "résume moi le powerpoint cours_histoire.pptx", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "il y a combien de lignes dans le fichier clients.csv", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "traduis le pdf notice.pdf en français", "intention": "information", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un dossier Projets/2026", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "écris un fichier notes.md sur le bureau avec les idées de la réunion", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un fichier todo.txt avec acheter du pain et appeler le garage", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un document Word sur le bureau avec un plan de révision en 3 parties", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "fais un tableur avec loyer 600 courses 250 essence 80", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "une présentation de 5 diapos sur le recyclage", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "fais un csv des participants : Paul, Marie, Léa", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "range mes téléchargements", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "range les fichiers de mon bureau cest le bordel", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "déplace facture.pdf dans Documents/Factures", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "renomme scan1.pdf en contrat.pdf", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "copie le dossier Photos2025 sur le bureau", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "mets vieux.txt à la corbeille", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "supprime le txt qui est sur le bureau", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "corrige les fautes du texte que j'ai copié", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "traduis en anglais ce que j'ai copié", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "reformule le texte du presse-papiers plus poliment", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "classe les papiers de mes téléchargements", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "classe la facture facture_box.pdf", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "écris dans un fichier index.html une page d'accueil simple", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un script python hello.py qui affiche bonjour", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "duplique le fichier cv.docx", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "fais un document word avec une lettre de motivation pour un poste de vendeur", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "enregistre un poème sur la pluie dans un fichier poeme.txt sur le bureau", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un fichier excel avec mes notes du trimestre maths 14 français 12", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "déplace toutes les captures d'écran du bureau dans un dossier Captures", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "jette le dossier test à la poubelle", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "renomme le dossier Nouveau dossier en Archives 2025", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "fais un résumé de ce que j'ai copié", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "réponds au texte que j'ai copié de façon polie", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "trouve le pdf du bail et copie le dans Documents", "intention": "action", "domaines": ["fichiers", "recherche"], "jeu": "entrainement"}
+{"texte": "crée un fichier liste.md dans le dossier essai avec trois tâches", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "écris un fichier recette.txt avec la recette des crêpes", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "fais moi un powerpoint de 3 slides pour présenter mon club de foot", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "crée un dossier Vacances sur le bureau et mets-y les photos de juillet", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "retrouve ma facture EDF de mars", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "où est la photo du chat sur le canapé", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "cherche le cours sur TCP", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "retrouve le devis de la cuisine", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "cherche partout le mail de Paul sur les vacances", "intention": "information", "domaines": ["recherche", "organisation"], "jeu": "entrainement"}
+{"texte": "où en est l'index ?", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "indexe maintenant", "intention": "action", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "combien j'ai dépensé en essence ce mois ci", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "mes dépenses de courses depuis 3 mois", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "fais moi un tableur de mes dépenses du mois", "intention": "action", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "je cherche un pdf sur les impôts de l'an dernier", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "tu peux retrouver la capture d'écran où il y avait un schéma réseau", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "ouvre ma facture d'électricité de février", "intention": "action", "domaines": ["recherche", "applications"], "jeu": "entrainement"}
+{"texte": "retrouve la note où j'avais mis le code du portail", "intention": "information", "domaines": ["recherche", "organisation"], "jeu": "entrainement"}
+{"texte": "combien j'ai payé en abonnements cette année", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "trouve les fichiers qui parlent de la rénovation de la salle de bain", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "cherche une image de coucher de soleil dans mes fichiers", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "retrouve le mail où Marie m'envoyait le planning", "intention": "information", "domaines": ["recherche", "organisation"], "jeu": "entrainement"}
+{"texte": "cherche le document sur le contrat de location", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "combien de fichiers sont indexés", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "exporte mes dépenses de l'année en excel", "intention": "action", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "ouvre le mail de Paul sur le devis que tu viens de trouver", "intention": "action", "domaines": ["recherche", "organisation"], "jeu": "entrainement"}
+{"texte": "j'ai dépensé combien chez le boulanger en octobre", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "ou est passé mon fichier sur la recette du gâteau au chocolat", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "trouve les photos de plage prises cet été", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "cherche mes fiches de paie de 2025", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "quel est le total de mes factures de téléphone sur six mois", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "retrouve le pdf de la notice du lave-linge", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "relance l'indexation des fichiers", "intention": "action", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "y a un fichier qui parle de la réunion budget quelque part ?", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "retrouve moi le billet de train pour Marseille", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "cherche les scans de mon permis", "intention": "information", "domaines": ["recherche"], "jeu": "entrainement"}
+{"texte": "quels sont les horaires de la poste de Lyon", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "qui a gagné le match hier soir", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "combien coûte un raspberry pi 5", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "quel temps il fera demain à Nantes", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "les actus du jour", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "c'est quand la prochaine éclipse de soleil", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "quel est le prix de l'essence en ce moment", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "résume l'article https://exemple.fr/article", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "quelle est la dernière version de python", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "qui est le président du Brésil actuellement", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cherche sur internet des avis sur le macbook air m4", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "lis la page ouverte et résume la", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "quels onglets sont ouverts", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "la boulangerie de la place est ouverte le dimanche ?", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cours du bitcoin aujourd'hui", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "quand sort le prochain film marvel", "intention": "information", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "mets daft punk get lucky sur youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cherche des tutos blender sur youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre github.com", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre twitch.tv", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre chrome lance youtube", "intention": "action", "domaines": ["web", "applications"], "jeu": "entrainement"}
+{"texte": "clique sur connexion", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "remplis le champ recherche avec chaussures de rando", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ferme l'onglet 3", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "page précédente", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "descends", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "recharge la page", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cherche sur google les horaires de la piscine", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cherche des recettes de crêpes sur google", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "montre moi l'itinéraire vers la gare sur maps", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "va sur amazon et achète une souris sans fil", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre la page de suivi de mon colis", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "lance une vidéo de chats sur youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "active l'onglet youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "mets de la musique lofi sur youtube", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "cherche des images de chalets en montagne", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "ouvre wikipédia sur la page de Napoléon", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "sur la page ouverte clique sur le deuxième lien", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "lance chrome va sur youtube et mets la dernière vidéo de cuisine", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "remonte en haut de la page", "intention": "action", "domaines": ["web"], "jeu": "entrainement"}
+{"texte": "qu'est-ce que j'ai demain ?", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "jai quoi aujourdhui", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "quels sont mes rappels", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "résume mes mails non lus", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "quels sont mes derniers mails", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "est-ce que j'ai des rendez-vous cette semaine", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "mon agenda de vendredi", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "j'ai reçu un mail de la banque ?", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "lis moi le dernier mail de Paul", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "cherche dans mes notes le code du portail", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "qu'est ce que j'ai comme notes sur le projet maison", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "c'est à quelle heure mon rdv chez le kiné", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "il me reste quoi comme rappels pour aujourd'hui", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "mets un rappel demain à 9h pour appeler la banque", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "mets moi un rappelle a 21h et un autre a 21h15", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "ajoute un rdv chez le dentiste jeudi à 14h", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "trie mes mails", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "réponds au dernier mail de Paul que je serai là jeudi", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "prépare un mail à Paul pour la réunion de lundi", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "envoie un mail à Marie pour lui dire que le dossier est prêt", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "écris à Paul que j'arrive dans 10 minutes", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "envoie un sms à maman : j'arrive dans 10 minutes", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "crée une note avec la liste des courses", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "ajoute du lait à la note Courses", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "range le mail numéro 2 dans la boîte Factures", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "rappelle moi d'arroser les plantes ce soir à 19h", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "demain à 18h rappelle-moi d'appeler Léa", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "bloque mon mardi après midi dans le calendrier", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "envoie un imessage à Léa pour lui souhaiter bon anniversaire", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "écris un mail au propriétaire pour signaler la fuite d'eau", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "note dans mon journal que j'ai couru 5 km aujourd'hui", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "range les newsletters dans une boîte à part", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "ajoute au calendrier le repas chez Maman samedi midi", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "dis à Marie par sms que je serai en retard", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "réponds à Paul que c'est d'accord pour samedi", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "crée un événement réunion d'équipe lundi 10h", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "ajoute œufs et farine à ma liste de courses", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "retrouve le mail de l'agence et réponds que je confirme la visite", "intention": "action", "domaines": ["organisation", "recherche"], "jeu": "entrainement"}
+{"texte": "volume à 30", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "monte le son", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "coupe le son", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "coupe le wifi", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "active le wifi", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "passe en mode sombre", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "remets le mode clair", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "pause", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "chanson suivante", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "reprends la musique", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "prends une capture d'écran", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ouvre les réglages bluetooth", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "copie ce texte : rendez-vous à 15h devant la gare", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "affiche une notification pause café", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "exécute ls -la ~/Documents", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "baisse un peu le son", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "mets le volume à fond", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ouvre les réglages du fond d'écran", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ferme l'appli qui prend le plus de ram", "intention": "action", "domaines": ["systeme", "applications"], "jeu": "entrainement"}
+{"texte": "lance la commande brew update dans le terminal", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "mute", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "morceau précédent", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "désactive le wi fi stp", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ouvre les réglages de notifications", "intention": "action", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "combien de batterie il me reste", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "combien d'espace disque", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "quelle version de macos j'ai", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "pourquoi mon mac rame", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "quelles applis prennent le plus de ram", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "qu'est-ce que j'ai copié", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "depuis quand le mac est allumé", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ya combien de place sur le disque", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "batterie", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "état de la mémoire", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "ouvre les réglages bluetooth et dis moi si le bluetooth est activé", "intention": "information", "domaines": ["systeme", "fenetres"], "jeu": "entrainement"}
+{"texte": "dans le terminal regarde combien pèse le dossier Téléchargements", "intention": "information", "domaines": ["systeme"], "jeu": "entrainement"}
+{"texte": "retiens que je préfère les réponses courtes", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "retiens que j'habite à Lyon", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "souviens toi que je travaille de nuit", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "note bien que mon chat s'appelle Moustache", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "oublie ce que tu sais sur mon travail", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "oublie tout", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "retiens mon code de carte bleue", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "n'oublie pas que je suis végétarien", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "mémorise que mon dentiste c'est le docteur Martin", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "retiens que je me lève à 6h en semaine", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "efface le souvenir sur mon adresse", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "retiens que je préfère Chrome à Safari", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "garde en mémoire que ma sœur s'appelle Léa", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "retiens que je réponds toujours en tutoyant", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "oublie que j'ai un chien", "intention": "action", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "qu'est-ce que tu sais de moi", "intention": "information", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "tu te souviens de quoi sur moi", "intention": "information", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "est-ce que tu sais où j'habite", "intention": "information", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "tu te rappelles comment s'appelle mon chat ?", "intention": "information", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "liste tes souvenirs", "intention": "information", "domaines": ["memoire"], "jeu": "entrainement"}
+{"texte": "crée une compétence mode travail : ouvre VS Code et Slack, volume à 20", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "quelles compétences tu connais", "intention": "information", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "quelles compétences toutes prêtes tu proposes", "intention": "information", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "installe la compétence convertir une image en jpg", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "supprime la compétence mode travail", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "enregistre ce que tu viens de faire comme compétence", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "lance la compétence mode travail", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "quand je te demande un calcul lance la calculatrice, enregistre ça comme compétence", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "apprends cette tâche pour la refaire plus tard", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "refais comme la dernière fois avec le dossier Photos2026", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "crée un skill soirée cinéma : mode sombre, volume 40, ouvre Netflix dans Chrome", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "tu as des recettes pour LightCraft ?", "intention": "information", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "installe la recette redimensionner une photo", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "rejoue la compétence rangement du lundi", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "efface le skill test", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "montre la liste de mes skills", "intention": "information", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "avec PhotoCraft convertis cette image en PNG", "intention": "action", "domaines": ["competences", "fichiers"], "jeu": "entrainement"}
+{"texte": "transforme ce que je viens de faire en recette réutilisable", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "crée une compétence matin qui ouvre Mail, Calendrier et la météo", "intention": "action", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "c'est quoi les compétences que tu as apprises par démonstration", "intention": "information", "domaines": ["competences"], "jeu": "entrainement"}
+{"texte": "annule", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "annule la dernière action", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "remets le fichier que tu viens de déplacer", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "défais ce que tu viens de faire", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "supprime la tâche du lundi", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "arrête le résumé des mails tous les matins", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "enlève la tâche programmée de rangement", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "qu'est-ce que tu as fait sur mes fichiers récemment", "intention": "information", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "quelles tâches sont programmées", "intention": "information", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "historique des actions", "intention": "information", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "qu'est-ce qui tourne automatiquement", "intention": "information", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "c'est quand la prochaine tâche planifiée", "intention": "information", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "annule le renommage", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "ctrl z sur le dernier rangement", "intention": "action", "domaines": ["taches"], "jeu": "entrainement"}
+{"texte": "fais-moi un cube de 1 mètre dans onshape", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "un cylindre de 40 mm de diamètre et 10 cm de haut", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "crée un pavé 20 x 10 x 5 cm", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "modélise une pièce cylindrique de 3 cm de diamètre sur 8 cm", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "dessine moi un cube de 50 mm en cao", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "quels sont mes documents onshape", "intention": "information", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "cherche mon document onshape support vélo", "intention": "information", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "onshape cube 10cm", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "fais une pièce rectangulaire de 100 par 50 par 20 mm", "intention": "action", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "j'ai combien de documents sur onshape", "intention": "information", "domaines": ["onshape"], "jeu": "entrainement"}
+{"texte": "tous les lundis à 9h range mes téléchargements", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "chaque matin à 8h fais moi un résumé de mes mails et de mon agenda", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "tous les soirs à 20h donne moi les actus", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "entrainement"}
+{"texte": "en semaine à 18h trie mes mails", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "toutes les heures dis moi le niveau de batterie", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "demain à 18h range le bureau", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "chaque vendredi classe les papiers des téléchargements", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "chaque dimanche soir fais un relevé de mes dépenses de la semaine", "intention": "planifier", "domaines": ["taches", "recherche"], "jeu": "entrainement"}
+{"texte": "dans 20 minutes mets la musique en pause", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "tous les matins donne-moi la météo", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "entrainement"}
+{"texte": "du lundi au vendredi à 7h30 dis moi ce que j'ai dans la journée", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "chaque nuit à 2h lance l'indexation", "intention": "planifier", "domaines": ["taches", "recherche"], "jeu": "entrainement"}
+{"texte": "tous les jours à 22h passe en mode sombre", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "chaque lundi matin liste mes rappels de la semaine", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "toutes les heures regarde le prix de l'essence", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "entrainement"}
+{"texte": "chaque dimanche déplace les captures du bureau dans Archives", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "ce soir à 23h coupe le wifi", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "programme le rangement du bureau tous les vendredis à 17h", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "automatise un résumé de mes mails non lus chaque midi", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "chaque matin à 9h cherche les nouvelles sur l'intelligence artificielle", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "entrainement"}
+{"texte": "tous les jours à 18h affiche une notification pour faire une pause", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "chaque soir classe automatiquement les factures téléchargées", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "tous les jeudis à 17h prépare un mail récap pour l'équipe", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "à 7h demain matin mets le volume à 50", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "fais moi un briefing tous les matins en semaine", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "tout les lundi a 9h range mes telechargement", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "chaque samedi à 10h regarde les résultats de foot", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "entrainement"}
+{"texte": "chaque heure vérifie si le mac rame", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "tous les dimanches soir résume mon agenda de la semaine prochaine", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "entrainement"}
+{"texte": "dans une heure range le dossier Téléchargements", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "entrainement"}
+{"texte": "chaque lundi fais moi le total de mes dépenses de la semaine passée", "intention": "planifier", "domaines": ["taches", "recherche"], "jeu": "entrainement"}
+{"texte": "tous les matins à 8h lance la musique", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "entrainement"}
+{"texte": "c'est quoi un SSD ?", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment on joint un fichier à un mail ?", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "pourquoi le ciel est bleu", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi la différence entre RAM et stockage", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment installer une appli sur mac", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "à quoi sert le swap", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "explique moi ce qu'est un VPN", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment fonctionne la photosynthèse", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "quelle est la capitale de l'Australie", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi un fichier .dmg", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment on fait une capture d'écran sur mac", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "pourquoi faut-il redémarrer son mac de temps en temps", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment envoyer un mail ?", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi la différence entre un mail en cc et en cci", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment marche le wifi", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "explique moi la règle de trois", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi gatekeeper sur mac", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "pourquoi mon mac chauffe quand je regarde des vidéos", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment on fait un tableau croisé dynamique dans excel", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi un modèle de langage", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment créer un raccourci clavier sur mac", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "qui a écrit les misérables", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment marche une batterie lithium", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c koi la diff entre usb c et thunderbolt", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment programmer une tâche récurrente sur mac", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment couper le son d'un onglet dans chrome", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi le cloud", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "pourquoi l'eau bout à 100 degrés", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "comment ajouter un numéro de page dans Pages", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "dans Excel où est le bouton pour figer la première ligne", "intention": "explication", "domaines": ["fenetres"], "jeu": "entrainement"}
+{"texte": "explique moi ce que fait la commande ls -la", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est quoi une extrusion en CAO", "intention": "explication", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris-moi une phrase sur la mer", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige un poème sur l'automne", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "donne-moi 3 idées de cadeaux pour ma sœur", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris un petit texte pour souhaiter bon anniversaire", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige un mail de relance pour une facture impayée", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "trouve moi un nom pour mon chat", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "fais moi une liste de courses pour un repas mexicain", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "traduis je suis en retard en anglais", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris un haïku sur la neige", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "propose moi un titre pour mon exposé sur l'énergie solaire", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "invente une histoire courte pour endormir un enfant", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "donne moi 5 idées de sorties pour le week-end", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige une lettre de motivation pour un job d'été", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris un message d'excuse pour un retard au travail", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "fais un slogan pour une boulangerie", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris une blague sur les informaticiens", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "donne moi un menu équilibré pour la semaine", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige trois phrases pour présenter mon entreprise de jardinage", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris un poème de 30 lignes sur la forêt", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "reformule cette phrase : je suis pas content du service", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "corrige : je les ai mangé hier soir", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "propose un plan pour une dissertation sur la liberté", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris moi un discours de mariage court et drôle", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "donne moi une idée de dessert facile", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige une annonce pour vendre mon vélo", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris un texte de remerciement pour un collègue qui part", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "fais moi un résumé en 3 lignes de l'histoire du petit chaperon rouge", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris une phrase sur le vent dans les arbres", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "écris une chanson sur les vacances", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "donne moi 10 noms d'équipe pour un tournoi de pétanque", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "rédige un mot pour la maîtresse pour excuser une absence", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "imagine un dialogue entre un chat et un chien", "intention": "redaction", "domaines": [], "jeu": "entrainement"}
+{"texte": "merci", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "salut ça va ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "t'es qui ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "tu tournes avec quel modèle ia ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "super merci beaucoup", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "ok", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "test", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "bonne nuit", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "t'es nul", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "haha", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "bonjour", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "tu peux faire quoi", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "coucou", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "oui", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "non laisse tomber", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est parfait", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "t'es vraiment fort", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "test test un deux", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "t'es là ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "ça marche merci", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "bien joué", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "à demain", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "tu m'entends", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "mdr", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "j'ai pas d'idée de quoi te demander là", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "oui mais c'est quoi ton modèle", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "t'es plus fort que siri ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "désolé je me suis trompé", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "tu fonctionnes en local ?", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "bravo", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "allô", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "rien oublie", "intention": "conversation", "domaines": [], "jeu": "entrainement"}
+{"texte": "combien font 5000 - 964", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "calcule 12 fois 7", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "quelle heure est-il", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "on est quel jour", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "20 % de 150", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "racine carrée de 144", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "combien font 5+3", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "2 puissance 10", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "c'est combien 1250 divisé par 4", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "quelle date sommes nous", "intention": "information", "domaines": [], "jeu": "entrainement"}
+{"texte": "lis le fichier colis.txt puis ouvre la page de suivi dans Chrome", "intention": "action", "domaines": ["fichiers", "web"], "jeu": "entrainement"}
+{"texte": "retrouve le devis de la cuisine et envoie-le à Paul par mail", "intention": "action", "domaines": ["recherche", "organisation"], "jeu": "entrainement"}
+{"texte": "résume mes mails et mets le résumé dans un fichier resume.txt", "intention": "action", "domaines": ["organisation", "fichiers"], "jeu": "entrainement"}
+{"texte": "lis la page ouverte et crée un document Word avec le résumé", "intention": "action", "domaines": ["web", "fichiers"], "jeu": "entrainement"}
+{"texte": "prends une capture d'écran et décris-la moi", "intention": "action", "domaines": ["systeme", "fichiers"], "jeu": "entrainement"}
+{"texte": "ouvre Spotify et mets le volume à 40", "intention": "action", "domaines": ["applications", "systeme"], "jeu": "entrainement"}
+{"texte": "lis le pdf convocation.pdf et ajoute le rendez-vous dans mon agenda", "intention": "action", "domaines": ["fichiers", "organisation"], "jeu": "entrainement"}
+{"texte": "cherche les horaires du cinéma et mets un rappel 30 minutes avant la séance de 20h", "intention": "action", "domaines": ["web", "organisation"], "jeu": "entrainement"}
+{"texte": "ouvre Pages, crée un document vide et écris le titre Rapport mensuel", "intention": "action", "domaines": ["applications", "fenetres"], "jeu": "entrainement"}
+{"texte": "regarde mon agenda de demain et ouvre l'itinéraire vers mon premier rendez-vous", "intention": "action", "domaines": ["organisation", "web"], "jeu": "entrainement"}
+{"texte": "range mes téléchargements puis ouvre le dossier Images", "intention": "action", "domaines": ["fichiers", "applications"], "jeu": "entrainement"}
+{"texte": "ferme tout sauf Claude et passe en mode sombre", "intention": "action", "domaines": ["applications", "systeme"], "jeu": "entrainement"}
+{"texte": "demande à Claude une recette de lasagnes et enregistre la réponse dans recette.md", "intention": "action", "domaines": ["fenetres", "fichiers"], "jeu": "entrainement"}
+{"texte": "ouvre chrome et va sur le site de la sncf", "intention": "action", "domaines": ["applications", "web"], "jeu": "entrainement"}
+{"texte": "copie le dernier mail de Marie dans le presse-papiers", "intention": "action", "domaines": ["systeme", "organisation"], "jeu": "entrainement"}
+{"texte": "j'ai un rendez-vous demain, il va faire quel temps là-bas ?", "intention": "information", "domaines": ["organisation", "web"], "jeu": "entrainement"}
+{"texte": "retrouve toutes mes factures d'internet et mets-les dans un dossier Internet", "intention": "action", "domaines": ["fichiers", "recherche"], "jeu": "entrainement"}
+{"texte": "lance TextEdit et colle ce que j'ai copié", "intention": "action", "domaines": ["applications", "fenetres"], "jeu": "entrainement"}
+{"texte": "écris un fichier courses.txt avec pain lait oeufs", "intention": "action", "domaines": ["fichiers"], "jeu": "entrainement"}
+{"texte": "ouvre le dossier Courses", "intention": "action", "domaines": ["applications"], "jeu": "entrainement"}
+{"texte": "écris à Maman que je passe ce soir", "intention": "action", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "démarre Keynote", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "ferme Discord", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "affiche-moi le dossier Recettes de cuisine", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "vas-y ouvre moi le dossier Scolarité", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "ferme toutes les fenêtres sauf Safari et Notes", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "quitte tout ce qui est ouvert", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "qu'est ce qui tourne comme appli en ce moment", "intention": "information", "domaines": ["applications"], "jeu": "test"}
+{"texte": "ouvre plan_maison.pdf avec Preview", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "révèle le fichier budget2026.numbers dans le Finder", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "installe Blender, j'ai le dmg dans Téléchargements", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "installe moi Audacity", "intention": "action", "domaines": ["applications", "web"], "jeu": "test"}
+{"texte": "lance l'appli Horloge", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "dans TextEdit sélectionne tout et mets la police en 14", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "clique sur le bouton Suivant de l'installeur", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "fais cmd option échap", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "écris à Claude pour lui demander comment soigner un rhume", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "demande à ChatGPT une idée de nom pour une startup", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "tape merci beaucoup dans Messages et envoie", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "décris ce qu'il y a à l'écran en ce moment", "intention": "information", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "lis ce qu'il y a dans la zone que je sélectionne", "intention": "information", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "où se trouve l'option pour exporter en mp3 dans GarageBand", "intention": "explication", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "montre moi où cliquer pour changer la langue de Word", "intention": "explication", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "choisis Présentation > Lire le diaporama dans Keynote", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "dans Mail clique sur Répondre à tous", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "que contient le dossier Scans", "intention": "information", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "lis-moi le document compte_rendu.docx", "intention": "information", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "décris la photo plage.png", "intention": "information", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "quel est le montant sur ticket_caisse.jpg", "intention": "information", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "crée un dossier Cours/Maths sur le bureau", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "écris un fichier idees.txt avec trois idées de vacances", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "fais un tableau excel avec les scores Paul 12 Marie 15 Léa 9", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "crée une présentation de 4 diapositives sur les volcans", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "mets la vieille facture.pdf à la corbeille", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "renomme photo1.jpg en anniversaire.jpg", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "déplace le dossier Brouillons dans Documents", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "range le dossier Documents par type", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "traduis en espagnol le texte que j'ai dans le presse-papiers", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "classe les papiers administratifs qui traînent dans Téléchargements", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "crée un document word avec le compte rendu de la réunion", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "retrouve ma quittance de loyer de septembre", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "où est le pdf de la garantie du frigo", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "cherche la photo du gâteau d'anniversaire", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "trouve le mail de Léa qui parlait du voyage", "intention": "information", "domaines": ["recherche", "organisation"], "jeu": "test"}
+{"texte": "j'ai dépensé combien en électricité cette année", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "l'index est à jour ?", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "lance l'indexation tout de suite", "intention": "action", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "crée un excel de mes dépenses de novembre", "intention": "action", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "ouvre le devis du plombier", "intention": "action", "domaines": ["recherche", "applications"], "jeu": "test"}
+{"texte": "combien j'ai mis en courses le mois dernier", "intention": "information", "domaines": ["recherche"], "jeu": "test"}
+{"texte": "à quelle heure ferme la mairie de Bordeaux le samedi", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "qui a remporté le tour de france cette année", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "combien coûte un ipad air en ce moment", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "il fait combien à Lille demain", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "résume la page chrome qui est ouverte", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "liste les onglets de chrome", "intention": "information", "domaines": ["web"], "jeu": "test"}
+{"texte": "mets la bande annonce du dernier Pixar sur youtube", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "ouvre lemonde.fr", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "dans chrome ferme l'onglet de la vidéo", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "clique sur s'inscrire sur la page", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "cherche des photos de tigres sur google images", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "reviens à la page d'avant", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "écris paris lyon dans le champ départ du site", "intention": "action", "domaines": ["web"], "jeu": "test"}
+{"texte": "qu'est ce que j'ai au programme jeudi", "intention": "information", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "quels mails j'ai reçu ce matin", "intention": "information", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "est-ce que Paul m'a répondu ?", "intention": "information", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "liste mes rappels pas faits", "intention": "information", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "cherche dans mes notes le code wifi de la maison de campagne", "intention": "information", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "rappelle moi samedi à 10h de sortir les poubelles", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "crée un rendez-vous coiffeur mardi à 17h", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "envoie un texto à Léa : je suis devant", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "écris un mail à Marie pour l'inviter dimanche", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "prépare une réponse au mail du syndic sans l'envoyer", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "ajoute pommes et beurre à la note Courses", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "mets le mail 4 dans la boîte Travail", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "trie ma boîte de réception", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "monte le volume à 70", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "coupe le micro... non coupe le son de l'ordi", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "éteins le wifi", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "rallume le wifi", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "active le thème sombre", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "mets en pause la musique", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "passe à la chanson d'après", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "fais une capture de l'écran", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "ouvre les réglages du clavier", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "lance df -h dans le terminal", "intention": "action", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "il me reste combien de pourcentage", "intention": "information", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "mon mac est lent pourquoi", "intention": "information", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "c'est quoi qui bouffe toute la ram", "intention": "information", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "il reste combien de go sur le ssd", "intention": "information", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "qu'est-ce qu'il y a dans le presse-papiers", "intention": "information", "domaines": ["systeme"], "jeu": "test"}
+{"texte": "retiens que je suis allergique aux arachides", "intention": "action", "domaines": ["memoire"], "jeu": "test"}
+{"texte": "souviens-toi que je préfère le thé au café", "intention": "action", "domaines": ["memoire"], "jeu": "test"}
+{"texte": "oublie mon adresse", "intention": "action", "domaines": ["memoire"], "jeu": "test"}
+{"texte": "tu as gardé quoi en mémoire à mon sujet", "intention": "information", "domaines": ["memoire"], "jeu": "test"}
+{"texte": "crée une compétence mode révision : ferme tout sauf Pages et coupe le son", "intention": "action", "domaines": ["competences"], "jeu": "test"}
+{"texte": "tu as quelles compétences en stock", "intention": "information", "domaines": ["competences"], "jeu": "test"}
+{"texte": "supprime le skill soirée cinéma", "intention": "action", "domaines": ["competences"], "jeu": "test"}
+{"texte": "installe la compétence créer un logo texte", "intention": "action", "domaines": ["competences"], "jeu": "test"}
+{"texte": "oups reviens en arrière sur les fichiers", "intention": "action", "domaines": ["taches"], "jeu": "test"}
+{"texte": "remets comme avant le rangement que tu viens de faire", "intention": "action", "domaines": ["taches"], "jeu": "test"}
+{"texte": "montre les tâches automatiques", "intention": "information", "domaines": ["taches"], "jeu": "test"}
+{"texte": "supprime la tâche de la météo du matin", "intention": "action", "domaines": ["taches"], "jeu": "test"}
+{"texte": "quelles actions je peux annuler", "intention": "information", "domaines": ["taches"], "jeu": "test"}
+{"texte": "fais un cylindre de 2 cm de diamètre et 5 cm de haut sur onshape", "intention": "action", "domaines": ["onshape"], "jeu": "test"}
+{"texte": "crée un cube de 30 cm", "intention": "action", "domaines": ["onshape"], "jeu": "test"}
+{"texte": "liste ce que j'ai sur onshape", "intention": "information", "domaines": ["onshape"], "jeu": "test"}
+{"texte": "chaque matin à 7h résume mes mails", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "test"}
+{"texte": "tous les samedis à 10h range le bureau", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "test"}
+{"texte": "toutes les heures donne moi les titres de l'actualité", "intention": "planifier", "domaines": ["taches", "web"], "jeu": "test"}
+{"texte": "dans 30 minutes baisse le volume à 10", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "test"}
+{"texte": "du lundi au vendredi à 8h dis moi mes rendez-vous", "intention": "planifier", "domaines": ["taches", "organisation"], "jeu": "test"}
+{"texte": "tous les soirs classe les factures de mes téléchargements", "intention": "planifier", "domaines": ["taches", "fichiers"], "jeu": "test"}
+{"texte": "chaque fin de semaine dis moi combien j'ai dépensé", "intention": "planifier", "domaines": ["taches", "recherche"], "jeu": "test"}
+{"texte": "ce soir à minuit passe en mode sombre", "intention": "planifier", "domaines": ["taches", "systeme"], "jeu": "test"}
+{"texte": "comment on vide la corbeille sur mac", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "c'est quoi un processeur", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "pourquoi la mer est salée", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "comment marche la recherche par le sens", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "comment je fais pour envoyer un sms depuis mon mac", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "c'est quoi le Bluetooth basse énergie", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "qui a peint la Joconde", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "comment on ajoute une imprimante sur mac", "intention": "explication", "domaines": [], "jeu": "test"}
+{"texte": "écris-moi un poème sur la lune", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "donne moi 3 idées de repas pour ce soir", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "écris une phrase pour décrire un coucher de soleil", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "rédige un message d'anniversaire pour mon grand-père", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "propose moi un nom pour ma chaîne youtube", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "traduis bonne journée en italien", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "rédige un mail pour demander un congé", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "raconte une petite histoire de pirates", "intention": "redaction", "domaines": [], "jeu": "test"}
+{"texte": "coucou toi", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "merci c'est top", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "t'es une ia ?", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "ça va ou quoi", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "nan c'est bon", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "trop bien", "intention": "conversation", "domaines": [], "jeu": "test"}
+{"texte": "combien font 345 fois 12", "intention": "information", "domaines": [], "jeu": "test"}
+{"texte": "il est quelle heure là", "intention": "information", "domaines": [], "jeu": "test"}
+{"texte": "ça fait combien 15 % de 80", "intention": "information", "domaines": [], "jeu": "test"}
+{"texte": "lis le fichier billet.txt et ouvre le site de la compagnie dans Chrome", "intention": "action", "domaines": ["fichiers", "web"], "jeu": "test"}
+{"texte": "retrouve la facture du garage et prépare un mail à Paul avec", "intention": "action", "domaines": ["recherche", "organisation"], "jeu": "test"}
+{"texte": "ouvre Notes et écris une nouvelle note avec bonjour dedans", "intention": "action", "domaines": ["applications", "fenetres"], "jeu": "test"}
+{"texte": "résume la page ouverte dans un fichier resume_article.md", "intention": "action", "domaines": ["web", "fichiers"], "jeu": "test"}
+{"texte": "écris un fichier haiku.txt avec un haïku sur l'hiver", "intention": "action", "domaines": ["fichiers"], "jeu": "test"}
+{"texte": "écris à Léa que le film commence à 21h", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
+{"texte": "écris à ChatGPT de me proposer un plan de révision", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
+{"texte": "tu peux m'ouvrir le dossier Lettres stp", "intention": "action", "domaines": ["applications"], "jeu": "test"}

@@ -347,7 +347,8 @@ class Orchestrateur:
             # mails lus pour une simple question). Seuls les outils de lecture restent.
             noms = [n for n in noms if (o := ctx.registre.get(n)) is not None and not o.toujours_confirmer
                     and _risque_fixe(o) == Risque.LECTURE and o.groupe not in ("organisation",)]
-        if redaction_seule(demande) or (sure and decision.intention in ("redaction", "conversation")):
+        if redaction_seule(demande) or (sure and decision.intention in ("redaction", "conversation")
+                                        and not cible_nommee(demande)):
             noms = []  # « écris-moi une phrase sur la mer » : la réponse est le texte, aucun fichier (banc du 25/11)
         elif sure and decision.intention == "planifier" and ctx.registre.get("planifier_tache") is not None:
             noms = ["planifier_tache"] + [n for n in noms if n != "planifier_tache"]
@@ -600,6 +601,12 @@ CIBLE = re.compile(r"\b(fichier|document|docx|word|pdf|tableur|excel|note|notes|
                    r"taches|tâches|depenses|dépenses|souvenirs|competences|compétences|applis|applications|"
                    r"telechargements|téléchargements|contacts|favoris|onglets)|~/|\.\w{2,4}\b", re.I)
 DESTINATAIRE = re.compile(r"\b[aà] [A-ZÉÈ]")  # « à Paul », « à Maman »
+
+
+def cible_nommee(demande: str) -> bool:
+    """Un fichier, une appli, un destinataire ou des données à toi sont nommés : il faudra des outils, quoi que dise
+    le classifieur (mesuré : « écris un fichier haiku.txt avec un haïku » classé rédaction à 82 %)."""
+    return bool(CIBLE.search(demande) or DESTINATAIRE.search(demande))
 
 
 def redaction_seule(demande: str) -> bool:

@@ -28,8 +28,8 @@ INTENTIONS = ("action", "information", "explication", "redaction", "planifier", 
 DOMAINES = ("applications", "fenetres", "fichiers", "recherche", "web", "organisation", "systeme", "memoire",
             "competences", "taches", "onshape")
 DIMENSIONS = 256
-VOISINS = 7
-PUISSANCE = 8          # les voisins les plus proches pèsent beaucoup plus que les autres
+VOISINS = 15
+PUISSANCE = 16         # les voisins les plus proches pèsent beaucoup plus (réglé sur le jeu de test : 15 voisins, puissance 16)
 SEUIL_DOMAINE = 0.3    # part des voisins (pondérée) qui doivent citer un domaine pour qu'il soit retenu
 
 

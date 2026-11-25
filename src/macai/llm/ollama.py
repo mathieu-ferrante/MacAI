@@ -287,7 +287,9 @@ class Ollama:
         # d'embeddings occupe 2,2 Go au lieu de 1 Go et sature la mémoire graphique à côté de l'agent (mesuré).
         self.verifier_modele(modele)
         corps = {"model": modele, "input": textes, "keep_alive": self.garder, "truncate": True,
-                 "options": {"num_ctx": CONTEXTE_EMBEDDINGS}}
+                 # num_gpu 0 : sur le processeur. Mesuré sur le M2 8 Go : la puce graphique reste au modèle de
+                 # l'agent (22 jetons/s au lieu de 19 quand les deux sont chargés), pour 10 ms de plus par phrase.
+                 "options": {"num_ctx": CONTEXTE_EMBEDDINGS, "num_gpu": 0}}
         if dimensions:
             corps["dimensions"] = dimensions
         vecs = self._sans_saturation(lambda: self._json("/api/embed", corps))["embeddings"]
