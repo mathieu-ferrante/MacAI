@@ -46,6 +46,25 @@ MAX_DESIGNES = 9
 # Outils de haut niveau d'abord (s'ils existent) : ils doivent survivre à la limite du nombre d'outils.
 PILOTAGE = ["demander_a_claude", "ecrire_et_envoyer", "ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
             "raccourci_clavier", "choisir_menu", "lister_menus", "attendre"]
+RESERVE_DOMAINE = 3
+SITUATION = ("demander_a_claude", "ecrire_et_envoyer", "choisir_menu", "lister_menus")
+# Le strict nécessaire pour piloter une appli ; « attendre » vient ensuite s'il reste de la place.
+PILOTAGE_MIN = ("ouvrir_application", "lire_fenetre", "cliquer_element", "saisir_element", "taper_texte",
+                "raccourci_clavier")
+
+
+def _pilotage_utile(nom: str, t: str) -> bool:
+    """Outils de pilotage propres à une situation : seulement si la demande en parle."""
+    if nom == "demander_a_claude":
+        return "claude" in t
+    if nom == "ecrire_et_envoyer":
+        return bool(VERS_APPLI.search(t)) or any(_contient(t, a) for a in ("chatgpt", "gemini", "mistral",
+                                                                           "perplexity", "copilot", "le chat"))
+    if nom in ("choisir_menu", "lister_menus"):
+        return bool(re.search(r"\bmenu|export|enregistr|imprim|format|preferen|reglage", t))
+    return True
+
+
 # Une deuxième action après l'ouverture d'une appli : il faudra lire sa fenêtre, cliquer, écrire.
 ACTION_DANS_APPLI = re.compile(r"\b(et|puis|ensuite|va|passe|demande|ecris|tape|envoie|mets|active|desactive|"
                                r"choisis|selectionne|clique|appuie|remplis|pose|dis-lui|demande-lui|"
@@ -124,10 +143,15 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
 
     mots = {_racine(m) for m in re.findall(r"[a-z0-9']+", t) if m not in VIDES and len(m) > 2}
     mots |= {_racine(a) for m in re.findall(r"[a-z0-9']+", t) for a in ANGLAIS.get(m, [])}
+    if re.search(r"(^|\s)(~|/)[^\s]*\.[a-z0-9]{1,5}\b", t):
+        mots.add(_racine("fichier"))  # « lis ~/notes/colis.txt » parle d'un fichier sans le dire
 
     def proximite(o) -> int:
         texte = normaliser(o.nom.replace("_", " ") + " " + o.description)
-        return len(mots & {_racine(m) for m in re.findall(r"[a-z0-9']+", texte)})
+        score = len(mots & {_racine(m) for m in re.findall(r"[a-z0-9']+", texte)})
+        # Le verbe de l'outil est celui de la demande (« lis » → lire_document, « ouvre » → ouvrir_url).
+        verbe = normaliser(o.nom.split("_")[0])
+        return score + (3 if re.search(r"(er|ir|re)$", verbe) and _racine(verbe) in mots else 0)
 
     # Outils désignés par leurs mots-clés (compétences, connecteurs MCP) : les plus proches de la demande
     # d'abord, et pas plus de MAX_DESIGNES (une appli peut en exposer des dizaines).
@@ -135,17 +159,25 @@ def choisir(demande: str, registre: Registre, mots_extra: dict[str, list[str]] |
                 if o.mots_cles and any(_contient(t, normaliser(m)) for m in o.mots_cles)]
     designes.sort(key=lambda o: -proximite(o))
     noms: list[str] = [o.nom for o in designes[:MAX_DESIGNES]]
-    if dans_appli:  # de quoi ouvrir l'appli, lire sa fenêtre, cliquer, écrire, valider
-        noms += [n for n in PILOTAGE if registre.get(n) is not None and n not in noms]
     # Dans les groupes retenus, les outils dont le nom et la description ressemblent le plus à la demande.
     candidats = []
     for rang, g in enumerate(choisis):
         for o in groupes[g]:
-            if o.nom in noms:
-                continue
-            candidats.append((-proximite(o), rang, o.nom))
-    noms += [n for _, _, n in sorted(candidats)]
-    noms = noms[:MAX_OUTILS - 3]
+            if o.nom not in noms:
+                candidats.append((-proximite(o), rang, o.nom))
+    candidats = list(dict.fromkeys(n for _, _, n in sorted(candidats)))
+    place = MAX_OUTILS - 3
+    if dans_appli:  # de quoi ouvrir l'appli, lire sa fenêtre, cliquer, écrire, valider
+        situation = [n for n in SITUATION if registre.get(n) is not None and n not in noms and _pilotage_utile(n, t)]
+        pilotage = situation + [n for n in PILOTAGE if n not in SITUATION and registre.get(n) is not None
+                                and n not in noms]
+        # Des places restent aux outils du domaine de la demande (« lis le fichier… puis ouvre dans Chrome… ») :
+        # sans elles, le pilotage remplissait tout et le modèle tapait « cat » dans un Terminal (vu en essai réel).
+        domaine = [n for n in candidats if n not in pilotage]
+        reserve = min(max(RESERVE_DOMAINE, place - len(noms) - len(situation) - len(PILOTAGE_MIN)), len(domaine))
+        noms += pilotage[:max(0, place - len(noms) - reserve)]
+    noms += [n for n in candidats if n not in noms]
+    noms = noms[:place]
     for g in TOUJOURS:  # toujours disponibles, en fin de liste
         noms += [o.nom for o in groupes.get(g, []) if o.nom not in noms]
     return noms[:MAX_OUTILS]

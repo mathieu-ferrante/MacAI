@@ -94,7 +94,7 @@ def _risque_ouvrir_url(args: dict) -> Risque:
     return Risque.SENSIBLE if securite.adresse_locale(str(args.get("url", ""))) else Risque.CREATION
 
 
-@outil("ouvrir_url", "Ouvre une adresse web dans Chrome (nouvel onglet).", "web",
+@outil("ouvrir_url", "Ouvre une adresse web (une page, un lien) dans Chrome, dans un nouvel onglet.", "web",
        {"url": ("string", "adresse complète, ex. https://cad.onshape.com")}, risque=_risque_ouvrir_url,
        annonce=lambda a: f"Ouvrir {a['url']}")
 def ouvrir_url(ctx, url):

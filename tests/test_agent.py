@@ -297,3 +297,17 @@ def test_relance_quand_il_pretend_ne_pas_avoir_acces(ctx):
                              Reponse(texte="Menu Fichier > Exporter.")])
     assert Orchestrateur(ctx, CommandesRapides()).traiter("dans Pages, exporte le document en PDF") == \
         "Menu Fichier > Exporter."
+
+
+def test_routeur_garde_les_outils_du_domaine_quand_on_pilote_une_appli():
+    """Vu en essai réel : « lis le fichier … puis ouvre dans Chrome … » ne proposait que le pilotage d'applis, et le
+    modèle tapait « cat » dans un Terminal."""
+    import os
+    os.environ.setdefault("MACAI_TOUS_OUTILS", "1")
+    from macai.outils.base import charger_tous
+    r = charger_tous()
+    noms = routeur.choisir("lis ~/essai/colis.txt et ouvre dans Chrome la page de suivi de mon colis", r)
+    assert {"lire_document", "ouvrir_url", "ouvrir_application"} <= set(noms)
+    noms = routeur.choisir("dans TextEdit, exporte le document en PDF", r)
+    assert {"choisir_menu", "lister_menus", "raccourci_clavier"} <= set(noms)
+    assert "demander_a_claude" in routeur.choisir("ouvre Claude et demande-lui la météo", r)
