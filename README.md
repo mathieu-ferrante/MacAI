@@ -11,7 +11,7 @@ Son « cerveau » est un modèle d'IA de 4 milliards de paramètres (`qwen3.5:4b
 Ollama. **Aucune demande, aucun fichier, aucun mail ne part dans le cloud.** Il est conçu pour un MacBook Air M2 de
 8 Go : au repos, l'ensemble occupe environ 50 Mo de mémoire.
 
-> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 442 tests automatiques, un banc de
+> **État au 25/11/2026** : installé et utilisé sur le MacBook Air (macOS 27). 448 tests automatiques, un banc de
 > 68 demandes réelles passées dans le vrai moteur avec le vrai modèle (68/68), et quatre relectures de sécurité. Ce qui reste à
 > essayer de ton côté est listé dans [A_VALIDER.md](A_VALIDER.md).
 
@@ -252,6 +252,10 @@ Ce qu'il change :
   réponse est le texte, aucun fichier n'est créé par erreur ;
 - une question « comment faire… » ne reçoit que des outils de lecture ;
 - une demande récurrente met l'outil de programmation en tête.
+
+Des modèles de décision tout faits ont été essayés à sa place : Jev lui-même n'existe qu'en ligne (interdit ici), et
+`laya` (multilingue, via Ollama) n'a trouvé la bonne intention que dans 24 à 31 % des cas sur les mêmes demandes
+françaises, contre 80 % pour ce classifieur entraîné sur des exemples de MacAI.
 
 Il n'est qu'un **aiguilleur** : il n'agit pas et ne contourne aucune confirmation. S'il hésite (confiance sous 70 %),
 ou si un fichier, une appli ou un destinataire est nommé, ses conseils ne retirent jamais d'outils. S'il est
@@ -766,7 +770,7 @@ MacAI.app (Swift, ~25 Mo)                 moteur Python (~35 Mo au repos)       
 - Code : `src/macai/` (Python 3.12, stdlib au maximum, imports paresseux), `app/` (Swift, SwiftPM),
   `installer.sh`. Structure détaillée dans [CLAUDE.md](CLAUDE.md), décisions dans [PLAN.md](PLAN.md), cahier des
   charges dans [CAHIER_DES_CHARGES.md](CAHIER_DES_CHARGES.md).
-- Tests : `.venv/bin/python -m pytest` (442 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
+- Tests : `.venv/bin/python -m pytest` (448 tests, ~10 s ; le code propre au Mac est testé avec AppleScript simulé,
   ce qui permet de développer aussi sur Windows).
 - Qualité réelle : `macai banc --scenarios` (68 demandes, vrai modèle, outils simulés ; 68/68 le 25/11, 13 s par
   demande en moyenne).

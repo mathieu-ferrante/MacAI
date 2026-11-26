@@ -177,6 +177,16 @@ Deuxième série, après `./installer.sh` du 25/11 (33 OK, 0 problème ; banc 68
 | « quitte Notes et Rappels » | ✅ « Notes n'était pas ouvert. Rappels n'était pas ouvert. » |
 | Préchargement à l'ouverture du panneau | ✅ première réponse 27,8 s → 21,2 s |
 
+Classifieur de demandes (26/11) :
+
+| Essai | Résultat sur le Mac |
+|---|---|
+| `macai classifieur` (147 demandes de test) | ✅ intention 80 %, domaine 77 %, routage qui couvre les bons outils 96 % (82 % sans), ~50 ms |
+| Banc réel avec classifieur | ✅ 68/68 ; comparaison alternée sans / avec : pas de ralentissement mesurable (les écarts viennent du swap) |
+| Modèle de décision `laya` à la place | ❌ 24-31 % d'intentions justes : non retenu, supprimé |
+| `tev1` | ⏳ téléchargement impossible depuis ce réseau (stockage Cloudflare injoignable) |
+| Ollama 0.40.3 → 0.40.18 | ✅ modèles et empreintes intacts ; 9,3 Go de vieux téléchargements et d'essais supprimés |
+
 À essayer par toi (demande tes mains) :
 
 | Essai | Attendu |

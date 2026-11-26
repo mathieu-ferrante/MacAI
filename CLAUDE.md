@@ -29,7 +29,7 @@ le Mac : [A_VALIDER.md](A_VALIDER.md).
 - `MACAI_TOUS_OUTILS=1` montre aussi les outils macOS ailleurs que sur Mac ; `MACAI_HOME` change le dossier de données.
 
 ```
-.venv\Scripts\python -m pytest            # 442 tests, ~10 s (Mac : .venv/bin/python -m pytest)
+.venv\Scripts\python -m pytest            # 448 tests, ~10 s (Mac : .venv/bin/python -m pytest)
 ```
 
 ## Structure
