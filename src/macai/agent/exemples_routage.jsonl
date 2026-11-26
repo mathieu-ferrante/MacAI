@@ -661,3 +661,9 @@
 {"texte": "écris à Léa que le film commence à 21h", "intention": "action", "domaines": ["organisation"], "jeu": "test"}
 {"texte": "écris à ChatGPT de me proposer un plan de révision", "intention": "action", "domaines": ["fenetres"], "jeu": "test"}
 {"texte": "tu peux m'ouvrir le dossier Lettres stp", "intention": "action", "domaines": ["applications"], "jeu": "test"}
+{"texte": "quoi de neuf dans ma boîte de réception", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "j'ai reçu quelque chose ?", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "des nouveaux messages dans ma boîte ?", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "y a du nouveau côté courrier", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "quelqu'un m'a écrit aujourd'hui ?", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
+{"texte": "regarde si j'ai des mails importants", "intention": "information", "domaines": ["organisation"], "jeu": "entrainement"}
